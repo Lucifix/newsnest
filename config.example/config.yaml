@@ -1,0 +1,309 @@
+# =============================================================================
+# NewsNest: main settings
+# =============================================================================
+# This file is re-read on every run; edits apply without a rebuild or restart.
+# Unknown keys are rejected (so typos show up as errors on the status panel).
+# On first start, the container copies config.example/ here if config/ is empty.
+
+# Time zone used for schedules and "today" in the digest.
+timezone: Europe/Ljubljana
+
+# Feed entries older than this many days are dropped when fetched.
+# Some feeds (e.g. Dnevnik) mix in evergreen pages from years ago.
+max_item_age_days: 3
+
+http:
+  # User-agent sent to RSS feeds. Honest and identifiable; feeds are public.
+  user_agent: "Mozilla/5.0 (compatible; NewsNest/0.1; self-hosted feed reader)"
+  # Give up on a single request after this many seconds.
+  timeout_seconds: 20
+
+schedules:
+  # How often category "news" sources are polled.
+  news_minutes: 15
+  # How often category "tech" sources are polled.
+  tech_minutes: 30
+  # How often category "world" sources are polled.
+  world_minutes: 20
+
+# -----------------------------------------------------------------------------
+# Plain RSS / Atom feeds
+# -----------------------------------------------------------------------------
+# id:        short unique name (used in the database and status panel; don't rename lightly)
+# name:      display name in the digest
+# url:       feed URL
+# category:  news | world | tech (decides the poll interval and the section; "news" is shown as Local)
+# enabled:   false to pause a feed without deleting it (optional, default true)
+# daily_cap: max items per day from this feed (optional; overrides categories.<cat>)
+# https_links: true rewrites http:// item links to https:// (optional, default false)
+# allow_http:  plain http:// feed URLs are rejected unless this is true (optional, default false)
+feeds:
+  # --- Slovenian news ---
+  # Many outlets covering the same story is what makes a story "big" (cross-source boost).
+  # No RSS found for Finance, Primorske novice, STA, Svet24.
+  - id: rtvslo
+    name: RTV SLO
+    url: https://img.rtvslo.si/feeds/00.xml
+    category: news
+  - id: 24ur
+    name: 24ur
+    url: https://www.24ur.com/rss
+    category: news
+  - id: delo
+    name: Delo
+    url: https://www.delo.si/rss
+    category: news
+  - id: dnevnik
+    name: Dnevnik
+    url: https://www.dnevnik.si/rss.xml
+    category: news
+  - id: vecer
+    name: Večer
+    url: https://vecer.com/feed/allarticles
+    category: news
+  - id: n1
+    name: N1 Slovenija
+    url: https://n1info.si/feed/
+    category: news
+  - id: siol
+    name: Siol
+    url: https://siol.net/feeds/latest
+    category: news
+  - id: zurnal24
+    name: Žurnal24
+    url: https://www.zurnal24.si/feeds/latest
+    category: news
+  - id: nova24tv
+    name: Nova24TV
+    url: https://nova24tv.si/feed/
+    category: news
+  - id: mladina
+    name: Mladina
+    url: https://www.mladina.si/media/rss/rss-fb-mladina.xml
+    category: news
+
+  # --- World news (all https, checked to return items) ---
+  - id: bbc-world
+    name: BBC World
+    url: https://feeds.bbci.co.uk/news/world/rss.xml
+    category: world
+    daily_cap: 12
+  - id: guardian-world
+    name: The Guardian
+    url: https://www.theguardian.com/world/rss
+    category: world
+    daily_cap: 12
+  - id: aljazeera
+    name: Al Jazeera
+    url: https://www.aljazeera.com/xml/rss/all.xml
+    category: world
+    daily_cap: 12
+  - id: dw
+    name: Deutsche Welle
+    url: https://rss.dw.com/rdf/rss-en-all
+    category: world
+    daily_cap: 8
+  - id: france24
+    name: France 24
+    url: https://www.france24.com/en/rss
+    category: world
+    daily_cap: 8
+  - id: npr-world
+    name: NPR World
+    url: https://feeds.npr.org/1004/rss.xml
+    category: world
+    daily_cap: 8
+
+  # --- International tech ---
+  - id: theverge
+    name: The Verge
+    url: https://www.theverge.com/rss/index.xml
+    category: tech
+  - id: arstechnica
+    name: Ars Technica
+    url: https://feeds.arstechnica.com/arstechnica/index
+    category: tech
+  - id: techcrunch
+    name: TechCrunch
+    url: https://techcrunch.com/feed/
+    category: tech
+  - id: engadget
+    name: Engadget
+    url: https://www.engadget.com/rss.xml
+    category: tech
+  # Hacker News front page, only stories with at least 150 points (change the number in the URL).
+  - id: hackernews
+    name: Hacker News
+    url: https://hnrss.org/frontpage?points=150
+    category: tech
+
+  # --- Slovenian tech (all three have their own RSS) ---
+  # The feed publishes http:// article links; slo-tech.com serves them fine over https.
+  - id: slotech
+    name: Slo-Tech
+    url: https://static.slo-tech.com/slotech.xml
+    category: tech
+    https_links: true
+  - id: racunalniske-novice
+    name: Računalniške novice
+    url: https://racunalniske-novice.com/feed/
+    category: tech
+  - id: monitor
+    name: Monitor
+    url: https://www.monitor.si/rss.php
+    category: tech
+
+# -----------------------------------------------------------------------------
+# Watches: named topics matched locally against everything collected above.
+# -----------------------------------------------------------------------------
+# A watched item is tagged with the watch name and always shown (never filtered out).
+# Keywords are case-insensitive and match at the start of a word, so use stems for
+# Slovenian: "ljubljan" matches Ljubljana, Ljubljani, ljubljanski.
+watches:
+  - name: Ljubljana
+    keywords: [ljubljan]
+  - name: Home Assistant
+    keywords: [home assistant, home-assistant]
+  - name: Homelab / self-hosting
+    keywords: [homelab, self-host, selfhost]
+
+# -----------------------------------------------------------------------------
+# GitHub release feeds for software I run (owner/repo).
+# -----------------------------------------------------------------------------
+github_releases:
+  category: tech
+  repos:
+    - home-assistant/core
+    - jellyfin/jellyfin
+  # Betas and release candidates (2026.10.0b5, v10.9.0-rc1) are skipped unless true.
+  include_prereleases: false
+
+# -----------------------------------------------------------------------------
+# Per-category settings
+# -----------------------------------------------------------------------------
+categories:
+  news:
+    # null = no cap
+    daily_cap_per_source: null
+  tech:
+    # Tech is high-volume: at most this many items per source per day reach the digest.
+    daily_cap_per_source: 15
+
+# -----------------------------------------------------------------------------
+# Scoring (used from step 3)
+# -----------------------------------------------------------------------------
+prefilter:
+  # Case-insensitive. An item whose title/snippet contains any of these is dropped before AI.
+  mute_keywords: []
+  # Always shown, whatever the score.
+  must_show_keywords: []
+
+scoring:
+  # false = show everything unscored, newest first.
+  enabled: true
+  # Claude model for the first pass and summaries.
+  model: claude-haiku-5-5
+  # How much the model thinks: low | medium | high. Higher costs more.
+  effort: low
+  # Items per scoring call.
+  batch_size: 20
+  # Every call carries a fixed prompt, so new items are collected first: scoring runs once this
+  # many are waiting, or when the oldest has waited max_wait_minutes. Refresh (↻) scores at once.
+  min_batch: 15
+  max_wait_minutes: 20
+  # final = topic*w + importance*w + personal*w (+ cross_source_bonus if 2+ sources).
+  weights:
+    topic: 0.4
+    importance: 0.3
+    personal: 0.3
+  cross_source_bonus: 1.0
+  # Items with final >= this get full-text extraction and key points (a one-line lede, 2-4 bullets,
+  # "for you" angle, and whether the full article is worth reading). Any other card has a
+  # "Get key points" button that writes them on demand (about $0.0003 per tap).
+  summary_threshold: 6.0
+  # Items with importance >= this go to "Top stories" whatever the topic.
+  top_story_importance: 8
+  # Language of the summaries.
+  summary_language: English
+  # Calibration mode: show every item with scores and reasons, hide nothing.
+  calibration_mode: true
+  # Fixed list of digest sections; Claude puts every item in exactly one ("Other" is always added).
+  categories:
+    - Ljubljana
+    - Slovenia
+    - Politics
+    - Economy
+    - World
+    - Crime & accidents
+    - Health
+    - Science
+    - Culture
+    - Sports
+    - Celebrities & lifestyle
+    - AI
+    - Software & releases
+    - Hardware & gadgets
+    - Security
+    - Tech business
+    - Gear & EDC
+    - Watches
+    - Cars & motoring
+    - Style & grooming
+    - Food & drink
+    - Design & home
+    - Travel & outdoors
+    - Other
+  # Model for the rare, quality-sensitive jobs: "Draft my profile" and the weekly interests.md proposal.
+  profile_model: claude-opus-5-5
+  # Days between automatic interests.md proposals (needs 10+ new ratings or misses). 0 = off.
+  proposal_every_days: 7
+
+feed:
+  # The home feed: unread stories from this many hours back (rolling, not the calendar day).
+  window_hours: 36
+  # Freshness halves every this many hours...
+  half_life_hours: 24
+  # ...but never below this share of the score, so a strong story from yesterday beats a weak fresh one.
+  freshness_floor: 0.5
+  # A story shown this many times without being opened drops out (top stories only sink).
+  seen_drop_after: 3
+  # About one card in this many is "Exploring": the best story from a category the feed rarely shows,
+  # even below digest.min_final, so 👍 can widen your interests (0 turns it off).
+  explore_every: 8
+  # ...but never one scored below this (advertorials, clickbait).
+  explore_min_final: 3.0
+  # A source you add gets its best few stories in for this many days, marked "New source", whatever they score.
+  new_source_days: 14
+  new_source_stories: 2
+  # Mark a story read once it has been on screen and you scroll past it (Settings → General).
+  auto_read_on_scroll: false
+
+discovery:
+  # Discovered sources: feeds on trial from OPML imports or the starter pack (Settings → Discovered sources).
+  enabled: true
+  # Candidates are polled this often (gentler than regular feeds).
+  poll_minutes: 90
+  # A discovered story reaches the feed only at or above this score (top stories always do).
+  min_final: 6.0
+  # At most this many stories per discovered source per day.
+  daily_cap_per_source: 4
+  # Score at most this many items per discovered source per 24 h (newest first); the rest are never
+  # shown anyway. Busy trial feeds publish 100+ a day. Watched items are always scored. 0 = no limit.
+  scored_per_source: 12
+  # Suggest making a candidate a regular source after this many opens or likes of its stories in a week.
+  promote_after: 3
+  # Retire a candidate that produced nothing above min_final within this many days.
+  retire_after_days: 21
+
+digest:
+  # Outside calibration mode, items with a final score below this are hidden.
+  # Watched and must-show items are never hidden. The Calibration page helps pick it.
+  min_final: 5.0
+
+budget:
+  # Hard daily cap on Claude API spend in USD. When reached, AI calls stop and items show unscored.
+  daily_usd: 0.50
+
+heartbeat:
+  # Alert if a news/tech feed returns 0 items for this many hours.
+  news_empty_hours: 3

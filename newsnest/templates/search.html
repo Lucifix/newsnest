@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{% if q %}{{ q }} · {% endif %}Search · NewsNest{% endblock %}
+{% block content %}
+<div class="feedwrap">
+<div class="pagehead">
+  <h1>Search</h1>
+</div>
+<form class="searchpage-form" action="/search" role="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search stories" aria-label="Search stories" autocomplete="off" enterkeyhint="search">
+  {% if everything %}<input type="hidden" name="all" value="1">{% endif %}
+  <button class="button" type="submit">Search</button>
+</form>
+{% include "_search_results.html" %}
+<p><a href="/">← Back to the feed</a></p>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+{% endblock %}

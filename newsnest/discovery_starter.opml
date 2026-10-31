@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>NewsNest starter pack</title></head>
+  <!-- Checked 2026-10-22: https, live, posting within 2 weeks, no podcasts or video. -->
+  <body>
+    <outline text="World, science and business">
+      <outline type="rss" text="CNBC International" title="CNBC International" xmlUrl="https://www.cnbc.com/id/100727362/device/rss/rss.html" category="world"/>
+      <outline type="rss" text="Fortune" title="Fortune" xmlUrl="https://fortune.com/feed" category="world"/>
+      <outline type="rss" text="Guardian Environment" title="Guardian Environment" xmlUrl="https://www.theguardian.com/us/environment/rss" category="world"/>
+      <outline type="rss" text="Guardian Space" title="Guardian Space" xmlUrl="https://www.theguardian.com/science/space/rss" category="world"/>
+      <outline type="rss" text="Guardian World" title="Guardian World" xmlUrl="https://www.theguardian.com/world/rss" category="world"/>
+      <outline type="rss" text="NASA" title="NASA" xmlUrl="https://www.nasa.gov/rss/dyn/breaking_news.rss" category="world"/>
+      <outline type="rss" text="Nature" title="Nature" xmlUrl="https://www.nature.com/nature.rss" category="world"/>
+      <outline type="rss" text="NYT Climate" title="NYT Climate" xmlUrl="https://rss.nytimes.com/services/xml/rss/nyt/Climate.xml" category="world"/>
+      <outline type="rss" text="NYT Science" title="NYT Science" xmlUrl="https://rss.nytimes.com/services/xml/rss/nyt/Science.xml" category="world"/>
+      <outline type="rss" text="NYT World" title="NYT World" xmlUrl="https://rss.nytimes.com/services/xml/rss/nyt/World.xml" category="world"/>
+      <outline type="rss" text="Phys.org" title="Phys.org" xmlUrl="https://phys.org/rss-feed/" category="world"/>
+      <outline type="rss" text="Popular Science" title="Popular Science" xmlUrl="https://www.popsci.com/arcio/rss/" category="world"/>
+      <outline type="rss" text="ScienceDaily" title="ScienceDaily" xmlUrl="https://www.sciencedaily.com/rss/all.xml" category="world"/>
+      <outline type="rss" text="Space.com" title="Space.com" xmlUrl="https://www.space.com/feeds/all" category="world"/>
+      <outline type="rss" text="The Conversation: Environment" title="The Conversation: Environment" xmlUrl="https://theconversation.com/au/environment/articles.atom" category="world"/>
+    </outline>
+    <outline text="Tech, security and self-hosting">
+      <outline type="rss" text="9to5Mac" title="9to5Mac" xmlUrl="https://9to5mac.com/feed" category="tech"/>
+      <outline type="rss" text="Android Authority" title="Android Authority" xmlUrl="https://www.androidauthority.com/feed" category="tech"/>
+      <outline type="rss" text="BleepingComputer" title="BleepingComputer" xmlUrl="https://www.bleepingcomputer.com/feed/" category="tech"/>
+      <outline type="rss" text="Cyber security news" title="Cyber security news" xmlUrl="https://www.zdnet.com/topic/security/rss.xml" category="tech"/>
+      <outline type="rss" text="GitHub Blog" title="GitHub Blog" xmlUrl="https://github.blog/feed/" category="tech"/>
+      <outline type="rss" text="Gizmodo" title="Gizmodo" xmlUrl="https://gizmodo.com/rss" category="tech"/>
+      <outline type="rss" text="Google Blog" title="Google Blog" xmlUrl="https://www.blog.google/rss/" category="tech"/>
+      <outline type="rss" text="GSMArena" title="GSMArena" xmlUrl="https://www.gsmarena.com/rss-news-reviews.php3" category="tech"/>
+      <outline type="rss" text="Hackaday" title="Hackaday" xmlUrl="https://hackaday.com/blog/feed/" category="tech"/>
+      <outline type="rss" text="Home Assistant blog" title="Home Assistant blog" xmlUrl="https://www.home-assistant.io/atom.xml" category="tech"/>
+      <outline type="rss" text="How-To Geek" title="How-To Geek" xmlUrl="https://www.howtogeek.com/feed/" category="tech"/>
+      <outline type="rss" text="InfoQ" title="InfoQ" xmlUrl="https://feed.infoq.com" category="tech"/>
+      <outline type="rss" text="Jeff Geerling" title="Jeff Geerling" xmlUrl="https://www.jeffgeerling.com/blog.xml" category="tech"/>
+      <outline type="rss" text="Krebs on Security" title="Krebs on Security" xmlUrl="https://krebsonsecurity.com/feed/" category="tech"/>
+      <outline type="rss" text="Lifehacker" title="Lifehacker" xmlUrl="https://lifehacker.com/rss" category="tech"/>
+      <outline type="rss" text="LWN.net" title="LWN.net" xmlUrl="https://lwn.net/headlines/rss" category="tech"/>
+      <outline type="rss" text="MacRumors" title="MacRumors" xmlUrl="https://feeds.macrumors.com/MacRumors-All" category="tech"/>
+      <outline type="rss" text="Macworld" title="Macworld" xmlUrl="https://www.macworld.com/index.rss" category="tech"/>
+      <outline type="rss" text="MakeUseOf" title="MakeUseOf" xmlUrl="https://www.makeuseof.com/feed/" category="tech"/>
+      <outline type="rss" text="NYT Technology" title="NYT Technology" xmlUrl="https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml" category="tech"/>
+      <outline type="rss" text="Phoronix" title="Phoronix" xmlUrl="https://www.phoronix.com/rss.php" category="tech"/>
+      <outline type="rss" text="r/selfhosted (top today)" title="r/selfhosted (top today)" xmlUrl="https://www.reddit.com/r/selfhosted/top/.rss?t=day" category="tech"/>
+      <outline type="rss" text="selfh.st" title="selfh.st" xmlUrl="https://selfh.st/rss/" category="tech"/>
+      <outline type="rss" text="The Hacker News" title="The Hacker News" xmlUrl="https://feeds.feedburner.com/TheHackersNews" category="tech"/>
+      <outline type="rss" text="The Next Web" title="The Next Web" xmlUrl="https://thenextweb.com/feed/" category="tech"/>
+      <outline type="rss" text="The Register" title="The Register" xmlUrl="https://www.theregister.com/headlines.rss" category="tech"/>
+      <outline type="rss" text="XDA" title="XDA" xmlUrl="https://www.xda-developers.com/feed/" category="tech"/>
+    </outline>
+  </body>
+</opml>

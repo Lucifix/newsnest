@@ -1,0 +1,48 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, fold, expand, feed_row, section_options with context %}
+{% block stitle %}Feeds{% endblock %}
+{% block sintro %}<p class="sub">Local is for Slovenian outlets. International news goes to World; gear, style and the good life to Lifestyle.</p>{% endblock %}
+{% block page %}
+{% if request.query_params.get('moved') %}<p class="callout ok">“{{ request.query_params.get('moved') }}” isn't in Slovenian, so it was added to World. Switch it below if that's wrong.</p>{% endif %}
+{% if foreign %}<p class="callout warn">{{ foreign|length }} {{ 'feed' if foreign|length == 1 else 'feeds' }} under Local {{ 'isn\'t' if foreign|length == 1 else 'aren\'t' }} in Slovenian. <a href="#feed-{{ foreign|sort|first }}">Show {{ 'it' if foreign|length == 1 else 'them' }}</a></p>{% endif %}
+{% if request.query_params.get('pack') is not none %}
+{% set added, pmoved = request.query_params.get('pack')|int, request.query_params.get('packmoved')|int %}
+<p class="callout ok">Added {{ added }} feed{{ 's' if added != 1 }} to Lifestyle{% if pmoved %} and moved {{ pmoved }} you already had{% endif %}.
+  {% if request.query_params.get('interest') == '1' %}Your interests now include men's lifestyle and gear.{% endif %}
+  The first stories arrive within half an hour.</p>
+{% endif %}
+
+{% call group() %}
+  {% call expand('Add a feed…') %}
+  <form method="post" action="/settings/feed_add" class="sform">
+    <label>Name <input name="name" required placeholder="Primorske novice"></label>
+    <label>Feed URL (https) <input name="url" type="url" required placeholder="https://…/rss"></label>
+    <label>Section <select name="category">{{ section_options('world') }}</select></label>
+    <button class="button" type="submit">Add feed</button>
+  </form>
+  {% endcall %}
+{% endcall %}
+
+{% for key in section_labels %}
+{% set feeds = cfg.feeds|selectattr('category', 'equalto', key)|list %}
+{% set offer = key == 'lifestyle' and lifestyle_missing %}
+{% if feeds or offer %}
+{# open when something in it needs a look: a flagged feed, or the one just changed (the redirect's #feed-id is handled by app.js) #}
+{% set attention = feeds|selectattr('id', 'in', foreign)|list or (feeds|selectattr('id', 'equalto', request.query_params.get('changed'))|list) %}
+{% call fold(section_labels[key], feeds|length, id='section-' ~ key, open=attention or offer and not feeds or request.query_params.get('pack') is not none and key == 'lifestyle') %}
+  {% if offer %}
+  {% call expand('Lifestyle &amp; gear pack'|safe, lifestyle_missing|length ~ ' popular feeds, checked this month') %}
+  <form method="post" action="/settings/pack/lifestyle" class="sform">
+    <p class="muted small">Gear, watches, cars, style and design: {{ lifestyle_missing|map(attribute='name')|list|join(', ') }}. Busy sites are capped so none floods the section.</p>
+    {% if not lifestyle_interest %}<label class="check"><input type="checkbox" name="interest" value="1" checked>
+      Add men's lifestyle &amp; gear to my interests, so these stories rank as wanted</label>{% endif %}
+    <button class="button" type="submit">Add {{ lifestyle_missing|length }} feeds</button>
+  </form>
+  {% endcall %}
+  {% endif %}
+  {% for f in feeds if f.id in foreign %}{{ feed_row(f, flagged=true) }}{% endfor %}
+  {% for f in feeds if f.id not in foreign %}{{ feed_row(f) }}{% endfor %}
+{% endcall %}
+{% endif %}
+{% endfor %}
+{% endblock %}

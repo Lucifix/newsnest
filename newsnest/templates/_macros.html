@@ -1,0 +1,335 @@
+{% macro rate_buttons(item_id, rating) %}
+<form class="rate" method="post" action="/api/items/{{ item_id }}/rate">
+  <button type="submit" name="value" value="{{ 0 if rating == 1 else 1 }}" class="act up" aria-pressed="{{ 'true' if rating == 1 else 'false' }}" aria-label="More like this" title="More like this">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v9H4v-9h3Zm2 9h8.2a2 2 0 0 0 2-1.6l1.2-6A2 2 0 0 0 18.4 10H14l.8-3.8A1.8 1.8 0 0 0 13 4l-4 6v10Z"/></svg>
+  </button>
+  <button type="submit" name="value" value="{{ 0 if rating == -1 else -1 }}" class="act down" aria-pressed="{{ 'true' if rating == -1 else 'false' }}" aria-label="Less like this" title="Less like this">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 13V4h3v9h-3Zm-2-9H6.8a2 2 0 0 0-2 1.6l-1.2 6A2 2 0 0 0 5.6 14H10l-.8 3.8A1.8 1.8 0 0 0 11 20l4-6V4Z"/></svg>
+  </button>
+</form>
+{% endmacro %}
+
+{% macro read_button(c) %}
+<form class="readform" method="post" action="/api/read">
+  <input type="hidden" name="ids" value="{{ c.ids }}">
+  <button type="submit" name="value" value="{{ 0 if c.read else 1 }}" class="act readtoggle" aria-pressed="{{ 'true' if c.read else 'false' }}"
+          aria-label="{{ 'Mark as unread' if c.read else 'Mark as read' }}" title="{{ 'Mark as unread' if c.read else 'Mark as read' }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+  </button>
+</form>
+{% endmacro %}
+
+{% macro save_button(c) %}
+<button type="button" class="act savetoggle" data-ids="{{ c.ids }}" aria-pressed="{{ 'true' if c.saved else 'false' }}"
+        aria-label="{{ 'Remove from saved' if c.saved else 'Save for later' }}" title="{{ 'Remove from saved' if c.saved else 'Save for later' }}">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"/></svg>
+</button>
+{% endmacro %}
+
+{# Compact story card for the Saved, Read and search lists; the action buttons come from {% call %} #}
+{% macro list_card(c, when, snippet=true, dim_read=true, pill=none) %}
+<article class="card story{% if dim_read and c.read %} read{% endif %}" data-ids="{{ c.ids }}" data-read="{{ 1 if c.read else 0 }}">
+  <div class="card-text">
+    <div class="meta">{{ badge(c.lead.source_name, c.logo) }}<span class="src">{{ c.lead.source_name }}</span>
+      <span class="sep" aria-hidden="true">·</span><span>{{ when }}</span>{% if pill %}<span class="pill">{{ pill }}</span>{% endif %}</div>
+    <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ c.lead.row.title }}</a></h3>
+    {% if snippet and c.lead.row.snippet %}<p class="snippet clamp-2">{{ c.lead.row.snippet }}</p>{% endif %}
+  </div>
+  <div class="foot"><div class="why"></div><div class="acts">{{ caller() }}</div></div>
+</article>
+{% endmacro %}
+
+{% macro badge(name, logo=none) %}
+{% if logo %}<img class="badge logo" src="{{ logo }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+{% else %}<span class="badge h{{ hue(name) }}" aria-hidden="true">{{ initials(name) }}</span>{% endif %}
+{% endmacro %}
+
+{% macro ring(final) %}
+{% if final is not none %}
+<span class="ring{% if final >= 7 %} high{% endif %}" style="--p: {{ [100, (final * 10)|round|int]|min }}" title="Score {{ '%.1f'|format(final) }} of 10">
+  <b>{{ '%.1f'|format(final) }}</b>
+</span>
+{% endif %}
+{% endmacro %}
+
+{% macro meta(c, kicker=none) %}
+<div class="meta">
+  {{ badge(c.lead.source_name, c.logo) }}
+  <span class="src">{{ c.lead.source_name }}</span>
+  <span class="sep" aria-hidden="true">·</span>
+  <time datetime="{{ c.lead.row.published or c.lead.row.fetched_at }}" title="{{ localtime(c.lead.row.published or c.lead.row.fetched_at, '%d.%m. %H:%M') }}">{{ ago(c.lead.row.published or c.lead.row.fetched_at) }}</time>
+  {% if kicker %}<span class="kicker">{{ kicker }}</span>{% endif %}
+  {% if c.unseen %}<span class="pill new">New</span>{% endif %}
+  <span class="pill readmark">Read</span>
+</div>
+{% endmacro %}
+
+{# The card's text: key points when summarized, else the feed snippet plus a button that writes them #}
+{% macro body_text(c, lines=3, open=false) %}
+{% set r = c.lead.row %}
+{% set sm = c.summary_member %}
+<div class="bodytext">
+{% if sm %}
+{{ summary_body(sm.row, lines, open) }}
+{% else %}
+{% if r.snippet %}<p class="snippet clamp-{{ lines }}">{{ r.snippet }}</p>{% endif %}
+{% if c.can_summarize %}{{ summarize_button(c.lead.id, lines, r.summary_status == 'error') }}{% endif %}
+{% endif %}
+</div>
+{% endmacro %}
+
+{% macro summarize_button(item_id, lines, retry=false) %}
+<div class="sumform">
+  <button type="button" class="sumbtn" data-summarize="{{ item_id }}" data-lines="{{ lines }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.9 8.6 19 10.5l-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9L12 3.5Z"/><path d="M19 16v4M17 18h4"/></svg>
+    <span>{{ 'Try key points again' if retry else 'Get key points' }}</span>
+  </button>
+</div>
+{% endmacro %}
+
+{# row: the summarized item. Older summaries (before key points) are a prose paragraph. #}
+{% macro summary_body(row, lines=3, open=false) %}
+{% set points = key_points(row) %}
+{% if points is none %}
+<p class="summary clamp-{{ lines }}">{{ row.summary }}</p>
+{% if row.summary_source == 'snippet' %}<p class="note">Summary from the feed snippet only</p>{% endif %}
+{% else %}
+<p class="summary lede">{{ row.summary }}</p>
+<details class="tldr"{% if open %} open{% endif %}>
+  <summary>
+    <span class="tldr-label">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><circle cx="5" cy="6" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="18" r="1.3"/></svg>
+      Key points{% if points %} <b>{{ points|length }}</b>{% endif %}
+    </span>
+    <span class="whycaret" aria-hidden="true"></span>
+    {% if row.summary_depth == 'full' %}<span class="depth">Worth a full read{% if row.summary_depth_tag %} · {{ row.summary_depth_tag }}{% endif %}</span>{% endif %}
+  </summary>
+  <div class="tldr-body">
+    {% if row.summary_why %}<p class="tldr-why"><span class="tag">For you</span>{{ row.summary_why }}</p>{% endif %}
+    {% if points %}<ul class="points">{% for p in points %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+    <p class="tldr-foot">
+      {% if row.summary_source == 'snippet' %}<span class="verdict warn">Only the feed snippet was readable</span>
+      {% elif row.summary_depth == 'full' %}<span class="verdict full">The article has more{% if row.summary_depth_tag %}: {{ row.summary_depth_tag }}{% endif %}</span>
+      {% elif row.summary_depth == 'enough' %}<span class="verdict ok">That's the whole story</span>{% endif %}
+      <a href="/go/{{ row.id }}" target="_blank" rel="noopener" class="openlink{% if row.summary_depth == 'full' %} strong{% endif %}">{{ 'Read the article' if row.summary_depth == 'full' else 'Open article' }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+    </p>
+  </div>
+</details>
+{% endif %}
+{% endmacro %}
+
+{% macro foot(c, calibration) %}
+{% set r = c.lead.row %}
+<div class="foot">
+  {{ ring(c.final) }}
+  <div class="why">
+    {% for w in c.watches %}<span class="pill watch">{{ w }}</span>{% endfor %}
+    {% if r.reason %}<span class="reason{% if not calibration %} clamp-1{% endif %}" title="{{ r.reason }}">{{ r.reason }}</span>
+    {% elif r.score_status in ('error', 'refused') %}<span class="reason">Not scored ({{ r.score_status }})</span>{% endif %}
+    {% if calibration and r.topic is not none %}<span class="subs">topic {{ r.topic }} · importance {{ r.importance }} · personal {{ r.personal }}</span>{% endif %}
+  </div>
+  <div class="acts">{{ save_button(c) }}{{ read_button(c) }}{{ rate_buttons(c.lead.id, r.rating) }}</div>
+</div>
+{% if c.others %}
+<details class="coverage">
+  <summary>
+    <span class="stack">{% for m in c.others[:4] %}{{ badge(m.source_name) }}{% endfor %}</span>
+    Also covered by {{ c.others|length }} {{ 'outlet' if c.others|length == 1 else 'outlets' }}
+  </summary>
+  <ul>
+    {% for m in c.others %}<li>{{ badge(m.source_name) }}<a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong> {{ m.row.title }}</a></li>{% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endmacro %}
+
+{% macro card_attrs(c, extra_class='') %}class="story {{ extra_class }}{% if c.unseen %} unseen{% endif %}{% if c.read %} read{% endif %}" id="item-{{ c.lead.id }}" data-ids="{{ c.ids }}" data-read="{{ 1 if c.read else 0 }}"{% endmacro %}
+
+{% macro card(c, calibration) %}
+{% set r = c.lead.row %}
+<article {{ card_attrs(c, 'card' ~ (' has-img' if c.image else '')) }}>
+  <div class="card-text">
+    {{ meta(c) }}
+    <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h3>
+    {{ body_text(c, 3) }}
+  </div>
+  {% if c.image %}
+  <a class="thumb-img" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+    <img src="{{ c.image }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+  </a>
+  {% endif %}
+  {{ foot(c, calibration) }}
+</article>
+{% endmacro %}
+
+{% macro hero(c, calibration) %}
+{% set r = c.lead.row %}
+<article {{ card_attrs(c, 'hero h' ~ hue(c.lead.source_name)) }}>
+  <a class="hero-media" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+    {% if c.image %}<img src="{{ c.image }}" alt="" decoding="async" referrerpolicy="no-referrer">{% endif %}
+    <span class="hero-mono">{{ initials(c.lead.source_name) }}</span>
+  </a>
+  <div class="hero-body">
+    {{ meta(c, 'Top story') }}
+    <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h3>
+    {{ body_text(c, 4, open=true) }}
+    {{ foot(c, calibration) }}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro more_menu(it) %}
+{% set c = it.card %}{% set r = c.lead.row %}
+<button type="button" class="act kebab-btn" aria-label="More options" title="More options" aria-haspopup="dialog"
+        data-lead="{{ c.lead.id }}" data-ids="{{ c.ids }}" data-src="{{ r.source_id }}" data-srcname="{{ c.lead.source_name }}"
+        data-cat="{{ it.category if it.category != 'Unscored' else '' }}" data-rating="{{ r.rating or 0 }}">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+</button>
+{% endmacro %}
+
+{% macro feed_foot(it, calibration) %}
+{% set c = it.card %}{% set r = c.lead.row %}
+<div class="slimfoot">
+  <details class="whybox">
+    <summary>
+      {% if c.final is not none %}<span class="scorechip{% if c.final >= 7 %} high{% endif %}" title="Score of 10">{{ '%.1f'|format(c.final) }}</span>{% endif %}
+      {% if c.final is none %}<span class="reasonline">Not scored yet</span>{% endif %}
+      {% if r.reason or r.topic is not none %}<span class="whycaret" aria-hidden="true"></span>{% endif %}
+    </summary>
+    <div class="whyfull">
+      {% if r.reason %}<p>{{ r.reason }}</p>{% endif %}
+      <p class="subs">{% if r.topic is not none %}Topic {{ r.topic }} · importance {{ r.importance }} · personal {{ r.personal }} · {% endif %}rank {{ it.rank }}{% if r.event %} · event {{ r.event }}{% endif %}</p>
+    </div>
+  </details>
+  <div class="acts slim">
+    <button type="button" class="act like" data-lead="{{ c.lead.id }}" aria-pressed="{{ 'true' if r.rating == 1 else 'false' }}"
+            aria-label="More like this" title="More like this">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v9H4v-9h3Zm2 9h8.2a2 2 0 0 0 2-1.6l1.2-6A2 2 0 0 0 18.4 10H14l.8-3.8A1.8 1.8 0 0 0 13 4l-4 6v10Z"/></svg>
+    </button>
+    <button type="button" class="act dislike" data-ids="{{ c.ids }}" aria-label="Not interested" title="Not interested">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 13V4h3v9h-3Zm-2-9H6.8a2 2 0 0 0-2 1.6l-1.2 6A2 2 0 0 0 5.6 14H10l-.8 3.8A1.8 1.8 0 0 0 11 20l4-6V4Z"/></svg>
+    </button>
+    {{ save_button(c) }}{{ read_button(c) }}{{ more_menu(it) }}
+  </div>
+</div>
+{% if c.others %}
+<details class="coverage">
+  <summary>
+    <span class="stack">{% for name in c.other_outlets[:4] %}{{ badge(name) }}{% endfor %}</span>
+    <span>Full coverage · {{ c.articles }} articles from {{ c.outlets }} outlets</span>
+  </summary>
+  <ul class="timeline">
+    {% for m in c.timeline %}
+    <li>{{ badge(m.source_name) }}
+      <a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong> {{ m.row.title }}</a>
+      <time class="muted" datetime="{{ m.row.published or m.row.fetched_at }}">{{ ago(m.row.published or m.row.fetched_at) }}</time></li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endmacro %}
+
+{# An Updated story was read already: instead of the old summary, the newest outlet's headline #}
+{% macro whats_new(it) %}
+{% set m = it.updated[-1] %}
+<p class="whatsnew clamp-2"><span class="src">{{ m.source_name }}</span> <time datetime="{{ m.row.published or m.row.fetched_at }}">{{ ago(m.row.published or m.row.fetched_at) }}</time> {{ m.row.title }}</p>
+{% endmacro %}
+
+{% macro feed_meta(it) %}
+{% set c = it.card %}
+<div class="meta">
+  {{ badge(c.lead.source_name, c.logo) }}
+  <span class="src">{{ c.lead.source_name }}</span>
+  <span class="sep" aria-hidden="true">·</span>
+  <time datetime="{{ c.lead.row.published or c.lead.row.fetched_at }}" title="{{ localtime(c.lead.row.published or c.lead.row.fetched_at, '%d.%m. %H:%M') }}">{{ ago(c.lead.row.published or c.lead.row.fetched_at) }}</time>
+  {% if it.top %}<span class="kicker">Top story</span>{% endif %}
+  {% if it.discovered %}<span class="pill discovered" title="From a source on trial; it becomes a regular source if you like its stories">Discovered</span>{% endif %}
+  {% if it.extra == 'new source' %}<span class="pill discovered" title="From a source you added recently; shown even when it scores low, so 👍/👎 can decide whether it stays">New source</span>
+  {% elif it.extra == 'exploring' %}<span class="pill exploring" title="Outside your usual topics; 👍 it and the weekly profile update can add it to your interests">Exploring</span>{% endif %}
+  {% if it.updated %}<span class="pill updated" title="Read before; joined since: {{ it.updated|map(attribute='source_name')|join(', ') }}">Updated</span>{% elif c.unseen %}<span class="pill new">New</span>{% endif %}
+  {% for w in c.watches %}<span class="pill watch">{{ w }}</span>{% endfor %}
+  <span class="pill readmark">Read</span>
+</div>
+{% endmacro %}
+
+{% macro feed_card(it, calibration) %}
+{% set c = it.card %}{% set r = c.lead.row %}
+{% if it.big %}
+<article {{ card_attrs(c, 'fcard big h' ~ hue(c.lead.source_name)) }}>
+  <a class="big-media" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+    <img src="{{ c.image }}" alt="" decoding="async" referrerpolicy="no-referrer" loading="{{ 'eager' if it.first else 'lazy' }}">
+    <span class="hero-mono">{{ initials(c.lead.source_name) }}</span>
+  </a>
+  <div class="big-body">
+    {{ feed_meta(it) }}
+    <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h3>
+    {{ body_text(c, 3, open=it.first and it.top) }}
+    {{ feed_foot(it, calibration) }}
+  </div>
+</article>
+{% else %}
+<article {{ card_attrs(c, 'card fcard' ~ (' has-img' if c.image else '')) }}>
+  <div class="card-text">
+    {{ feed_meta(it) }}
+    <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h3>
+    {% if it.updated %}{{ whats_new(it) }}{% else %}{{ body_text(c, 2, open=it.first and it.top) }}{% endif %}
+  </div>
+  {% if c.image %}
+  <a class="thumb-img" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+    <img src="{{ c.image }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+  </a>
+  {% endif %}
+  {{ feed_foot(it, calibration) }}
+</article>
+{% endif %}
+{% endmacro %}
+
+{% macro mark_all(feed, token) %}
+<form class="readall" method="post" action="/api/read">
+  <input type="hidden" name="token" value="{{ token }}">
+  <button class="linkbutton" type="submit" name="value" value="1">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 12.5 4 4L15 8.5M10 15l1.5 1.5L21 7"/></svg>Mark all read
+  </button>
+</form>
+{% endmacro %}
+
+{% macro section_list(sections, calibration) %}
+{% for s in sections %}
+<section class="group">
+  <h3 class="sec c{{ cat_hue(s.title) }}"><span class="sec-mark" aria-hidden="true"></span>{{ s.title }} <span class="count">{{ s.cards|length }}</span></h3>
+  <div class="cards">
+    {% for c in s.cards %}{{ card(c, calibration) }}{% endfor %}
+  </div>
+  {% if s.hidden_low or s.hidden_cap %}
+  <p class="hidden-note">
+    {% if s.hidden_low %}{{ s.hidden_low }} more below your score threshold.{% endif %}
+    {% if s.hidden_cap %}{{ s.hidden_cap }} more over a source's daily cap.{% endif %}
+  </p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endmacro %}
+
+{% macro banner_box(banner) %}
+{% if banner %}
+{# data-banner identifies this exact set of problems: ✕ hides it until the problems change (see app.js) #}
+<div class="banner" role="alert" data-banner="{{ banner|join(' | ') }}">
+  <svg class="banner-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3Zm0 6v6m0 3v.5" /></svg>
+  <div>
+    <strong>Something needs attention</strong>
+    <ul>{% for b in banner %}<li>{{ b }}</li>{% endfor %}</ul>
+    <a class="banner-link" href="/status">Open status</a>
+  </div>
+  <button type="button" class="banner-close" aria-label="Dismiss for now" title="Dismiss for now">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro logo_mark() %}
+<svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+  <path class="logo-arc" d="M8.8 13.6A9.6 9.6 0 0 1 18.4 23.2"/>
+  <path class="logo-arc" d="M8.8 6.4A16.8 16.8 0 0 1 25.6 23.2"/>
+  <circle class="logo-dot" cx="8.8" cy="23.2" r="4.2"/>
+</svg>
+{% endmacro %}

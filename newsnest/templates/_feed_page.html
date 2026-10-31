@@ -1,0 +1,18 @@
+{% from "_macros.html" import feed_card, mark_all with context %}
+{% for it in page %}{{ feed_card(it, feed.calibration) }}{% endfor %}
+{% if next_offset %}
+<a class="loadmore" href="/?n={{ next_offset + 20 }}" data-fragment="/feed/more?token={{ token }}&amp;offset={{ next_offset }}&amp;f={{ feed.active|urlencode }}">
+  Show more stories
+</a>
+{% else %}
+<div class="caughtup">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/></svg>
+  <h2>{% if feed.items %}That's everything{% else %}You're all caught up{% endif %}</h2>
+  <p>
+    {% if feed.read_count %}<a href="/read">Read in the last {{ cfg.feed.window_hours|int }} h ({{ feed.read_count }})</a>{% endif %}
+    {% if feed.dropped %}<span class="muted"> · {{ feed.dropped }} skipped, low-scoring or over a source's cap</span>{% endif %}
+  </p>
+  {% if feed.items %}{{ mark_all(feed, token) }}{% endif %}
+  <p><a href="/archive">Browse earlier days</a></p>
+</div>
+{% endif %}

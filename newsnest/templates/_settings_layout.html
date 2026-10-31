@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_settings_ui.html" import group, link_row %}
+{% block title %}{{ self.stitle() }} · NewsNest{% endblock %}
+{% block content %}
+{% set saved_msgs = {'general': 'Saved', 'feed_add': 'Feed added', 'feed_remove': 'Feed removed', 'feed_toggle': 'Saved',
+  'feed_section': 'Section changed', 'watch_add': 'Watch added', 'watch_remove': 'Watch removed', 'keywords': 'Filters saved',
+  'repo_add': 'Repository added', 'repo_remove': 'Repository removed', 'discovery': 'Saved', 'applied': 'Changes applied', 'threshold': 'Limit changed', 'calibration_toggle': 'Saved'} %}
+<div class="settings{% if root %} is-root{% endif %}"{% if saved and not error %} data-toast="{{ saved_msgs.get(saved, 'Saved') }}"{% endif %}>
+  {# The menu: the whole screen at /settings on a phone, a sidebar on wider screens #}
+  <nav class="snav" aria-label="Settings">
+    <h1 class="snav-title">Settings</h1>
+    {% if cfg %}
+    {% call group(icons=true) %}
+      {{ link_row('/settings/general', 'General', icon='general', current=page == 'general') }}
+    {% endcall %}
+    {% call group('Sources', icons=true) %}
+      {{ link_row('/settings/feeds', 'Feeds', icon='feeds', value=nav.feeds, current=page == 'feeds') }}
+      {{ link_row('/settings/discover', 'Discover', icon='discover', value=(nav.trial ~ ' on trial') if nav.trial else none,
+                  dot=nav.earned > 0, current=page == 'discover') }}
+      {{ link_row('/settings/topics', 'Topics & filters', icon='topics', value=nav.watches or none, current=page == 'topics') }}
+    {% endcall %}
+    {% call group('Advanced', icons=true) %}
+      {{ link_row('/settings/more', 'More sources', icon='more', current=page == 'more') }}
+      {{ link_row('/calibration', 'Calibration', icon='calibration', current=page == 'calibration') }}
+      {{ link_row('/status', 'Status', icon='status', value=(banner|length ~ (' problem' if banner|length == 1 else ' problems')) if banner else none,
+                  current=page == 'status') }}
+    {% endcall %}
+    {% call group('You', icons=true) %}
+      {{ link_row('/profile', 'Profile & tuning', icon='profile', current=page == 'profile') }}
+      {{ link_row('/settings/app', 'Install, backup & log out', icon='app', current=page == 'app') }}
+    {% endcall %}
+    {% endif %}
+  </nav>
+
+  <div class="spage">
+    {% block back %}<a class="sback" href="/settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>Settings</a>{% endblock %}
+    <div class="pagehead">
+      <h1>{% block stitle %}{% endblock %}</h1>
+      {% block sintro %}{% endblock %}
+    </div>
+    {% if error %}<p class="callout error" role="alert">{{ error_prefix|default('Not saved: ') }}{{ error }}</p>{% endif %}
+    {% if not cfg and require_cfg|default(true) %}
+    <p class="callout error">config.yaml is invalid, so it can't be edited here. Fix it on the server; the errors are on the status panel.</p>
+    {% else %}
+    {% block page %}{% endblock %}
+    {% endif %}
+  </div>
+</div>
+{# The ⋯ menu of a row: app.js fills it from the row's <template> #}
+<div class="sheet-backdrop" id="rowbackdrop" hidden></div>
+<div class="sheet" id="rowmenu" role="dialog" aria-modal="true" aria-label="Actions" hidden>
+  <p class="sheet-title"></p>
+  <div data-items></div>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import list_card, read_button with context %}
+{% block title %}Read · NewsNest{% endblock %}
+{% block content %}
+<div class="feedwrap">
+<div class="pagehead">
+  <h1>Read</h1>
+  <p class="sub">Stories you opened or marked read in the last {{ cfg.feed.window_hours|int }} hours. Uncheck one to put it back in the feed.</p>
+</div>
+<div class="stream">
+{% for c, at in stories %}
+{% call list_card(c, "read " ~ ago(at), snippet=false) %}{{ read_button(c) }}{% endcall %}
+{% else %}
+<p class="empty">Nothing read yet in this window.</p>
+{% endfor %}
+</div>
+<p><a href="/">← Back to the feed</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, fold, expand, action_row, avatar, menu, menu_item, section_options with context %}
+{% block stitle %}Discover{% endblock %}
+{% block sintro %}<p class="sub">Feeds on trial show only their best stories ({{ cfg.discovery.min_final }}+, at most {{ cfg.discovery.daily_cap_per_source }} a day each).</p>{% endblock %}
+{% block page %}
+{% set live = candidates|selectattr('status', 'equalto', 'candidate')|sort(attribute='title')|sort(attribute='signals', reverse=true)|list %}
+{% set checking = candidates|selectattr('status', 'equalto', 'checking')|list %}
+{% set others = candidates|rejectattr('status', 'in', ['candidate', 'checking'])|list %}
+{% set need = cfg.discovery.promote_after %}
+{% set status_text = {'dismissed': 'Removed', 'retired': 'Retired', 'promoted': 'Now a regular source', 'rejected': 'Failed the check'} %}
+{% if request.query_params.get('added') is not none %}<p class="callout ok">{{ request.query_params.get('added') }} feeds added; checking them in the background (refresh in a minute).</p>{% endif %}
+
+{% if suggestions %}
+{% call group('Earned a place', footnote='You opened or liked their stories a lot this week.') %}
+  {% for sgg in suggestions %}
+  <div class="srow">
+    {{ avatar(sgg.title) }}
+    <span class="srow-main"><span class="srow-title">{{ sgg.title }}</span><span class="srow-sub">{{ sgg.signals }} stories opened or liked this week</span></span>
+    <span class="srow-end"><form method="post" action="/discovery/{{ sgg.source_id }}/promote" class="srow-form"><button class="button small" type="submit">Keep</button></form></span>
+  </div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
+
+{% if live or checking %}
+{% call group('On trial · ' ~ live|length, footnote='Open or like ' ~ need ~ ' of a source\'s stories in a week and it is suggested as a regular source. Nothing good in ' ~ cfg.discovery.retire_after_days ~ ' days and it is retired.' ~ ((' Checking ' ~ checking|length ~ ' more feeds…') if checking else '')) %}
+  {% for c in live %}
+  <div class="srow">
+    {{ avatar(c.title) }}
+    <span class="srow-main"><span class="srow-title">{{ c.title }}</span>
+      <span class="srow-sub">{{ section_labels.get(c.category, c.category) }}{% if c.check.per_day %} · ~{{ c.check.per_day }}/day{% endif %} · {{ c["items"] }} {{ 'story' if c["items"] == 1 else 'stories' }}</span></span>
+    <span class="srow-end">
+      <span class="srow-value{% if c.signals %} progress{% endif %}" title="Stories opened or liked this week, of {{ need }} needed">{{ c.signals }} of {{ need }}</span>
+      {% call menu(c.title) %}
+        {{ menu_item('/discovery/' ~ c.source_id ~ '/promote', 'Keep as a regular source', 'check') }}
+        {{ menu_item('/discovery/' ~ c.source_id ~ '/remove', 'Remove', 'trash', danger=true) }}
+      {% endcall %}
+    </span>
+  </div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
+
+{% call group('Add sources') %}
+  {% if starter_missing %}
+  {{ action_row('/discovery/starter', ('Add ' ~ starter_missing|length ~ ' new starter feed' ~ ('s' if starter_missing|length != 1 else '')) if starter_missing|length < starter_total else ('Add the starter pack (' ~ starter_total ~ ' feeds)'),
+                'World, science, business, tech, security and self-hosting') }}
+  {% else %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Starter pack added ✓</span><span class="srow-sub">All {{ starter_total }} feeds are on trial or regular sources</span></span></div>
+  {% endif %}
+  {% call expand('Import OPML…', 'From a link or a file') %}
+  <form method="post" action="/discovery/import" enctype="multipart/form-data" class="sform">
+    <label>OPML link <input name="url" type="url" placeholder="https://…/feeds.opml"></label>
+    <label>…or a file <input name="file" type="file" accept=".opml,.xml,text/xml"></label>
+    <label>Section when the file doesn't say <select name="category">{{ section_options('world') }}</select></label>
+    <button class="button" type="submit">Import</button>
+  </form>
+  {% endcall %}
+{% endcall %}
+
+{% if others %}
+{% call fold('Not on trial', others|length) %}
+  {% for c in others %}
+  <div class="srow">
+    <span class="srow-main"><span class="srow-title">{{ c.title }}</span>
+      <span class="srow-sub">{{ status_text.get(c.status, c.status) }}{% if c.check.reason and c.check.reason != 'ok' %}: {{ c.check.reason }}{% endif %}</span></span>
+    {% if c.status in ('dismissed', 'retired') %}
+    <span class="srow-end"><form method="post" action="/discovery/{{ c.source_id }}/restore" class="srow-form"><button class="button small secondary" type="submit">Try again</button></form></span>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
+{% endblock %}

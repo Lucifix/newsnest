@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import ring with context %}
+{% block title %}Missed this · NewsNest{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>Missed this</h1>
+  <p class="sub">Found something elsewhere that NewsNest should have shown you? Paste the link. It is logged as a miss,
+    scored against your profile to show why it was missed, and used in the weekly <code>interests.md</code> proposal.</p>
+</div>
+<section class="panel">
+  <form method="post" action="/missed" class="inline">
+    <label for="url">Article link</label>
+    <input id="url" name="url" type="url" required placeholder="https://…" inputmode="url">
+    <button class="button" type="submit">Check</button>
+  </form>
+</section>
+
+{% for m in misses %}
+<article class="card">
+  <div class="card-text">
+  <div class="meta"><span class="muted">{{ localtime(m.at, '%d.%m. %H:%M') }}</span>
+    </div>
+  <h3><a href="{{ m.url }}" target="_blank" rel="noopener">{{ m.title or m.url }}</a></h3>
+  <p><strong>{{ m.db_status }}</strong></p>
+  </div>
+  <div class="foot">{{ ring(m.final) }}<div class="why">
+  {% if m.reason %}<p class="reason">Scored now: {{ m.reason }}{% if m.topic is not none %} <span class="subs">topic {{ m.topic }} · importance {{ m.importance }} · personal {{ m.personal }}</span>{% endif %}</p>{% endif %}
+  {% if m.error %}<p class="reason">{{ m.error }}</p>{% endif %}
+  </div></div>
+</article>
+{% endfor %}
+{% endblock %}

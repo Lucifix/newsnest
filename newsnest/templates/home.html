@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_macros.html" import feed_card, mark_all, banner_box with context %}
+{% block title %}For you · NewsNest{% endblock %}
+{% block body_class %}feedpage{% endblock %}
+{% block banner %}{% endblock %}
+{% block content %}
+{% set live_sources = status.sources|rejectattr('health.level', 'equalto', 'disabled')|list %}
+{% set ok_sources = live_sources|rejectattr('health.level', 'equalto', 'failing')|list %}
+{% set hour = now_local.hour %}
+<div class="feedwrap">
+{{ banner_box(banner) }}
+<header class="masthead">
+  <p class="dateline">{{ now_local.strftime('%A, %d %B') }}</p>
+  <h1>{{ 'Good morning' if hour < 12 else 'Good afternoon' if hour < 18 else 'Good evening' }}</h1>
+  <div class="mastrow">
+    <p class="counters">
+      <span class="{{ 'hot' if feed.unseen }}"><b>{{ feed.unseen }}</b> new</span>
+      {% if ok_sources|length < live_sources|length %}
+      <a href="/status" class="bad"><b>{{ ok_sources|length }}/{{ live_sources|length }}</b> sources</a>
+      {% endif %}
+    </p>
+    {% if feed.items %}{{ mark_all(feed, token) }}{% endif %}
+  </div>
+</header>
+
+{% if feed.subchips %}
+{# One row: the parts of this tab (All, or All / Local / World on News), then its categories. The four
+   you read most show; the rest (except the selected one) fold behind More. #}
+{% set extra = feed.subchips|selectattr('fold')|list|length %}
+<nav class="cats" aria-label="Categories">
+  {% for chip in feed.subchips %}
+  {% set classes = (['scope'] if chip.scope else ['c' ~ cat_hue(chip.label)]) + (['extra'] if chip.fold else []) %}
+  <a class="{{ classes|join(' ') }}" href="/?f={{ chip.key|urlencode }}" {% if chip.key == feed.active %}aria-current="true"{% endif %}>
+    {% if not chip.scope %}<i class="dot" aria-hidden="true"></i>{% endif %}{{ chip.label }} <span>{{ chip.count if chip.count < 100 else '99+' }}</span></a>
+  {% endfor %}
+  {% if extra %}<button type="button" class="cats-more" aria-expanded="false" data-count="{{ extra }}" hidden>More <span>{{ extra }}</span></button>{% endif %}
+</nav>
+{% endif %}
+
+{% if not feed.profile %}
+<div class="callout invite">
+  <div>
+    <h2>Teach NewsNest what you care about</h2>
+    <p>Rate about 30 headlines and Claude drafts your interest profile. Until then the feed is ordered by freshness only.</p>
+  </div>
+  <a class="button" href="/profile">Set up my profile</a>
+</div>
+{% endif %}
+
+{% if suggestion %}
+<div class="callout suggest">
+  <p><strong>{{ suggestion.title }}</strong> earned a place: you opened or liked {{ suggestion.signals }} of its stories this week.</p>
+  <form method="post" action="/discovery/{{ suggestion.source_id }}/promote"><button class="button small" type="submit">Make it a regular source</button></form>
+  <a class="button small secondary" href="/settings#discovery">Review</a>
+</div>
+{% endif %}
+
+<div class="stream" data-track-seen id="stream">
+  {% include "_feed_page.html" %}
+</div>
+</div>
+
+<div class="sheet-backdrop" hidden></div>
+<div class="sheet" id="cardmenu" role="dialog" aria-modal="true" aria-label="Story options" hidden>
+  <p class="sheet-title" data-fill="srcname"></p>
+  <button type="button" class="pop-item" data-action="less_source">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg><span>Less from <b data-fill="srcname"></b></span></button>
+  <button type="button" class="pop-item" data-action="less_category" data-needs-cat>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg><span>Less about <b data-fill="cat"></b></span></button>
+  <button type="button" class="pop-item" data-action="more_category" data-needs-cat>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>More about <b data-fill="cat"></b></span></button>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+{% endblock %}

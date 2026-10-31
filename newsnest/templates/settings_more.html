@@ -1,0 +1,19 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, expand, remove_btn with context %}
+{% block stitle %}More sources{% endblock %}
+{% block page %}
+{% call group('GitHub releases', footnote='New releases of these projects show up as stories.') %}
+  {% for repo in cfg.github_releases.repos %}
+  <div class="srow">
+    <span class="srow-main"><span class="srow-title">{{ repo }}</span></span>
+    <span class="srow-end">{{ remove_btn('/settings/repo_remove', {'repo': repo}, 'Remove ' ~ repo) }}</span>
+  </div>
+  {% endfor %}
+  {% call expand('Add a repository…') %}
+  <form method="post" action="/settings/repo_add" class="sform">
+    <label>Repository (owner/name) <input name="repo" required pattern="[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+" placeholder="immich-app/immich"></label>
+    <button class="button" type="submit">Add repository</button>
+  </form>
+  {% endcall %}
+{% endcall %}
+{% endblock %}

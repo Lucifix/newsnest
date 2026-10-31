@@ -1,0 +1,180 @@
+{# Settings building blocks, iOS Settings style: a group is a rounded list of rows with a small header above
+   and an optional footnote below. A row is [icon] [title + subtitle] [value or control]; the control never wraps. #}
+
+{% macro group(title=none, footnote=none, id=none, icons=false) %}
+<section class="sgroup"{% if id %} id="{{ id }}"{% endif %}>
+  {% if title %}<h2 class="sgroup-title">{{ title }}</h2>{% endif %}
+  <div class="slist{% if icons %} has-icons{% endif %}">{{ caller() }}</div>
+  {% if footnote %}<p class="sgroup-foot">{{ footnote }}</p>{% endif %}
+</section>
+{% endmacro %}
+
+{% macro chevron() %}<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>{% endmacro %}
+
+{# Coloured icon tile in front of a menu row #}
+{% macro tile(key) %}
+<span class="stile tile-{{ key }}" aria-hidden="true"><svg viewBox="0 0 24 24">
+{% if key == 'general' %}<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>
+{% elif key == 'feeds' %}<path d="M5 11a8 8 0 0 1 8 8M5 5a14 14 0 0 1 14 14"/><circle cx="6" cy="18" r="1.4"/>
+{% elif key == 'discover' %}<circle cx="12" cy="12" r="8.5"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>
+{% elif key == 'topics' %}<path d="M4 6h16l-6 7v5l-4 2v-7z"/>
+{% elif key == 'more' %}<path d="M8 12h.01M12 12h.01M16 12h.01"/><rect x="3.5" y="5.5" width="17" height="13" rx="3"/>
+{% elif key == 'status' %}<path d="M3 12h4l3-8 4 16 3-8h4"/>
+{% elif key == 'calibration' %}<path d="M5 20V11M11 20V5M17 20v-6M3 20h18"/>
+{% elif key == 'app' %}<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>
+{% elif key == 'profile' %}<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.6 3.8-5.5 7-5.5s5.8 1.9 7 5.5"/>
+{% endif %}</svg></span>
+{% endmacro %}
+
+{# A row that opens another page: title, optional gray value, chevron #}
+{% macro link_row(href, title, icon=none, value=none, dot=false, current=false) %}
+<a class="srow" href="{{ href }}"{% if current %} aria-current="page"{% endif %}>
+  {% if icon %}{{ tile(icon) }}{% endif %}
+  <span class="srow-main"><span class="srow-title">{{ title }}</span></span>
+  <span class="srow-end">{% if dot %}<span class="sdot" aria-label="needs a look"></span>{% endif %}{% if value is not none %}<span class="srow-value">{{ value }}</span>{% endif %}{{ chevron() }}</span>
+</a>
+{% endmacro %}
+
+{# On/off switch; the form around it saves on change #}
+{% macro toggle_row(name, title, sub=none, checked=false) %}
+<label class="srow">
+  <span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
+  <span class="srow-end"><input class="switch" type="checkbox" role="switch" name="{{ name }}" {% if checked %}checked{% endif %}></span>
+</label>
+{% endmacro %}
+
+{# A short value typed in place, right-aligned like iOS (a number with an optional unit, or a word) #}
+{% macro input_row(name, title, value, sub=none, type='text', unit=none, step=none, min=none, max=none, width='5.5em') %}
+<label class="srow">
+  <span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
+  <span class="srow-end">{% if unit %}<span class="srow-unit">{{ unit }}</span>{% endif %}<input class="sinput" style="width: {{ width }}" type="{{ type }}" name="{{ name }}" value="{{ value }}" required
+    {% if type == 'number' %}inputmode="decimal"{% endif %}{% if step %} step="{{ step }}"{% endif %}{% if min is not none %} min="{{ min }}"{% endif %}{% if max is not none %} max="{{ max }}"{% endif %}></span>
+</label>
+{% endmacro %}
+
+{% macro section_options(selected, hint=true) %}
+{% for key in section_labels %}<option value="{{ key }}" {% if key == selected %}selected{% endif %}>{{ section_labels[key] }}{% if hint and key == 'news' %} (Slovenian outlets){% endif %}</option>{% endfor %}
+{% endmacro %}
+
+{# ---------- rows with actions (need the page context: `initials`, `section_labels`) ---------- #}
+
+{# Letter badge in front of a feed or source #}
+{% macro avatar(name) %}<span class="savatar" aria-hidden="true">{{ initials(name) }}</span>{% endmacro %}
+
+{# A group that folds away: header with a count, rows inside. `id` is the anchor the settings redirects point at. #}
+{% macro fold(title, count, id=none, open=false, icons=false) %}
+<details class="sgroup sfold"{% if id %} id="{{ id }}"{% endif %}{% if open %} open{% endif %}>
+  <summary class="sgroup-title"><span>{{ title }}</span><span class="count">{{ count }}</span>
+    <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+  <div class="slist{% if icons %} has-icons{% endif %}">{{ caller() }}</div>
+</details>
+{% endmacro %}
+
+{# "Add a feed…": a row that opens its form in place #}
+{% macro expand(title, sub=none, open=false) %}
+<details class="srow-expand"{% if open %} open{% endif %}>
+  <summary class="srow"><span class="srow-main"><span class="srow-title srow-accent">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
+    <svg class="chev expand-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+  <div class="sbody">{{ caller() }}</div>
+</details>
+{% endmacro %}
+
+{# A row that is a button: submits a POST. kind: '' | 'danger' | 'accent' #}
+{% macro action_row(action, title, sub=none, fields={}, kind='accent', confirm=none) %}
+<form method="post" action="{{ action }}" class="srow-form"{% if confirm %} data-confirm="{{ confirm }}"{% endif %}>
+  {% for k, v in fields.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <button type="submit" class="srow sact sact-{{ kind }}"><span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span></button>
+</form>
+{% endmacro %}
+
+{# Small trash button at the end of a row #}
+{% macro remove_btn(action, fields, label, confirm=none) %}
+<form method="post" action="{{ action }}" class="srow-form"{% if confirm %} data-confirm="{{ confirm }}"{% endif %}>
+  {% for k, v in fields.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <button class="iconbtn danger" type="submit" aria-label="{{ label }}" title="{{ label }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+</form>
+{% endmacro %}
+
+{# ⋯ button; the caller supplies menu_item()s, which open in a sheet (bottom on phones, popover on desktop) #}
+{% macro menu(title) %}
+<button type="button" class="iconbtn rowmenu-btn" aria-label="Actions for {{ title }}" aria-haspopup="dialog" aria-expanded="false"
+        data-title="{{ title }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+<template>{{ caller() }}</template>
+{% endmacro %}
+
+{% macro menu_item(action, label, icon, fields={}, danger=false, confirm=none) %}
+<form method="post" action="{{ action }}"{% if confirm %} data-confirm="{{ confirm }}"{% endif %}>
+  {% for k, v in fields.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <button type="submit" class="pop-item{% if danger %} danger{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true">
+  {% if icon == 'pause' %}<path d="M9 5v14M15 5v14"/>{% elif icon == 'play' %}<path d="M8 5l11 7-11 7z"/>
+  {% elif icon == 'check' %}<path d="m5 12.5 4.5 4.5L19 7.5"/>{% elif icon == 'undo' %}<path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/>
+  {% else %}<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>{% endif %}</svg><span>{{ label }}</span></button>
+</form>
+{% endmacro %}
+
+{# The current value as gray text with a ⌄; a transparent native <select> on top does the choosing.
+   The form around it needs data-autosubmit. #}
+{% macro value_select(name, label, selected, options) %}
+<span class="vselect"><span class="vselect-text">{{ options[selected] }}</span>
+  <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+  <select name="{{ name }}" aria-label="{{ label }}">{% for key, text in options.items() %}<option value="{{ key }}" {% if key == selected %}selected{% endif %}>{{ text }}</option>{% endfor %}</select></span>
+{% endmacro %}
+
+{# One feed: badge, name, host, its section as a value-select, and a ⋯ menu #}
+{% macro feed_row(f, flagged=false) %}
+{% set name = f.name or f.id %}
+{% set moved = request.query_params.get('changed') == f.id %}
+<div class="srow feed-row{% if not f.enabled %} paused{% endif %}{% if flagged %} flagged{% endif %}" id="feed-{{ f.id }}">
+  {{ avatar(name) }}
+  <span class="srow-main">
+    <span class="srow-title">{{ name }}</span>
+    {% if flagged %}<span class="srow-sub warn">Not in Slovenian. Move it to World or Tech</span>
+    {% elif moved %}<span class="srow-sub ok">Moved{% if request.query_params.get('n') %} · {{ request.query_params.get('n') }} stories{% endif %}</span>
+    {% else %}<span class="srow-sub" title="{{ f.url }}">{{ host(f.url) }}{% if not f.enabled %} · paused{% endif %}{% if f.daily_cap %} · max {{ f.daily_cap }}/day{% endif %}</span>{% endif %}
+  </span>
+  <span class="srow-end">
+    <form method="post" action="/settings/feed_section" data-autosubmit class="srow-form"><input type="hidden" name="id" value="{{ f.id }}">
+      {{ value_select('category', 'Section of ' ~ name, f.category, section_labels) }}
+      <noscript><button class="button small secondary" type="submit">Save</button></noscript></form>
+    {% call menu(name) %}
+      {{ menu_item('/settings/feed_toggle', 'Pause' if f.enabled else 'Resume', 'pause' if f.enabled else 'play', {'id': f.id}) }}
+      {{ menu_item('/settings/feed_remove', 'Remove', 'trash', {'id': f.id}, danger=true, confirm='Remove ' ~ name ~ '?') }}
+    {% endcall %}
+  </span>
+</div>
+{% endmacro %}
+
+{# ---------- profile: how the feed is tuned ---------- #}
+
+{# Three dots: how far a source or topic is pushed up or down. The exact factor is only a tooltip. #}
+{% macro strength(direction, level, weight) %}
+<span class="strength {{ direction }}" role="img" title="×{{ '%.2f'|format(weight) }}"
+      aria-label="{{ ['a tiny bit', 'a little', 'clearly', 'as much as it goes'][level] }} {{ direction }}">{% for i in range(3) %}<i{% if i < level %} class="on"{% endif %}></i>{% endfor %}</span>
+{% endmacro %}
+
+{# An outlet or a topic NewsNest has learned to show more or less of, with a way back to normal #}
+{% macro tuning_row(r, direction) %}
+<div class="srow">
+  {% if r.outlet %}{{ avatar(r.name) }}{% else %}<span class="savatar topic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12.5V5h7.5L20 13.5 13.5 20 4 12.5Z"/><circle cx="8.5" cy="9" r="1.2"/></svg></span>{% endif %}
+  <span class="srow-main"><span class="srow-title">{{ r.name }}</span><span class="srow-sub">{{ 'Outlet' if r.outlet else 'Topic' }}</span></span>
+  <span class="srow-end">
+    {{ strength(direction, r.level, r.weight) }}
+    <form method="post" action="/api/weights/reset" class="srow-form"><input type="hidden" name="kind" value="{{ r.kind }}"><input type="hidden" name="key" value="{{ r.key }}">
+      <button class="iconbtn" type="submit" aria-label="Back to normal: {{ r.name }}" title="Back to normal">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5"/></svg></button></form>
+  </span>
+</div>
+{% endmacro %}
+
+{# Rows past the first `shown` fold behind "Show N more" #}
+{% macro tuning_rows(rows, direction, shown=10) %}
+{% for r in rows[:shown] %}{{ tuning_row(r, direction) }}{% endfor %}
+{% if rows|length > shown %}
+<details class="srow-more">
+  <summary class="srow"><span class="srow-main"><span class="srow-title srow-accent">Show {{ rows|length - shown }} more</span></span>
+    <svg class="chev expand-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+  {% for r in rows[shown:] %}{{ tuning_row(r, direction) }}{% endfor %}
+</details>
+{% endif %}
+{% endmacro %}

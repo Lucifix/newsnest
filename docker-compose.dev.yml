@@ -1,0 +1,14 @@
+# Dev copy in ~/newsnest: own project name, port and folders.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+name: newsnest-dev
+
+services:
+  newsnest:
+    image: newsnest:dev
+    container_name: newsnest-dev
+    ports: !override
+      - "${NEWSNEST_DEV_PORT:-3096}:8080"
+    volumes: !override
+      - ./config:/config
+      - ./data:/data

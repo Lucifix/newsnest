@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Archive · NewsNest{% endblock %}
+{% block content %}
+<div class="pagehead"><h1>Archive</h1></div>
+<section class="panel">
+  <ul class="days">
+  {% for d, n in days %}
+    <li><a href="{{ '/' if d == today else '/day/' ~ d.isoformat() }}">{{ d.strftime('%a %d.%m.%Y') }}</a> <span class="muted">{{ n }} items</span></li>
+  {% endfor %}
+  {% if not days %}<li class="empty">Nothing stored yet.</li>{% endif %}
+  </ul>
+</section>
+{% endblock %}

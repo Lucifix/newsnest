@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_macros.html" import list_card, save_button with context %}
+{% block title %}Saved · NewsNest{% endblock %}
+{% block content %}
+<div class="feedwrap">
+<div class="pagehead">
+  <h1>Saved</h1>
+  <p class="sub">Stories you saved for later. They stay here until you remove them.</p>
+</div>
+<div class="stream" data-saved-list>
+{% for c, at in stories %}
+{% call list_card(c, "saved " ~ ago(at), dim_read=false) %}{{ save_button(c) }}{% endcall %}
+{% else %}
+<p class="empty">Nothing saved yet. Tap the bookmark on a story to keep it here.</p>
+{% endfor %}
+</div>
+<p><a href="/">← Back to the feed</a></p>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+{% endblock %}

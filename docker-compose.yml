@@ -1,0 +1,42 @@
+# NewsNest: production stack (Portainer: Stacks -> Add stack -> Repository, branch main).
+# The image is built on your own server from the Dockerfile. Secrets are set as environment variables
+# in the Portainer stack, never committed. Dev uses docker-compose.dev.yml on top of this file.
+
+name: newsnest
+
+services:
+  newsnest:
+    build: .
+    # Built locally from the Dockerfile; never pulled (there is no registry image)
+    image: newsnest:local
+    pull_policy: build
+    container_name: newsnest
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - TZ=${TZ:-Europe/Ljubljana}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Login password for the web UI. Without it the app refuses all access.
+      - NEWSNEST_PASSWORD=${NEWSNEST_PASSWORD:-${RADAR_PASSWORD:-}}
+    ports:
+      - "${NEWSNEST_PORT:-${RADAR_PORT:-3095}}:8080"
+    volumes:
+      # config.yaml + profile files; seeded from config.example/ on first start if empty
+      - ${NEWSNEST_CONFIG_PATH:-${RADAR_CONFIG_PATH:-/opt/newsnest/config}}:/config
+      # SQLite database
+      - ${NEWSNEST_DATA_PATH:-${RADAR_DATA_PATH:-/opt/newsnest/data}}:/data
+
+# ============================================================================
+# DEPLOYMENT NOTES:
+# ============================================================================
+#
+# Before the first deploy, create the folders owned by PUID:PGID (Docker would create them as root):
+#   sudo mkdir -p /opt/newsnest/config /opt/newsnest/data
+#   sudo chown -R 1000:1000 /opt/newsnest
+#
+# Stack environment variables in Portainer: NEWSNEST_PASSWORD (required: no password, no access),
+# ANTHROPIC_API_KEY, optionally TZ, PUID, PGID.
+# The RADAR_* names used before the rename (RADAR_PASSWORD, RADAR_PORT, RADAR_CONFIG_PATH, RADAR_DATA_PATH)
+# are still read when the NEWSNEST_* one is not set.
+#
+# LAN-only: http://<server IP>:3095. Never expose it through Nginx Proxy Manager without authentication.

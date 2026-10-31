@@ -1,0 +1,80 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, expand with context %}
+{% block back %}<a class="sback" href="/profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>Profile</a>{% endblock %}
+{% block stitle %}{{ 'Your profile draft' if p.kind == 'draft' else 'Suggested changes' }}{% endblock %}
+{% block sintro %}<p class="sub">{{ localtime(p.created_at, '%d.%m.%Y %H:%M') }}{% if basis %} · {{ basis }}{% endif %}{% if p.status != 'pending' %} · {{ p.status }}{% endif %}</p>{% endblock %}
+
+{% macro change_text(c) %}
+{% if c.op == 'reword' %}{% for kind, text in word_diff(c.old, c.new) %}{% if kind == 'same' %}{{ text }} {% elif kind == 'del' %}<del>{{ text }}</del> {% else %}<ins>{{ text }}</ins> {% endif %}{% endfor %}
+{% else %}{{ c.new if c.op == 'add' else c.old }}{% endif %}
+{% endmacro %}
+
+{% macro editor(label, button) %}
+<form method="post" action="/profile/save/interests.md" class="sform">
+  <input type="hidden" name="proposal_id" value="{{ p.id }}">
+  <label class="sr-only" for="proposed">Proposed interests.md</label>
+  <textarea id="proposed" name="text" rows="16" spellcheck="false">{{ p.proposed_text }}</textarea>
+  <button class="button" type="submit">{{ button }}</button>
+</form>
+{% endmacro %}
+
+{% block page %}
+{% if p.rationale %}
+{% call group('Why') %}<div class="srow"><span class="srow-main"><span class="srow-title wrap">{{ p.rationale }}</span></span></div>{% endcall %}
+{% endif %}
+
+{% if p.kind == 'weekly' and items is not none %}
+{# one row per change; every change is ticked, untick what you don't want #}
+{% if p.status == 'pending' and items %}
+<form method="post" action="/profile/proposals/{{ p.id }}/apply">
+  {% call group(items|length ~ (' change' if items|length == 1 else ' changes'), footnote='Untick what you don\'t want. Everything else in your interests stays exactly as it is.') %}
+    {% for c in items %}
+    <label class="srow change">
+      <span class="optag {{ c.op }}">{{ {'add': 'Add', 'remove': 'Remove', 'reword': 'Reword'}[c.op] }}</span>
+      <span class="srow-main"><span class="srow-title wrap">{{ change_text(c) }}</span>
+        <span class="srow-sub wrap">{{ 'Want' if c.section == 'want' else 'Skip' }} · {{ c.reason }}</span></span>
+      <span class="srow-end"><input class="switch" type="checkbox" role="switch" name="accept" value="{{ loop.index0 }}" checked aria-label="Apply this change"></span>
+    </label>
+    {% endfor %}
+  {% endcall %}
+  <div class="actions-row"><button class="button" type="submit">Apply the ticked changes</button></div>
+</form>
+<form method="post" action="/profile/proposals/{{ p.id }}/reject" class="actions-row"><button class="button secondary" type="submit">Dismiss</button></form>
+{% call group() %}
+  {% call expand('Edit the result as text instead', 'All changes applied, then yours to adjust') %}{{ editor('', 'Save as my interests') }}{% endcall %}
+{% endcall %}
+{% elif p.status == 'pending' %}
+{% call group() %}<div class="srow"><span class="srow-main"><span class="srow-title">No changes suggested</span></span></div>{% endcall %}
+{% else %}
+{% call group(items|length ~ ' changes') %}
+  {% for c in items %}
+  <div class="srow change"><span class="optag {{ c.op }}">{{ c.op|capitalize }}</span>
+    <span class="srow-main"><span class="srow-title wrap">{{ change_text(c) }}</span><span class="srow-sub wrap">{{ 'Want' if c.section == 'want' else 'Skip' }} · {{ c.reason }}</span></span></div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
+
+{% elif p.kind == 'weekly' %}
+{# made before changes were listed one by one: only the bullets that differ, not a line diff #}
+{% call group('What differs') %}
+  {% for section, text in gone.removed %}<div class="srow change"><span class="optag remove">Remove</span><span class="srow-main"><span class="srow-title wrap">{{ text }}</span><span class="srow-sub">{{ 'Want' if section == 'want' else 'Skip' }}</span></span></div>{% endfor %}
+  {% for section, text in gone.added %}<div class="srow change"><span class="optag add">Add</span><span class="srow-main"><span class="srow-title wrap">{{ text }}</span><span class="srow-sub">{{ 'Want' if section == 'want' else 'Skip' }}</span></span></div>{% endfor %}
+  {% if not gone.removed and not gone.added %}<div class="srow"><span class="srow-main"><span class="srow-title">No changes proposed</span></span></div>{% endif %}
+{% endcall %}
+{% if p.status == 'pending' %}
+{% call group('Approve, editing first if you like', footnote='This older suggestion rewrites the whole file, so it is all or nothing.') %}
+  {{ editor('', 'Approve') }}
+  <form method="post" action="/profile/proposals/{{ p.id }}/reject" class="sbody-plain"><button class="button secondary" type="submit">Reject</button></form>
+{% endcall %}
+{% endif %}
+
+{% else %}
+{# the first draft from your ratings #}
+{% if p.status == 'pending' %}
+{% call group('Edit, then save as your interests') %}
+  {{ editor('', 'Save as my profile') }}
+  <form method="post" action="/profile/proposals/{{ p.id }}/reject" class="sbody-plain"><button class="button secondary" type="submit">Reject</button></form>
+{% endcall %}
+{% endif %}
+{% endif %}
+{% endblock %}

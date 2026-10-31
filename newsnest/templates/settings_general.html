@@ -1,0 +1,24 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, toggle_row, input_row %}
+{% block stitle %}General{% endblock %}
+{% block page %}
+{# Every control saves as soon as it changes; without JS the Save button below does it #}
+<form method="post" action="/settings/general" data-autosave>
+  {% call group('Reading') %}
+    {{ toggle_row('auto_read_on_scroll', 'Mark read when I scroll past', checked=cfg.feed.auto_read_on_scroll) }}
+    {{ toggle_row('calibration_mode', 'Calibration mode', 'Show every story with its score', cfg.scoring.calibration_mode) }}
+  {% endcall %}
+
+  {% call group('Scoring', footnote='Scores run from 0 to 11. Stories below the limit stay out of your feed.') %}
+    {{ input_row('min_final', 'Hide stories below', cfg.digest.min_final, type='number', step=0.5, min=0, max=11, width='4.5em') }}
+    {{ input_row('summary_language', 'Summary language', cfg.scoring.summary_language, width='8.5em') }}
+  {% endcall %}
+
+  {% call group('AI', footnote='Spent today: $%.2f. When the budget runs out, new stories show unscored until tomorrow.'|format(spent)) %}
+    {{ input_row('daily_usd', 'Daily budget', '%.2f'|format(cfg.budget.daily_usd), type='number', unit='$', step=0.05, min=0, width='5em') }}
+  {% endcall %}
+
+  <noscript><button class="button" type="submit">Save</button></noscript>
+</form>
+<p class="sgroup-foot spage-foot">Settings are saved to <code>config.yaml</code> (the previous version is kept as a backup) and apply on the next run.</p>
+{% endblock %}

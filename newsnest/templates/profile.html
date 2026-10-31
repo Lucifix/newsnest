@@ -1,0 +1,73 @@
+{% extends "_settings_layout.html" %}
+{% from "_macros.html" import rate_buttons with context %}
+{% from "_settings_ui.html" import group, fold, expand, link_row, action_row, tuning_row, tuning_rows with context %}
+{% block stitle %}Profile &amp; tuning{% endblock %}
+{% block sintro %}<p class="sub">What NewsNest knows about you: your interests, and which outlets and topics it shows more or less of.</p>{% endblock %}
+{% block page %}
+{% if request.query_params.get('skipped', '0')|int(0) %}<p class="callout warn">{{ request.query_params.get('skipped') }} of the changes no longer fit your interests and were skipped.</p>{% endif %}
+{% if onboarding %}
+{% call group('Get started: rate some headlines', footnote='Mark what you\'d want to see (👍) and what you\'d skip (👎). Aim for about 30, at least 10. Then Claude (' ~ (cfg.scoring.profile_model if cfg else '') ~ ') writes a first interests.md for you to edit.') %}
+  {% for it in items %}
+  <div class="srow">
+    <span class="srow-main"><span class="srow-title wrap">{{ it.title }}</span><span class="srow-sub">{{ it.publisher or it.source_id }}</span></span>
+    <span class="srow-end">{{ rate_buttons(it.id, it.rating) }}</span>
+  </div>
+  {% endfor %}
+  {% if not items %}<div class="srow"><span class="srow-main"><span class="srow-title">No headlines yet</span>
+    <span class="srow-sub">Check the <a href="/status">status panel</a>, or wait for the first run.</span></span></div>{% endif %}
+  <div class="srow"><span class="srow-main"><span class="srow-title"><strong id="rated-count">{{ rated }}</strong> rated so far</span></span></div>
+  <form method="post" action="/profile/draft" class="sbody-plain">
+    <button class="button" type="submit" id="draft-button" {% if rated < 10 %}disabled{% endif %}>Draft my profile</button>
+    <span class="muted small">Or write it yourself below.</span>
+  </form>
+{% endcall %}
+{% endif %}
+
+{% if proposals %}
+{% call group('Waiting for you') %}
+  {% for p in proposals %}
+  {{ link_row('/profile/proposals/' ~ p.id, 'Profile draft' if p.kind == 'draft' else 'Suggested changes' ~ (' · ' ~ p.count if p.count else ''), value=localtime(p.created_at, '%d.%m. %H:%M')) }}
+  {% endfor %}
+{% endcall %}
+{% endif %}
+
+{% macro editor(name, title, sub, rows) %}
+{% call expand(title, sub) %}
+<form method="post" action="/profile/save/{{ name }}" class="sform">
+  <label class="sr-only" for="f-{{ name }}">{{ name }}</label>
+  <textarea id="f-{{ name }}" name="text" rows="{{ rows }}" spellcheck="false">{{ files[name] }}</textarea>
+  <button class="button" type="submit">Save</button>
+</form>
+{% endcall %}
+{% endmacro %}
+
+{% call group('Your interests', footnote='Claude reads this on every scoring call; changes apply from the next run. Text inside HTML comments is ignored.') %}
+  {{ editor('interests.md', 'Interests', 'What you care about and what to skip', 14) }}
+{% endcall %}
+
+<section class="sgroup" id="tuning">
+  <h2 class="sgroup-title tuning-title">How your feed is tuned</h2>
+  <p class="sgroup-foot tuning-intro">NewsNest shows more or less from these, based on what you open, like, and pick in a story's ⋯ menu. Nothing is ever hidden.</p>
+</section>
+{% if tuning.more or tuning.less or tuning.small %}
+{% if tuning.more %}{% call group('Showing more', icons=true) %}{{ tuning_rows(tuning.more, 'more') }}{% endcall %}{% endif %}
+{% if tuning.less %}{% call group('Showing less', icons=true) %}{{ tuning_rows(tuning.less, 'less') }}{% endcall %}{% endif %}
+{% if tuning.small %}
+{% call fold('Small adjustments', tuning.small|length, icons=true) %}
+  {% for r in tuning.small %}{{ tuning_row(r, 'more' if r.weight >= 1 else 'less') }}{% endfor %}
+{% endcall %}
+{% endif %}
+{% call group() %}
+  {{ action_row('/api/weights/reset', 'Forget all tuning', 'Back to showing everything the same', kind='danger', confirm='Forget everything NewsNest learned about what to show more or less of?') }}
+{% endcall %}
+{% else %}
+{% call group() %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Nothing yet</span>
+    <span class="srow-sub">Use ⋯ on a story → More about / Less from.</span></span></div>
+{% endcall %}
+{% endif %}
+
+{% call group('Advanced', footnote='Text inside HTML comments is ignored.') %}
+  {{ editor('seed_examples.md', 'Seed examples', 'About 20 headlines starting with + (want) or - (don\'t want)', 9) }}
+{% endcall %}
+{% endblock %}

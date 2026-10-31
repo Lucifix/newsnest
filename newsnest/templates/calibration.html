@@ -1,0 +1,104 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group %}
+{% block stitle %}Calibration{% endblock %}
+{% block sintro %}<p class="sub">How the scores NewsNest gives line up with your 👍 and 👎, so you can pick where the feed cuts off.</p>{% endblock %}
+{% macro chart_svg(ch, cls) %}
+    <svg class="{{ cls }}" viewBox="0 0 {{ ch.width }} {{ ch.height }}" role="img"
+         aria-label="Histogram of scores: {{ cal.n_up }} wanted and {{ cal.n_down }} not wanted stories by score. Table below.">
+      {% for g in ch.grid %}
+      <line class="grid" x1="{{ ch.left }}" x2="{{ ch.right }}" y1="{{ g.y }}" y2="{{ g.y }}"></line>
+      <text class="tick" x="{{ ch.left - 6 }}" y="{{ g.y + 4 }}" text-anchor="end">{{ g.label }}</text>
+      {% endfor %}
+      {% set limit = cfg.digest.min_final %}{% if limit is not none %}
+      {% set tx = ch.left + (ch.right - ch.left) * limit / 12 %}
+      <line class="threshold" x1="{{ tx }}" x2="{{ tx }}" y1="6" y2="{{ ch.base }}"></line>
+      <text class="tick" x="{{ tx + 4 }}" y="14">limit {{ limit }}</text>
+      {% endif %}
+      {% for b in ch.bars %}
+      <g class="bar">
+        <path class="mark {{ b.series }}" d="{{ b.path }}"></path>
+        <title>Score {{ b.bin }}–{{ b.bin + 1 }}: {{ b.count }} {{ 'wanted' if b.series == 'up' else 'not wanted' }}</title>
+      </g>
+      {% endfor %}
+      <line class="axis" x1="{{ ch.left }}" x2="{{ ch.right }}" y1="{{ ch.base }}" y2="{{ ch.base }}"></line>
+      {% for x in ch.xlabels %}
+      <text class="tick" x="{{ x.x }}" y="{{ ch.base + 17 }}" text-anchor="middle">{{ x.label }}</text>
+      {% endfor %}
+    </svg>
+{% endmacro %}
+{% block page %}
+<nav class="chips daypick" aria-label="Period">
+  {% for d in (7, 30, 90) %}<a class="chip small" href="?days={{ d }}" {% if d == days %}aria-current="true"{% endif %}>{{ d }} days</a>{% endfor %}
+</nav>
+
+{% set limit = cfg.digest.min_final %}
+{% call group(footnote='{:,}'.format(cal.n_scored) ~ ' stories scored in the last ' ~ days ~ ' days.') %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Your ratings</span></span>
+    <span class="srow-end"><span class="srow-value">{{ cal.n_up }} 👍 · {{ cal.n_down }} 👎</span></span></div>
+  <div class="srow"><span class="srow-main"><span class="srow-title">Feed hides stories below</span></span>
+    <span class="srow-end"><span class="srow-value">{{ limit }}</span></span></div>
+  <form method="post" action="/settings/calibration_toggle" data-autosubmit class="srow-form">
+    <label class="srow"><span class="srow-main"><span class="srow-title">Calibration mode</span>
+      <span class="srow-sub wrap">{{ 'On: you see every story with its score, so the limit isn\'t applied yet' if cfg.scoring.calibration_mode else 'Off: stories below the limit are hidden' }}</span></span>
+      <span class="srow-end"><input class="switch" type="checkbox" role="switch" {% if cfg.scoring.calibration_mode %}checked{% endif %}></span></label>
+    <noscript><button class="button small secondary" type="submit">Turn {{ 'off' if cfg.scoring.calibration_mode else 'on' }}</button></noscript>
+  </form>
+{% endcall %}
+
+{% if cal.n_up + cal.n_down == 0 %}
+{% call group() %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Nothing to compare yet</span>
+    <span class="srow-sub wrap">Rate some stories with 👍 or 👎 in the feed; this page compares their scores.</span></span></div>
+{% endcall %}
+{% else %}
+
+{% call group('Scores of the stories you rated', footnote='Blue are stories you liked, orange ones you didn\'t. A good limit has most blue to its right and most orange to its left.') %}
+  <figure class="chart schart">
+    <div class="legend" aria-hidden="true">
+      <span><i class="swatch up"></i>👍 wanted</span>
+      <span><i class="swatch down"></i>👎 not wanted</span>
+    </div>
+    {{ chart_svg(cal.chart, 'chart-wide') }}
+    {{ chart_svg(cal.chart_narrow, 'chart-narrow') }}
+    <details class="charttable">
+      <summary>Show as a table</summary>
+      <div class="tablewrap">
+      <table>
+        <thead><tr><th>Score</th><th class="num">👍</th><th class="num">👎</th><th class="num">Not rated</th></tr></thead>
+        <tbody>{% for b, h in cal.hist.items() %}<tr><td>{{ b }}–{{ b + 1 }}</td><td class="num">{{ h.up }}</td><td class="num">{{ h.down }}</td><td class="num">{{ h.unrated }}</td></tr>{% endfor %}</tbody>
+      </table>
+      </div>
+    </details>
+  </figure>
+{% endcall %}
+{% endif %}
+
+{# Each possible limit as a row: what it keeps, what it hides, how much you'd read; one tap to use it #}
+{% call group('Where to cut off', footnote=('Best fit is the limit that keeps the most of what you like while hiding the most of what you don\'t. ' if cal.suggested else 'A best fit appears after at least 5 👍 and 5 👎. ') ~ 'Watched topics and must-show words are never hidden.') %}
+  {% for t in cal.table %}
+  <div class="srow limit-row{% if t.current %} is-current{% endif %}">
+    <span class="srow-main">
+      <span class="srow-title">Hide below {{ t.threshold }}{% if t.threshold == cal.suggested %} <span class="pill watch">best fit</span>{% endif %}</span>
+      <span class="srow-sub wrap">{% if t.kept_up is not none %}Keeps {{ '%d%%'|format(100 * t.kept_up) }} of 👍{% endif %}{% if t.hidden_down is not none %} · hides {{ '%d%%'|format(100 * t.hidden_down) }} of 👎{% endif %} · about {{ '%.0f'|format(t.per_day) }} a day</span>
+    </span>
+    <span class="srow-end">
+      {% if t.current %}<span class="srow-value">Current</span>
+      {% else %}<form method="post" action="/settings/threshold" class="srow-form"><input type="hidden" name="min_final" value="{{ t.threshold }}">
+        <button class="button small secondary" type="submit">Use</button></form>{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+{% endcall %}
+
+{% if cal.subscores %}
+{% call group('What tells them apart', footnote='Each story gets three scores, added up with these weights. The one with the biggest gap between 👍 and 👎 is what matters most to you; weights are set in config.yaml (scoring.weights).') %}
+  {% for s in cal.subscores %}
+  <div class="srow">
+    <span class="srow-main"><span class="srow-title">{{ s.label }}{% if s.best %} <span class="pill watch">biggest gap</span>{% endif %}</span>
+      <span class="srow-sub">👍 {{ s.up }} · 👎 {{ s.down }} · weight {{ s.weight }}</span></span>
+    <span class="srow-end"><span class="srow-value{% if s.best %} progress{% endif %}">{{ '%+.1f'|format(s.gap) }}</span></span>
+  </div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
+{% endblock %}

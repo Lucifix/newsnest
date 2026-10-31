@@ -1,0 +1,16 @@
+{% from "_macros.html" import list_card, read_button, save_button with context %}
+{# Search results: the live search layer fetches this alone; /search wraps it in a page #}
+<div class="searchresults" data-q="{{ q }}">
+{% if not q %}
+<p class="empty">Search titles and key points of the last {{ days }} days.</p>
+{% else %}
+<div class="stream">
+{% for c in cards %}
+{% call list_card(c, ago(c.newest), pill="hidden" if hidden(c) else none) %}{{ save_button(c) }}{{ read_button(c) }}{% endcall %}
+{% else %}
+<p class="empty">{% if everything %}Nothing matches “{{ q }}”.{% else %}Nothing in the last {{ days }} days matches “{{ q }}”.{% endif %}</p>
+{% endfor %}
+</div>
+{% if older %}<p class="searchmore"><a class="button secondary" href="/search?q={{ q|urlencode }}&amp;all=1" data-search-all>Show older results</a></p>{% endif %}
+{% endif %}
+</div>

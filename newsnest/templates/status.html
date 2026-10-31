@@ -1,0 +1,88 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, fold, action_row with context %}
+{% block stitle %}Status{% endblock %}
+{% block sintro %}<p class="sub">Last run {{ localtime(status.last_tick, '%d.%m. %H:%M:%S') or 'never' }}</p>{% endblock %}
+
+{% macro kv(title, value, sub=none) %}
+<div class="srow"><span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub wrap">{{ sub }}</span>{% endif %}</span>
+  <span class="srow-end"><span class="srow-value">{{ value }}</span></span></div>
+{% endmacro %}
+
+{# One source: a dot for its health, where it stands, and a number or state at the end #}
+{% macro source_row(s, attention=false) %}
+<div class="srow">
+  <span class="lead-dot {{ s.health.level }}" aria-hidden="true"></span>
+  <span class="srow-main">
+    <span class="srow-title">{{ s.name }}</span>
+    <span class="srow-sub{% if attention %} wrap{% endif %}">{{ section_labels.get(s.category, s.category) }} · {{ localtime(s.last_run, '%d.%m. %H:%M') or 'not run yet' }}{% if s.http %} · HTTP {{ s.http }}{% endif %}{% if attention and s.last_success and s.last_success != s.last_run %} · last success {{ localtime(s.last_success, '%d.%m. %H:%M') }}{% endif %}</span>
+    {% if s.health.message %}<span class="srow-sub wrap {{ s.health.level }}">{{ s.health.message }}</span>{% endif %}
+  </span>
+  <span class="srow-end">{% if attention or s.health.level in ('pending', 'disabled') %}<span class="state {{ s.health.level }}">{{ s.health.level }}</span>
+    {% else %}<span class="srow-value" title="New stories today">{{ s.new_today }} new</span>{% endif %}</span>
+</div>
+{% endmacro %}
+
+{% block page %}
+{% if status.config_errors %}
+{% call group('config.yaml errors', footnote='Nothing is fetched until these are fixed on the server.') %}
+  {% for e in status.config_errors %}<div class="srow"><span class="srow-main"><span class="srow-title wrap mono">{{ e }}</span></span></div>{% endfor %}
+{% endcall %}
+{% endif %}
+
+{% call group(footnote=status.counts['items']|string ~ ' items, ' ~ status.counts['stories'] ~ ' stories, ' ~ status.counts['rated'] ~ ' rated') %}
+  {% if running %}<div class="srow"><span class="srow-main"><span class="srow-title">Fetching…</span><span class="srow-sub">Refresh in a minute</span></span></div>
+  {% else %}{{ action_row('/api/run', 'Fetch everything now') }}{% endif %}
+{% endcall %}
+
+{% set attention = status.sources|selectattr('health.level', 'in', ['failing', 'warning'])|list %}
+{% set working = status.sources|selectattr('health.level', 'equalto', 'ok')|list %}
+{% set idle = status.sources|selectattr('health.level', 'in', ['pending', 'disabled'])|list %}
+{% if attention %}
+{% call group('Needs attention · ' ~ attention|length) %}{% for s in attention %}{{ source_row(s, true) }}{% endfor %}{% endcall %}
+{% endif %}
+
+{% set ai = status.ai %}
+{% if ai %}
+{% call group('AI today', footnote='Scoring starts once a profile exists and ANTHROPIC_API_KEY is set.' if not ai.status else none) %}
+  {{ kv('Spent', '$%.4f of $%.2f'|format(ai.spent, ai.cap)) }}
+  <div class="srow srow-meter"><div class="meter" role="img" aria-label="{{ (100 * ai.spent / ai.cap)|round|int if ai.cap else 0 }}% of the daily budget used">
+    <span style="width: {{ [100, (100 * ai.spent / ai.cap) if ai.cap else 100]|min }}%"></span></div></div>
+  {{ kv('Calls', ai.usage.calls ~ ((' (' ~ ai.usage.failed ~ ' failed)') if ai.usage.failed else '')) }}
+  {{ kv('Tokens in / out', '{:,} / {:,}'.format(ai.usage.input, ai.usage.output)) }}
+  {{ kv('Cache read / write', '{:,} / {:,}'.format(ai.usage.cache_read, ai.usage.cache_write)) }}
+  {{ kv('Waiting to be scored', ai.pending) }}
+  {% if ai.status and ai.status.ok %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Last call</span><span class="srow-sub">{{ localtime(ai.status.at, '%d.%m. %H:%M') }}</span></span><span class="srow-end"><span class="state ok">ok</span></span></div>
+  {% elif ai.status %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Last call</span><span class="srow-sub wrap failing">{{ ai.status.error }} · {{ localtime(ai.status.at, '%d.%m. %H:%M') }}</span></span><span class="srow-end"><span class="state failing">failing</span></span></div>
+  {% endif %}
+{% endcall %}
+{% endif %}
+
+{% if working %}
+{% call fold('Working', working|length) %}{% for s in working %}{{ source_row(s) }}{% endfor %}{% endcall %}
+{% endif %}
+{% if idle %}
+{% call fold('Paused or waiting', idle|length) %}{% for s in idle %}{{ source_row(s) }}{% endfor %}{% endcall %}
+{% endif %}
+
+{% if ai_calls %}
+{% call fold('Recent AI calls', ai_calls|length) %}
+  {% for c in ai_calls %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">{{ c.purpose }}</span>
+    <span class="srow-sub wrap">{{ localtime(c.at, '%d.%m. %H:%M') }} · {{ c.model }} · {{ '{:,}'.format(c.input_tokens or 0) }} in / {{ '{:,}'.format(c.output_tokens or 0) }} out{% if c.cache_read_tokens %} · {{ '{:,}'.format(c.cache_read_tokens) }} cached{% endif %}</span>
+    {% if not c.ok %}<span class="srow-sub wrap failing">{{ c.error or c.stop_reason }}</span>{% endif %}</span>
+    <span class="srow-end"><span class="srow-value">${{ '%.4f'|format(c.cost_usd) }}</span></span></div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
+
+{% if recent_errors %}
+{% call fold('Recent fetch errors', recent_errors|length) %}
+  {% for e in recent_errors %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">{{ e.source_id }}</span>
+    <span class="srow-sub wrap">{{ localtime(e.at, '%d.%m. %H:%M') }} · {{ e.status }}: {{ e.error }}</span></span></div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, expand, remove_btn %}
+{% block stitle %}Topics &amp; filters{% endblock %}
+{% block page %}
+{% call group('Watches', footnote='Matches are tagged, never hidden. Keywords match at a word start, so use stems: ljubljan matches Ljubljani.') %}
+  {% for w in cfg.watches %}
+  <div class="srow">
+    <span class="srow-main"><span class="srow-title">{{ w.name }}</span><span class="srow-sub">{{ w.keywords|join(', ') }}</span></span>
+    <span class="srow-end">{{ remove_btn('/settings/watch_remove', {'name': w.name}, 'Remove ' ~ w.name, 'Remove watch ' ~ w.name ~ '?') }}</span>
+  </div>
+  {% endfor %}
+  {% call expand('Add a watch…') %}
+  <form method="post" action="/settings/watch_add" class="sform">
+    <label>Name <input name="name" required placeholder="Energy prices"></label>
+    <label>Keywords (comma-separated) <input name="keywords" required placeholder="elektrik, cene energ"></label>
+    <button class="button" type="submit">Add watch</button>
+  </form>
+  {% endcall %}
+{% endcall %}
+
+{# Both lists save together to /settings/keywords. With JS the words are chips that save as you add or remove them;
+   without it the two text boxes stay and the button saves. #}
+<form method="post" action="/settings/keywords" data-autosave>
+  {% call group('Mute words', footnote='Stories containing one of these are dropped.') %}
+    <div class="chipbox" data-chipbox><textarea name="mute" rows="4" aria-label="Mute words, one per line">{{ cfg.prefilter.mute_keywords|join('\n') }}</textarea></div>
+  {% endcall %}
+  {% call group('Always show', footnote='Stories containing one of these always pass the filter.') %}
+    <div class="chipbox" data-chipbox><textarea name="must_show" rows="4" aria-label="Always-show words, one per line">{{ cfg.prefilter.must_show_keywords|join('\n') }}</textarea></div>
+  {% endcall %}
+  <button class="button" type="submit" data-chip-save>Save filters</button>
+</form>
+{% endblock %}

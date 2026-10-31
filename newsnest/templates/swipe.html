@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import banner_box, badge with context %}
+{% block title %}Swipe · NewsNest{% endblock %}
+{% block body_class %}feedpage swipepage{% endblock %}
+{% block banner %}{% endblock %}
+{% block content %}
+<div class="feedwrap swipewrap">
+{{ banner_box(banner) }}
+
+<div class="deckhead">
+  <p class="dateline">Swipe to sort</p>
+  <p class="deckcount"><b data-left>{{ left }}</b> to sort</p>
+</div>
+
+<div class="deck" data-deck aria-label="Stories to sort">
+  {% for it in deck %}
+  {% set c = it.card %}{% set r = c.lead.row %}
+  <article class="swipecard h{{ hue(c.lead.source_name) }}" data-lead="{{ c.lead.id }}" data-ids="{{ c.ids }}">
+    <div class="swipe-media">
+      {% if c.image %}<img src="{{ c.image }}" alt="" draggable="false" decoding="async" referrerpolicy="no-referrer" loading="{{ 'eager' if loop.index <= 3 else 'lazy' }}">{% endif %}
+      <span class="hero-mono">{{ initials(c.lead.source_name) }}</span>
+    </div>
+    <div class="swipe-body">
+      <div class="meta">
+        {{ badge(c.lead.source_name, c.logo) }}
+        <span class="src">{{ c.lead.source_name }}</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <time datetime="{{ r.published or r.fetched_at }}">{{ ago(r.published or r.fetched_at) }}</time>
+        {% if it.top %}<span class="kicker">Top story</span>{% endif %}
+        {% if it.updated %}<span class="pill updated">Updated</span>{% elif c.unseen %}<span class="pill new">New</span>{% endif %}
+        {% for w in c.watches %}<span class="pill watch">{{ w }}</span>{% endfor %}
+        <span class="pill readmark">Read</span>
+      </div>
+      <h2><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" draggable="false">{{ r.title }}</a></h2>
+      {% set sm = c.summary_member %}
+      {% set points = key_points(sm.row) if sm else none %}
+      {% if sm and points is not none %}
+      <div class="swipe-points">
+        <p class="lede">{{ sm.row.summary }}</p>
+        {% if sm.row.summary_why %}<p class="tldr-why"><span class="tag">For you</span>{{ sm.row.summary_why }}</p>{% endif %}
+        {% if points %}<ul class="points">{% for p in points %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+        {% if sm.row.summary_depth == 'full' %}<p class="depth">Worth a full read{% if sm.row.summary_depth_tag %} · {{ sm.row.summary_depth_tag }}{% endif %}</p>{% endif %}
+      </div>
+      {% elif sm %}<p class="summary">{{ sm.row.summary }}</p>
+      {% elif r.snippet %}<p class="snippet">{{ r.snippet }}</p>{% endif %}
+      <div class="swipe-foot">
+        {% if c.final is not none %}<span class="scorechip{% if c.final >= 7 %} high{% endif %}" title="Score of 10">{{ '%.1f'|format(c.final) }}</span>{% endif %}
+        {% if r.reason %}<span class="reasonline">{{ r.reason }}</span>{% endif %}
+        {% if c.others %}<span class="swipe-cov"><span class="stack">{% for name in c.other_outlets[:3] %}{{ badge(name) }}{% endfor %}</span>{{ c.outlets }} outlets</span>{% endif %}
+      </div>
+    </div>
+    <span class="stamp like" aria-hidden="true">More</span>
+    <span class="stamp nope" aria-hidden="true">Nope</span>
+    <span class="stamp skip" aria-hidden="true">Later</span>
+  </article>
+  {% endfor %}
+  <div class="deck-done">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/></svg>
+    {% if left > deck|length %}
+    <h2>Nice, that's {{ deck|length }}</h2>
+    <p>{{ left - deck|length }} more stories are waiting.</p>
+    <a class="button" href="/swipe">Next stories</a>
+    {% else %}
+    <h2>All sorted</h2>
+    <p>Nothing left to swipe. New stories arrive with the next fetch.</p>
+    <a class="button secondary" href="/">Back to For you</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="deckbar">
+  <button type="button" class="deckbtn small" data-undo disabled aria-label="Undo" title="Undo (Backspace)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+  </button>
+  <button type="button" class="deckbtn nope" data-swipe="left" aria-label="Not interested" title="Not interested (←)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+  </button>
+  <button type="button" class="deckbtn small" data-swipe="up" aria-label="Later: no opinion" title="Later, no opinion (↑)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+  </button>
+  <button type="button" class="deckbtn like" data-swipe="right" aria-label="More like this" title="More like this (→)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v9H4v-9h3Zm2 9h8.2a2 2 0 0 0 2-1.6l1.2-6A2 2 0 0 0 18.4 10H14l.8-3.8A1.8 1.8 0 0 0 13 4l-4 6v10Z"/></svg>
+  </button>
+</div>
+<p class="deckhint">Left: not interested · Right: more like this · Up: later · Tap to read</p>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+{% endblock %}

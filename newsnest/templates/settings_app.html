@@ -1,0 +1,18 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group %}
+{% block stitle %}Install, backup &amp; log out{% endblock %}
+{% block page %}
+{% call group('Install the app') %}
+  {# app.js fills the text and shows the button when the browser can install #}
+  <div id="install" class="sbody-plain">
+    <p class="muted" data-install-status>Install NewsNest on your phone from the browser menu (needs an https address).</p>
+    <button type="button" class="button" data-install hidden>Install NewsNest</button>
+  </div>
+{% endcall %}
+{% call group('Backup', footnote='A single .db file with all items, ratings, saved stories and history. Config and profile files live in the config folder and are not included.') %}
+  <a class="srow sact" href="/settings/backup/database" download><span class="srow-main"><span class="srow-title">Download database backup</span><span class="srow-sub">Consistent copy, safe while NewsNest is running</span></span></a>
+{% endcall %}
+{% call group('Account') %}
+  <a class="srow sact sact-danger" href="/logout"><span class="srow-main"><span class="srow-title">Log out</span><span class="srow-sub">Sign this device out</span></span></a>
+{% endcall %}
+{% endblock %}
