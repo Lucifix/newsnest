@@ -5,11 +5,21 @@
 # Unknown keys are rejected (so typos show up as errors on the status panel).
 # On first start, the container copies config.example/ here if config/ is empty.
 
-# Time zone used for schedules and "today" in the digest.
-timezone: Europe/Ljubljana
+# Time zone used for schedules and "today" in the digest, e.g. Europe/Berlin or America/New_York.
+# Set it with "where you live" in Settings → General.
+timezone: UTC
+
+# Where you live. Claude ranks stories for someone living there, and Settings → Feeds offers the Local
+# news pack for your country (Slovenia, Germany, United States, United Kingdom so far).
+# country: empty = no local focus; city is optional.
+# tld:     feeds on this web domain always count as Local, e.g. ".de" (optional).
+region:
+  country: ""
+  city: ""
+  tld: ""
 
 # Feed entries older than this many days are dropped when fetched.
-# Some feeds (e.g. Dnevnik) mix in evergreen pages from years ago.
+# Some feeds mix in evergreen pages from years ago.
 max_item_age_days: 3
 
 http:
@@ -38,49 +48,9 @@ schedules:
 # https_links: true rewrites http:// item links to https:// (optional, default false)
 # allow_http:  plain http:// feed URLs are rejected unless this is true (optional, default false)
 feeds:
-  # --- Slovenian news ---
+  # --- Local news ---
+  # Add your country's pack in Settings → Feeds, or your own feeds here with category: news.
   # Many outlets covering the same story is what makes a story "big" (cross-source boost).
-  # No RSS found for Finance, Primorske novice, STA, Svet24.
-  - id: rtvslo
-    name: RTV SLO
-    url: https://img.rtvslo.si/feeds/00.xml
-    category: news
-  - id: 24ur
-    name: 24ur
-    url: https://www.24ur.com/rss
-    category: news
-  - id: delo
-    name: Delo
-    url: https://www.delo.si/rss
-    category: news
-  - id: dnevnik
-    name: Dnevnik
-    url: https://www.dnevnik.si/rss.xml
-    category: news
-  - id: vecer
-    name: Večer
-    url: https://vecer.com/feed/allarticles
-    category: news
-  - id: n1
-    name: N1 Slovenija
-    url: https://n1info.si/feed/
-    category: news
-  - id: siol
-    name: Siol
-    url: https://siol.net/feeds/latest
-    category: news
-  - id: zurnal24
-    name: Žurnal24
-    url: https://www.zurnal24.si/feeds/latest
-    category: news
-  - id: nova24tv
-    name: Nova24TV
-    url: https://nova24tv.si/feed/
-    category: news
-  - id: mladina
-    name: Mladina
-    url: https://www.mladina.si/media/rss/rss-fb-mladina.xml
-    category: news
 
   # --- World news (all https, checked to return items) ---
   - id: bbc-world
@@ -137,31 +107,13 @@ feeds:
     url: https://hnrss.org/frontpage?points=150
     category: tech
 
-  # --- Slovenian tech (all three have their own RSS) ---
-  # The feed publishes http:// article links; slo-tech.com serves them fine over https.
-  - id: slotech
-    name: Slo-Tech
-    url: https://static.slo-tech.com/slotech.xml
-    category: tech
-    https_links: true
-  - id: racunalniske-novice
-    name: Računalniške novice
-    url: https://racunalniske-novice.com/feed/
-    category: tech
-  - id: monitor
-    name: Monitor
-    url: https://www.monitor.si/rss.php
-    category: tech
-
 # -----------------------------------------------------------------------------
 # Watches: named topics matched locally against everything collected above.
 # -----------------------------------------------------------------------------
 # A watched item is tagged with the watch name and always shown (never filtered out).
-# Keywords are case-insensitive and match at the start of a word, so use stems for
-# Slovenian: "ljubljan" matches Ljubljana, Ljubljani, ljubljanski.
+# Keywords are case-insensitive and match at the start of a word, so a stem catches every form:
+# "electr" matches electric, electricity. Your city makes a good watch.
 watches:
-  - name: Ljubljana
-    keywords: [ljubljan]
   - name: Home Assistant
     keywords: [home assistant, home-assistant]
   - name: Homelab / self-hosting
@@ -228,9 +180,10 @@ scoring:
   # Calibration mode: show every item with scores and reasons, hide nothing.
   calibration_mode: true
   # Fixed list of digest sections; Claude puts every item in exactly one ("Other" is always added).
+  # "Local" is your city or area and "National" your country (set in Settings → General).
   categories:
-    - Ljubljana
-    - Slovenia
+    - Local
+    - National
     - Politics
     - Economy
     - World

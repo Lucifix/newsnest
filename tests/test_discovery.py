@@ -47,9 +47,20 @@ def test_starter_pack_parses_with_categories():
 def test_opml_folder_maps_category():
     opml = """<opml><body><outline text="Cyber security"><outline xmlUrl="https://a.example/feed" text="A"/></outline>
               <outline text="Science"><outline xmlUrl="https://b.example/feed" text="B"/></outline>
-              <outline text="Slovenske novice"><outline xmlUrl="https://c.example/feed" text="C"/></outline></body></opml>"""
-    # Local only when the folder says so; anything else that isn't tech is World
-    assert [(f.title, f.category) for f in parse_opml(opml)] == [("A", "tech"), ("B", "world"), ("C", "news")]
+              <outline text="Slovenske novice"><outline xmlUrl="https://c.example/feed" text="C"/></outline>
+              <outline text="Lokales"><outline xmlUrl="https://d.example/feed" text="D"/></outline></body></opml>"""
+    # Local only when the folder says so (or names the reader's country or city); anything else that isn't tech is World
+    assert [(f.title, f.category) for f in parse_opml(opml)] == [("A", "tech"), ("B", "world"), ("C", "world"), ("D", "news")]
+    assert [f.category for f in parse_opml(opml, local_words=("sloven",))] == ["tech", "world", "news", "news"]
+
+
+def test_region_words(cfg):
+    from newsnest.config import RegionCfg
+    from newsnest.discovery import region_words
+    cfg.region = RegionCfg(country="Österreich", city="Wien")
+    assert region_words(cfg) == ("oster", "wien")
+    cfg.region = RegionCfg()
+    assert region_words(cfg) == ()
 
 
 def test_check_feed_rules():
@@ -57,11 +68,8 @@ def test_check_feed_rules():
         "https://ok.example/feed": (rss(), 200),
         "https://pod.example/feed": (rss(enclosure="audio/mpeg"), 200),
         "https://old.example/feed": (rss(days_old=40), 200),
-        "https://sl.example/feed": (rss(title="Vlada je sprejela nov zakon o plačah {i}"), 200),
     })
     assert check_feed(c, "https://ok.example/feed").ok
-    assert check_feed(c, "https://ok.example/feed").slovenian is False
-    assert check_feed(c, "https://sl.example/feed").slovenian is True
     assert check_feed(c, "https://pod.example/feed").reason == "podcast or video channel"
     assert "no new post" in check_feed(c, "https://old.example/feed").reason
     assert check_feed(c, "http://plain.example/feed").reason.startswith("plain http")
@@ -69,7 +77,7 @@ def test_check_feed_rules():
 
 
 def test_add_candidates_skips_known_feeds(conn, cfg):
-    feeds = [OpmlFeed("https://www.24ur.com/rss", "24ur again", "news"),  # already a regular source
+    feeds = [OpmlFeed("https://feeds.bbci.co.uk/news/world/rss.xml", "BBC again", "world"),  # already a regular source
              OpmlFeed("https://new.example/feed", "New one", "tech"),
              OpmlFeed("https://new.example/feed/", "New one twice", "tech")]
     assert add_candidates(conn, cfg, feeds, "test") == 1

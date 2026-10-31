@@ -88,12 +88,17 @@ mkdir -p config data     # so Docker doesn't create them as root
 docker compose up -d --build
 ```
 
-Open <http://localhost:3095>, log in with your password, and tap **Set up my profile**. You rate about
-30 headlines and Claude drafts your interests from them. The first fetch starts right away.
+Open <http://localhost:3095>, log in with your password, and tap **Set up my profile**:
 
-On first start NewsNest copies a starter [`config.yaml`](config.example/config.yaml) into `config/`.
-Change the feeds in **Settings → Feeds**, or edit the file. It is re-read on every run, so there is
-nothing to restart.
+1. **Say where you live.** Your country and city tell Claude whose news is "big", and your time zone is
+   picked up from the browser.
+2. **Add local news.** NewsNest offers the local pack for your country (Slovenia, Germany, the United
+   States and the United Kingdom so far), or add your own feeds under Local in **Settings → Feeds**.
+3. **Rate about 30 headlines**, and Claude drafts your interests from them.
+
+On first start NewsNest copies a starter [`config.yaml`](config.example/config.yaml) into `config/`, with
+international news and tech feeds and no local ones. Change the feeds in **Settings → Feeds**, or edit
+the file. It is re-read on every run, so there is nothing to restart.
 
 > [!NOTE]
 > The login is a single shared password over plain HTTP, which is fine on your home network. If you
@@ -138,8 +143,8 @@ Everything lives in the `config/` folder, which is re-read on every run:
 Edits made in the Settings pages are written back to `config.yaml`, comments included.
 
 > [!TIP]
-> The example config comes with a starter set of feeds and the time zone `Europe/Ljubljana`. Replace the
-> feeds with your own, and set `timezone` to yours.
+> The example config comes with international feeds, no region and the time zone `UTC`. Set where you
+> live in **Settings → General** (country, city, time zone), and NewsNest offers your country's local pack.
 
 <details>
 <summary>Environment variables</summary>
@@ -150,7 +155,7 @@ Set these in `.env` (see [`.env.example`](.env.example)).
 | --- | --- | --- |
 | `NEWSNEST_PASSWORD` | – | **Required.** Password for the web UI. With none set, access is refused. |
 | `ANTHROPIC_API_KEY` | – | Turns on scoring, key points and the weekly suggestions. |
-| `TZ` | `Europe/Ljubljana` | Container time zone. |
+| `TZ` | `UTC` | Container time zone (logs). The app itself uses `timezone` from `config.yaml`. |
 | `NEWSNEST_PORT` | `3095` | Port the web UI is published on. |
 | `NEWSNEST_CONFIG_PATH` | `/opt/newsnest/config` | Host folder for `config.yaml` and the profile files. |
 | `NEWSNEST_DATA_PATH` | `/opt/newsnest/data` | Host folder for the database. |
@@ -258,3 +263,7 @@ Planned work and known limits are tracked in [TODO.md](TODO.md).
 
 Bug reports, ideas and pull requests are welcome. Please open an issue first for anything big. Run
 `python -m pytest` before you send a PR, and add a test for what you change.
+
+**A local news pack for your country** is an easy first PR: add a `LocalPack` to `LOCAL_PACKS` in
+[`newsnest/packs.py`](newsnest/packs.py) with 8 to 10 national outlets across the spectrum, each checked
+with `newsnest.discovery.check_feed` (https, working, posting in the last two weeks).

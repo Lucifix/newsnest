@@ -12,8 +12,12 @@ from newsnest.db import iso, parse_iso, utcnow
 from newsnest.scoring import final_score
 
 BINS = list(range(0, 12))  # final runs 0-10 plus the cross-source bonus
-SUBSCORES = (("topic", "Fits your interests"), ("importance", "Big news for Slovenia"),
-             ("personal", "You'd want to read it"))
+
+
+def subscore_labels(cfg: Config) -> tuple[tuple[str, str], ...]:
+    country = cfg.region.country
+    return (("topic", "Fits your interests"), ("importance", f"Big news for {country}" if country else "Big news in general"),
+            ("personal", "You'd want to read it"))
 
 
 @dataclass
@@ -62,7 +66,7 @@ def calibration_data(conn: sqlite3.Connection, cfg: Config, days: int = 30) -> d
     up_m, down_m = means(1), means(-1)
     subscores = []
     if up_m and down_m:
-        for key, label in SUBSCORES:
+        for key, label in subscore_labels(cfg):
             subscores.append({"key": key, "label": label, "up": up_m[key], "down": down_m[key],
                               "gap": round(up_m[key] - down_m[key], 1), "weight": getattr(cfg.scoring.weights, key)})
         best = max(subscores, key=lambda s: s["gap"])

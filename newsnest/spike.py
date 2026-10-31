@@ -1,7 +1,7 @@
 """Step-1 spike: run every source once and print parsed samples.
 
     python -m newsnest.spike                     # all enabled sources
-    python -m newsnest.spike --source rtvslo     # one source
+    python -m newsnest.spike --source bbc-world  # one source
     python -m newsnest.spike --out spike-output.md
 
 No database, no AI.

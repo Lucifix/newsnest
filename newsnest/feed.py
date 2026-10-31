@@ -6,7 +6,7 @@ rank = final score x freshness x boosts x learned weights
   boosts     top story (importance >= threshold), watch / must-show, not seen yet
   sinking    every time a story was on screen without being opened it sinks; after
              feed.seen_drop_after impressions it drops out (top stories only sink)
-  weights    per outlet and per category, learned from the card menu ("less from 24ur")
+  weights    per outlet and per category, learned from the card menu ("less from <outlet>")
 Read stories leave the feed (they are listed under "Read"), unless the story was updated
 afterwards: new outlets joined it after it was read (two for a top story, otherwise
 three, at least one of them in the last few hours). It is then back as unread, marked Updated.
@@ -150,7 +150,7 @@ def _joined_since(card: Card, read_at: datetime) -> list[Member]:
 # A read story comes back as Updated when this many new outlets joined it after it was read: fewer
 # for top stories, where follow-ups matter. Otherwise it is mostly the same news reaching more
 # outlets, so it also needs one of them in the last UPDATE_FRESH_HOURS. Watch hits get no lower bar:
-# a broad watch (Ljubljana) matches much of the local news.
+# a broad watch (your city) matches much of the local news.
 UPDATE_OUTLETS_KEY, UPDATE_OUTLETS = 2, 3
 UPDATE_FRESH_HOURS = 6
 

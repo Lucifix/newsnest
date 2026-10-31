@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from zoneinfo import ZoneInfo
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 Category = Literal["news", "tech", "world", "lifestyle"]  # "news" is shown as Local
 
@@ -45,7 +47,7 @@ class FeedCfg(_Strict):
 
 class WatchCfg(_Strict):
     name: str
-    # Case-insensitive, matched at the start of a word: "ljubljan" matches Ljubljana, Ljubljani, ljubljanski
+    # Case-insensitive, matched at the start of a word: "electr" matches electric, electricity
     keywords: list[str]
 
 
@@ -99,7 +101,7 @@ class ScoringCfg(_Strict):
     calibration_mode: bool = True
     # Fixed list so "news by category" stays a handful of sections; Claude must pick one of these
     categories: list[str] = Field(default_factory=lambda: [
-        "Ljubljana", "Slovenia", "Politics", "Economy", "World", "Crime & accidents", "Health",
+        "Local", "National", "Politics", "Economy", "World", "Crime & accidents", "Health",
         "Science", "Culture", "Sports", "Celebrities & lifestyle", "AI", "Software & releases",
         "Hardware & gadgets", "Security", "Tech business",
         "Gear & EDC", "Watches", "Cars & motoring", "Style & grooming", "Food & drink", "Design & home",
@@ -175,8 +177,35 @@ class HttpCfg(_Strict):
     timeout_seconds: float = 20
 
 
+class RegionCfg(_Strict):
+    # Where the reader lives. Empty country = no local focus, and the AI prompts stay neutral.
+    country: str = ""
+    city: str = ""
+    # A feed on this domain always counts as Local, e.g. ".si" (optional)
+    tld: str = ""
+
+    @field_validator("country", "city")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("tld")
+    @classmethod
+    def _tld(cls, v: str) -> str:
+        v = v.strip().lower()
+        return f".{v.lstrip('.')}" if v else ""
+
+    @property
+    def place(self) -> str:
+        """"Ljubljana, Slovenia", "Slovenia", or "" when no country is set."""
+        if not self.country:
+            return ""
+        return f"{self.city}, {self.country}" if self.city else self.country
+
+
 class Config(_Strict):
-    timezone: str = "Europe/Ljubljana"
+    timezone: str = "UTC"
+    region: RegionCfg = Field(default_factory=RegionCfg)
     # Feed entries older than this are dropped at fetch time (some feeds carry evergreen pages)
     max_item_age_days: float = 3
     http: HttpCfg = Field(default_factory=HttpCfg)
@@ -192,6 +221,16 @@ class Config(_Strict):
     discovery: DiscoveryCfg = Field(default_factory=DiscoveryCfg)
     budget: BudgetCfg = Field(default_factory=BudgetCfg)
     heartbeat: HeartbeatCfg = Field(default_factory=HeartbeatCfg)
+
+    @field_validator("timezone")
+    @classmethod
+    def _timezone(cls, v: str) -> str:
+        v = v.strip()
+        try:
+            ZoneInfo(v)
+        except (ValueError, KeyError):  # ZoneInfoNotFoundError is a KeyError
+            raise ValueError(f"unknown time zone {v!r}, e.g. Europe/Berlin or America/New_York") from None
+        return v
 
 
 @dataclass

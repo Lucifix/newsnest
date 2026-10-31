@@ -14,7 +14,7 @@ from newsnest.config import Config
 from newsnest.db import iso, parse_iso, utcnow
 from newsnest.interests import OPS, SECTIONS, apply_changes
 from newsnest.profile import read_profile, seed_examples, strip_comments
-from newsnest.scoring import final_score
+from newsnest.scoring import final_score, reader_phrase
 
 BULLET_RULES = """\
 Bullets are short topics, places or kinds of stories, under about 12 words each. No individual \
@@ -23,12 +23,16 @@ headlines, product names or lists of examples in parentheses. Keep to about 20 b
 
 PROFILE_FORMAT = f"""\
 Write it as Markdown with two sections, "## Want" and "## Skip", each a list of concrete bullets \
-(e.g. "Ljubljana traffic, parking and construction", "celebrity gossip"). {BULLET_RULES} English."""
+(e.g. "local traffic, parking and construction", "celebrity gossip"). {BULLET_RULES} English."""
 
-DRAFT_SYSTEM = f"""\
-You draft a news interest profile for one reader in Ljubljana, Slovenia, from headlines they rated \
-(+ = want, - = don't want). Most headlines are Slovenian. Infer the underlying interests, \
+
+def draft_system(cfg: Config) -> str:
+    return f"""\
+You draft a news interest profile for {reader_phrase(cfg)}, from headlines they rated \
+(+ = want, - = don't want). Headlines can be in any language. Infer the underlying interests, \
 generalise from the examples, and do not invent interests the ratings don't support. {PROFILE_FORMAT}"""
+
+
 
 PROPOSAL_SYSTEM = f"""\
 You maintain a reader's news interest profile, a Markdown file with "## Want" and "## Skip" bullets. \
@@ -87,7 +91,7 @@ def draft_profile(conn: sqlite3.Connection, cfg: Config, ai: AIClient) -> int:
     lines = [f"{'+' if r['rating'] > 0 else '-'} {r['title']}" for r in rated]
     lines += [f"{'+' if want else '-'} {title}" for want, title in seed_examples()]
     result = ai.call(purpose="profile_draft", model=cfg.scoring.profile_model,
-                     system=[{"type": "text", "text": DRAFT_SYSTEM}],
+                     system=[{"type": "text", "text": draft_system(cfg)}],
                      messages=[{"role": "user", "content": "<ratings>\n" + "\n".join(lines) + "\n</ratings>"}],
                      max_tokens=16000, effort="medium", schema=SCHEMA)
     data = parse_json(result.text)
@@ -130,7 +134,7 @@ def weekly_proposal(conn: sqlite3.Connection, cfg: Config, ai: AIClient) -> int 
         lines.append(f"{verdict} {r['title']} (score {f if f is not None else 'none'}; {r['reason'] or ''}){flag}")
     misses = conn.execute("SELECT * FROM misses WHERE at > ? ORDER BY at DESC LIMIT 30", (last,)).fetchall()
     miss_lines = [f"MISSED: {m['title'] or m['url']} (score {m['final']}; {m['reason'] or m['error'] or ''})" for m in misses]
-    # Card-menu feedback ("less from 24ur", "more about Health"); seen-but-skipped is never sent here
+    # Card-menu feedback ("less from <outlet>", "more about Health"); seen-but-skipped is never sent here
     fb = conn.execute("SELECT kind, target, COUNT(*) AS n FROM feedback WHERE at > ? AND target IS NOT NULL "
                       "GROUP BY kind, target ORDER BY n DESC LIMIT 30", (last,)).fetchall()
     labels = {"less_source": "less from outlet", "more_source": "more from outlet",

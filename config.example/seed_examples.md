@@ -4,9 +4,9 @@ Used as examples in every scoring call, so scoring is useful from day one.
 One headline per line, starting with + or -.
 Anything inside these comment markers is ignored, so the file counts as empty.
 
-Example:
-+ Ljubljana uvaja nove parkirne cone
+Headlines can be in any language. Example:
++ City council introduces new parking zones in the centre
 + Home Assistant 2026.11 brings local voice to more devices
-- Znana pevka razkrila podrobnosti o poroki
-- Nogometaši izgubili prijateljsko tekmo
+- Pop star reveals wedding details
+- National team loses friendly match
 -->

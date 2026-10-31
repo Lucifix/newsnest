@@ -44,16 +44,16 @@
 {% endmacro %}
 
 {# A short value typed in place, right-aligned like iOS (a number with an optional unit, or a word) #}
-{% macro input_row(name, title, value, sub=none, type='text', unit=none, step=none, min=none, max=none, width='5.5em') %}
+{% macro input_row(name, title, value, sub=none, type='text', unit=none, step=none, min=none, max=none, width='5.5em', required=true, placeholder=none, list=none) %}
 <label class="srow">
   <span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
-  <span class="srow-end">{% if unit %}<span class="srow-unit">{{ unit }}</span>{% endif %}<input class="sinput" style="width: {{ width }}" type="{{ type }}" name="{{ name }}" value="{{ value }}" required
-    {% if type == 'number' %}inputmode="decimal"{% endif %}{% if step %} step="{{ step }}"{% endif %}{% if min is not none %} min="{{ min }}"{% endif %}{% if max is not none %} max="{{ max }}"{% endif %}></span>
+  <span class="srow-end">{% if unit %}<span class="srow-unit">{{ unit }}</span>{% endif %}<input class="sinput" style="width: {{ width }}" type="{{ type }}" name="{{ name }}" value="{{ value }}"{% if required %} required{% endif %}
+    {% if type == 'number' %}inputmode="decimal"{% endif %}{% if step %} step="{{ step }}"{% endif %}{% if min is not none %} min="{{ min }}"{% endif %}{% if max is not none %} max="{{ max }}"{% endif %}{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}{% if list %} list="{{ list }}"{% endif %}></span>
 </label>
 {% endmacro %}
 
 {% macro section_options(selected, hint=true) %}
-{% for key in section_labels %}<option value="{{ key }}" {% if key == selected %}selected{% endif %}>{{ section_labels[key] }}{% if hint and key == 'news' %} (Slovenian outlets){% endif %}</option>{% endfor %}
+{% for key in section_labels %}<option value="{{ key }}" {% if key == selected %}selected{% endif %}>{{ section_labels[key] }}{% if hint and key == 'news' %} (where you live){% endif %}</option>{% endfor %}
 {% endmacro %}
 
 {# ---------- rows with actions (need the page context: `initials`, `section_labels`) ---------- #}
@@ -129,7 +129,7 @@
   {{ avatar(name) }}
   <span class="srow-main">
     <span class="srow-title">{{ name }}</span>
-    {% if flagged %}<span class="srow-sub warn">Not in Slovenian. Move it to World or Tech</span>
+    {% if flagged %}<span class="srow-sub warn">Doesn't read like your other Local feeds. Move it to World or Tech</span>
     {% elif moved %}<span class="srow-sub ok">Moved{% if request.query_params.get('n') %} · {{ request.query_params.get('n') }} stories{% endif %}</span>
     {% else %}<span class="srow-sub" title="{{ f.url }}">{{ host(f.url) }}{% if not f.enabled %} · paused{% endif %}{% if f.daily_cap %} · max {{ f.daily_cap }}/day{% endif %}</span>{% endif %}
   </span>

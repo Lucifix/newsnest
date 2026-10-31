@@ -5,6 +5,27 @@
 {% block sintro %}<p class="sub">What NewsNest knows about you: your interests, and which outlets and topics it shows more or less of.</p>{% endblock %}
 {% block page %}
 {% if request.query_params.get('skipped', '0')|int(0) %}<p class="callout warn">{{ request.query_params.get('skipped') }} of the changes no longer fit your interests and were skipped.</p>{% endif %}
+{% if onboarding and cfg and not cfg.region.country %}
+{% call group('Where do you live?', footnote='Claude ranks stories for someone living there, and NewsNest offers local news for your country. You can change it later in Settings → General.') %}
+  <form method="post" action="/settings/region" class="sform" id="region-form">
+    <input type="hidden" name="next" value="/profile">
+    <input type="hidden" name="timezone" value="" data-browser-timezone>
+    <label>Country <input name="country" required placeholder="Germany" list="country-list" autocomplete="country-name"></label>
+    <label>City (optional) <input name="city" placeholder="Berlin" autocomplete="address-level2"></label>
+    <button class="button" type="submit">Continue</button>
+  </form>
+  {% include "_region_lists.html" %}
+{% endcall %}
+{% elif onboarding and local_pack and local_missing %}
+{% call group('Local news for ' ~ local_pack.country, footnote='Headlines from them show up below within about 15 minutes.') %}
+  <form method="post" action="/settings/pack/local/{{ local_pack.code }}" class="sbody-plain">
+    <input type="hidden" name="next" value="/profile">
+    <p class="muted small">{{ local_missing|map(attribute='name')|list|join(', ') }}</p>
+    <button class="button" type="submit">Add {{ local_missing|length }} feeds</button>
+  </form>
+{% endcall %}
+{% endif %}
+{% if request.query_params.get('localpack') is not none %}<p class="callout ok">Added {{ request.query_params.get('localpack') }} local feeds. Their first headlines arrive within about 15 minutes.</p>{% endif %}
 {% if onboarding %}
 {% call group('Get started: rate some headlines', footnote='Mark what you\'d want to see (👍) and what you\'d skip (👎). Aim for about 30, at least 10. Then Claude (' ~ (cfg.scoring.profile_model if cfg else '') ~ ') writes a first interests.md for you to edit.') %}
   {% for it in items %}

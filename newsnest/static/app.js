@@ -88,6 +88,13 @@ document.addEventListener("change", (event) => {
   form.requestSubmit();
 });
 
+// The onboarding region form sends the browser's time zone, so nobody has to pick one from a list
+document.addEventListener("DOMContentLoaded", () => {
+  for (const input of document.querySelectorAll("input[data-browser-timezone]")) {
+    try { input.value = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { /* leave it empty */ }
+  }
+});
+
 // Settings → General saves in place: no reload, a toast says whether it worked
 document.addEventListener("change", async (event) => {
   const form = event.target.closest("form[data-autosave]");

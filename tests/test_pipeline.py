@@ -102,6 +102,8 @@ def test_regroup_merges_existing_items(conn, cfg):
 
 
 def test_prefilter_watch_beats_mute(conn, cfg):
+    from newsnest.config import WatchCfg
+    cfg.watches = [WatchCfg(name="Ljubljana", keywords=["ljubljan"])]
     cfg.prefilter.mute_keywords = ["horoskop", "ljubljan"]
     pf = Prefilter(cfg)
     ingest(conn, src("delo"), [item("delo", "Dnevni horoskop za četrtek", "https://delo.si/h"),
