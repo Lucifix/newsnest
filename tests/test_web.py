@@ -181,6 +181,20 @@ def test_region_in_general_settings(client, env):
     assert "error=" in r.headers["location"] and "time+zone" in r.headers["location"].replace("%20", "+")
 
 
+def test_settings_save_with_options_from_older_versions(client, env):
+    # a config from before Google News and listings were removed still saves; the old options stay put
+    path = env.config / "config.yaml"
+    path.write_text(path.read_text(encoding="utf-8").replace("news_empty_hours: 3", "news_empty_hours: 3\n  listing_failed_runs: 2")
+                    + "\ngoogle_news:\n  enabled: false\nlistings:\n  enabled: false\n", encoding="utf-8")
+    r = client.post("/settings/general", data={"min_final": "5", "daily_usd": "0.5", "summary_language": "English",
+                                               "country": "Slovenia", "city": "Ljubljana", "timezone": "Europe/Ljubljana",
+                                               "tld": ".si"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/general?saved=general"
+    text = path.read_text(encoding="utf-8")
+    assert 'country: "Slovenia"' in text or "country: Slovenia" in text
+    assert "google_news:" in text and "listing_failed_runs: 2" in text
+
+
 def test_onboarding_asks_where_you_live_then_offers_the_pack(client, env):
     from newsnest.config import load_config
     from newsnest.packs import SLOVENIA, missing_from
