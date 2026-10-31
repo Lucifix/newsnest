@@ -25,8 +25,8 @@ Learned outlet weights (card menu → "Less from …") keep a noisy new source i
 - [ ] PWA (home-screen app, pull to refresh, offline shell): needs HTTPS via NPM or VPN.
 - [x] Swipe section (Tinder-style deck at /swipe: right 👍, left not interested, up later, tap opens).
 - [ ] Swipe gestures on the feed cards themselves (not built; the deck is a separate section).
-- [ ] Search: Slovene word forms (Ljubljana should find Ljubljani). Today whole words match, plus the
-      last word as a prefix while typing. Options: a Slovene stemmer, or the FTS5 trigram tokenizer.
+- [ ] Search: word forms in inflected languages (Ljubljana should find Ljubljani). Today whole words
+      match, plus the last word as a prefix while typing. Likely fix: the FTS5 trigram tokenizer.
 
 ## Known limitations
 - Story grouping is headline-based; occasional false merges (both headlines stay visible on the card).

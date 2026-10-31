@@ -44,7 +44,7 @@ def test_scoring_batches_and_stores(conn, cfg):
     assert call["output_config"]["format"]["type"] == "json_schema"
     assert call["system"][1]["cache_control"] == {"type": "ephemeral"}
     row = conn.execute("SELECT * FROM items LIMIT 1").fetchone()
-    assert row["score_status"] == "scored" and row["ai_category"] == "Ljubljana"
+    assert row["score_status"] == "scored" and row["ai_category"] == "Local"
 
 
 def test_refusal_splits_batch_and_marks_only_the_culprit(conn, cfg):
@@ -129,3 +129,24 @@ def test_final_score_weights_and_cross_source_bonus(cfg):
     assert final_score(row, 1, cfg) == 7.0  # 0.4*10 + 0.3*5 + 0.3*5
     assert final_score(row, 2, cfg) == 8.0
     assert final_score({"topic": None}, 3, cfg) is None
+
+
+def test_prompts_follow_the_region(cfg):
+    from newsnest.calibration import subscore_labels
+    from newsnest.config import RegionCfg
+    from newsnest.profile_ai import draft_system
+    from newsnest.scoring import instructions
+
+    cfg.region = RegionCfg()
+    cfg.scoring.categories = ["Local", "National", "World", "Other"]
+    for text in (instructions(cfg), draft_system(cfg)):
+        assert "Slovenia" not in text and "Ljubljana" not in text and "one reader" in text
+    assert "in general" in instructions(cfg)
+    assert dict(subscore_labels(cfg))["importance"] == "Big news in general"
+
+    cfg.region = RegionCfg(country="Germany", city="Berlin")
+    text = instructions(cfg)
+    assert "one reader who lives in Berlin, Germany" in text and "for someone living in Germany" in text
+    assert '"National" means Germany' in text
+    assert "Berlin, Germany" in draft_system(cfg)
+    assert dict(subscore_labels(cfg))["importance"] == "Big news for Germany"

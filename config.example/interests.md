@@ -9,8 +9,8 @@ Anything inside these comment markers is ignored, so the file counts as empty.
 Example of what it can look like:
 
 ## Want
-- Ljubljana local news: traffic, parking, construction, city decisions
-- Slovenian economy, taxes, energy prices
+- Local news: traffic, parking, construction, city decisions
+- National economy, taxes, energy prices
 - Tech: self-hosting, Home Assistant, AI, major product launches
 
 ## Skip

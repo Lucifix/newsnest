@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
     environment:
-      - TZ=${TZ:-Europe/Ljubljana}
+      - TZ=${TZ:-UTC}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       # Login password for the web UI. Without it the app refuses all access.
       - NEWSNEST_PASSWORD=${NEWSNEST_PASSWORD:-${RADAR_PASSWORD:-}}

@@ -27,8 +27,8 @@ import httpx
 from newsnest.config import Config, Source, slugify
 from newsnest.db import dumps, iso, parse_iso, session, utcnow
 from newsnest.scoring import final_score
-from newsnest.sections import SECTIONS, local_section, looks_slovenian
-from newsnest.textmatch import normalize_url
+from newsnest.sections import SECTIONS
+from newsnest.textmatch import fold, normalize_url
 
 log = logging.getLogger(__name__)
 
@@ -44,9 +44,10 @@ class OpmlFeed:
     category: str   # news (Local) | world | tech | lifestyle
 
 
-def parse_opml(data: bytes | str, default_category: str = "tech") -> list[OpmlFeed]:
+def parse_opml(data: bytes | str, default_category: str = "tech", local_words: tuple[str, ...] = ()) -> list[OpmlFeed]:
     """Every outline with an xmlUrl. Category: the outline's own category attribute (news/world/tech),
-    else the parent folder's name mapped to a section, else the default."""
+    else the parent folder's name mapped to a section, else the default. local_words are extra folder
+    words that mean Local (from region_words)."""
     root = ET.fromstring(data)
     out: list[OpmlFeed] = []
 
@@ -56,7 +57,7 @@ def parse_opml(data: bytes | str, default_category: str = "tech") -> list[OpmlFe
             if url:
                 cat = (child.get("category") or "").strip().lower()
                 if cat not in SECTIONS:
-                    cat = _map_folder(folder) or default_category
+                    cat = _map_folder(folder, local_words) or default_category
                 out.append(OpmlFeed(url.strip(), (child.get("title") or child.get("text") or url).strip(), cat))
             else:
                 walk(child, child.get("title") or child.get("text") or folder)
@@ -71,16 +72,24 @@ _LIFESTYLE_WORDS = re.compile(r"\b(lifestyle|gear|style|men'?s?|watch(es)?|desig
 _TECH_WORDS = ("tech", "security", "apple", "android", "programming", "develop", "diy", "linux", "self", "home", "gadget")
 
 
-def _map_folder(folder: str | None) -> str | None:
+_LOCAL_WORDS = ("local", "lokal", "regional")
+
+
+def region_words(cfg: Config) -> tuple[str, ...]:
+    """Folder words that mean Local for this reader: the start of their country and city ("sloven", "ljubl")."""
+    return tuple(fold(w)[:5] for w in (cfg.region.country, cfg.region.city) if len(w.strip()) >= 3)
+
+
+def _map_folder(folder: str | None, local_words: tuple[str, ...] = ()) -> str | None:
     if not folder:
         return None
-    f = folder.lower()
+    f = fold(folder)
     if _LIFESTYLE_WORDS.search(f):
         return "lifestyle"
     if any(w in f for w in _TECH_WORDS):
         return "tech"
     # Local only when the folder says so: a "News" folder in someone's OPML is BBC and the Guardian
-    return "news" if any(w in f for w in ("sloven", "lokal", "local", "novice")) else "world"
+    return "news" if any(w in f for w in _LOCAL_WORDS + local_words) else "world"
 
 
 @dataclass
@@ -90,7 +99,6 @@ class CheckResult:
     title: str | None = None
     final_url: str | None = None
     per_day: float = 0.0
-    slovenian: bool | None = None
 
 
 def check_feed(client: httpx.Client, url: str) -> CheckResult:
@@ -122,9 +130,7 @@ def check_feed(client: httpx.Client, url: str) -> CheckResult:
     if newest_days > STALE_DAYS:
         return CheckResult(False, f"no new post in {int(newest_days)} days")
     span = max(1.0, (max(dates) - min(dates)) / 86400)
-    slovenian = looks_slovenian([f"{e.get('title', '')} {e.get('summary', '')[:300]}" for e in entries[:30]], str(r.url))
-    return CheckResult(True, "ok", (parsed.feed.get("title") or "").strip() or None, str(r.url), round(len(dates) / span, 1),
-                       slovenian)
+    return CheckResult(True, "ok", (parsed.feed.get("title") or "").strip() or None, str(r.url), round(len(dates) / span, 1))
 
 
 def _key(url: str) -> str:
@@ -187,11 +193,10 @@ def check_pending(cfg: Config, client: httpx.Client | None = None) -> dict:
                 last_hit[host] = time.monotonic()
                 status = "candidate" if res.ok else "rejected"
                 done[status] += 1
-                conn.execute("UPDATE candidates SET status = ?, checked_at = ?, check_result = ?, title = COALESCE(?, title), "
-                             "category = ? WHERE id = ?",
+                conn.execute("UPDATE candidates SET status = ?, checked_at = ?, check_result = ?, title = COALESCE(?, title) "
+                             "WHERE id = ?",
                              (status, iso(utcnow()), dumps({"reason": res.reason, "per_day": res.per_day}),
-                              r["title"] if r["title"] and not r["title"].startswith("http") else res.title,
-                              local_section(r["category"], res.slovenian), r["id"]))
+                              r["title"] if r["title"] and not r["title"].startswith("http") else res.title, r["id"]))
     finally:
         if own:
             client.close()

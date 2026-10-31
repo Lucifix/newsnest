@@ -17,7 +17,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from newsnest.bootstrap import config_dir
-from newsnest.config import Config, build_sources
+from newsnest.config import Config, build_sources, drop_removed
 
 
 class ConfigEditError(Exception):
@@ -44,6 +44,9 @@ def edit_config(change: Callable[[CommentedMap], None]) -> None:
     data = y.load(path.read_text(encoding="utf-8"))
     change(data)
     plain = json.loads(json.dumps(data, default=str))
+    # Validate the way load_config reads it: options from older versions are ignored, not errors. They
+    # stay in the file untouched.
+    drop_removed(plain)
     try:
         cfg = Config.model_validate(plain)
         build_sources(cfg)

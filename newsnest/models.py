@@ -33,7 +33,7 @@ class Item:
     guid: str              # stable id from the feed, falls back to the url
     published: datetime | None  # timezone-aware UTC
     snippet: str = ""
-    publisher: str = ""    # human name of the outlet, e.g. "24ur.com"
+    publisher: str = ""    # human name of the outlet, e.g. "bbc.co.uk"
     extra: dict[str, Any] = field(default_factory=dict)
 
 

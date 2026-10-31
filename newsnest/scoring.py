@@ -25,22 +25,22 @@ MAX_SCORE_AGE = timedelta(days=3)
 MAX_ATTEMPTS = 3
 
 INSTRUCTIONS = """\
-You rate news items for one reader who lives in Ljubljana, Slovenia. You get the reader's interest \
+You rate news items for {reader}. You get the reader's interest \
 profile, example headlines they marked as wanted (+) or not wanted (-), their recent ratings, and a \
-batch of items with title, source and snippet. Most items are in Slovenian; judge the meaning, not \
+batch of items with title, source and snippet. Items can be in any language; judge the meaning, not \
 the language.
 
 For every item return:
 - topic (0-10): how well the subject matches the reader's stated interests.
-- importance (0-10): how significant the news is in general for someone living in Slovenia, \
+- importance (0-10): how significant the news is {importance_scope}, \
 regardless of the reader's interests. A national emergency, a major policy change, a large disaster \
 or a major world event scores high even when its topic is outside the profile.
 - personal (0-10): how likely this reader is to actually want to read this specific item, given \
 the profile, the examples and the ratings. Clickbait, advertorials, horoscopes, quizzes and \
 promotional pages score low.
-- reason: at most 8 words in English naming the decisive factor, e.g. "Ljubljana parking; local \
+- reason: at most 8 words in English naming the decisive factor, e.g. "city parking rules; local \
 interest".
-- category: exactly one of the allowed categories.
+- category: exactly one of the allowed categories.{place_note}
 {event_rules}
 
 Use this anchored scale for all three scores:
@@ -53,6 +53,24 @@ Return exactly one entry per input item and copy each item's id unchanged.
 
 Allowed categories: {categories}
 """
+
+
+def reader_phrase(cfg: Config) -> str:
+    """Who the prompts rate for: "one reader who lives in Berlin, Germany", or just "one reader"."""
+    place = cfg.region.place
+    return f"one reader who lives in {place}" if place else "one reader"
+
+
+def instructions(cfg: Config) -> str:
+    region = cfg.region
+    place_note = ""
+    if region.place and {"Local", "National"} & set(cfg.scoring.categories):
+        area = f"{region.city} and its area" if region.city else "the reader's city or area"
+        place_note = f' "Local" means {area}, "National" means {region.country}.'
+    return INSTRUCTIONS.format(
+        reader=reader_phrase(cfg),
+        importance_scope=f"for someone living in {region.country}" if region.country else "in general",
+        place_note=place_note, categories=", ".join(cfg.scoring.categories), event_rules=EVENT_RULES)
 
 
 def score_schema(categories: list[str]) -> dict:
@@ -88,8 +106,7 @@ def system_blocks(cfg: Config) -> list[dict]:
     profile = (f"<interest_profile>\n{strip_comments(read_profile('interests.md'))}\n</interest_profile>\n\n"
                f"<seed_examples>\n{seed_text}\n</seed_examples>")
     return [
-        {"type": "text", "text": INSTRUCTIONS.format(categories=", ".join(cfg.scoring.categories),
-                                                    event_rules=EVENT_RULES)},
+        {"type": "text", "text": instructions(cfg)},
         {"type": "text", "text": profile, "cache_control": {"type": "ephemeral"}},
     ]
 

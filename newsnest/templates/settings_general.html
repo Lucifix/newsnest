@@ -4,6 +4,14 @@
 {% block page %}
 {# Every control saves as soon as it changes; without JS the Save button below does it #}
 <form method="post" action="/settings/general" data-autosave>
+  {% call group('Where you live', footnote='Claude ranks stories for someone living there, and Local news packs follow your country. The web domain is optional: feeds on it always count as Local.') %}
+    {{ input_row('country', 'Country', cfg.region.country, required=false, placeholder='Germany', list='country-list', width='9em') }}
+    {{ input_row('city', 'City', cfg.region.city, required=false, placeholder='Berlin', width='9em') }}
+    {{ input_row('timezone', 'Time zone', cfg.timezone, list='tz-list', width='11em') }}
+    {{ input_row('tld', 'Local web domain', cfg.region.tld, required=false, placeholder='.de', width='5em') }}
+  {% endcall %}
+  {% include "_region_lists.html" %}
+
   {% call group('Reading') %}
     {{ toggle_row('auto_read_on_scroll', 'Mark read when I scroll past', checked=cfg.feed.auto_read_on_scroll) }}
     {{ toggle_row('calibration_mode', 'Calibration mode', 'Show every story with its score', cfg.scoring.calibration_mode) }}

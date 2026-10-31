@@ -93,7 +93,7 @@ def test_database_backup_download(client, tmp_path):
 
 def test_health_reports_problems(client):
     body = client.get("/health").json()
-    assert body["sources"] == 26
+    assert body["sources"] == 13
     assert body["status"] == "degraded"  # scheduler has not run in tests
     assert any("scheduler" in p for p in body["problems"])
 
@@ -125,8 +125,8 @@ def test_settings_edit_keeps_comments_and_validates(client, env):
     client.post("/settings/feed_remove", data={"id": "primorske-novice"})
     assert path.read_text(encoding="utf-8") == before  # round trip is lossless
     # the same address twice is refused (twice the requests ends in HTTP 429 and the red banner)
-    r = client.post("/settings/feed_add", data={"name": "24ur again", "url": "https://www.24ur.com/rss/",
-                                                 "category": "news"}, follow_redirects=False)
+    r = client.post("/settings/feed_add", data={"name": "BBC again", "url": "https://feeds.bbci.co.uk/news/world/rss.xml/",
+                                                 "category": "world"}, follow_redirects=False)
     assert "already+a+feed" in r.headers["location"] or "already%20a%20feed" in r.headers["location"]
     assert path.read_text(encoding="utf-8") == before
     # http feed is rejected by validation and nothing is written
@@ -135,12 +135,17 @@ def test_settings_edit_keeps_comments_and_validates(client, env):
     assert "error=" in r.headers["location"]
     assert path.read_text(encoding="utf-8") == before
     # moving a feed to another section takes its stored stories along
-    client.post("/settings/feed_section", data={"id": "24ur", "category": "world"})
-    assert {r[0] for r in connect().execute("SELECT category FROM items WHERE source_id = '24ur'")} == {"world"}
-    client.post("/settings/feed_section", data={"id": "24ur", "category": "news"})
+    client.post("/settings/feed_section", data={"id": "theverge", "category": "world"})
+    assert {r[0] for r in connect().execute("SELECT category FROM items WHERE source_id = 'theverge'")} == {"world"}
+    client.post("/settings/feed_section", data={"id": "theverge", "category": "tech"})
     assert path.read_text(encoding="utf-8") == before
-    assert "error=" in client.post("/settings/feed_section", data={"id": "24ur", "category": "local"},
+    assert "error=" in client.post("/settings/feed_section", data={"id": "theverge", "category": "local"},
                                    follow_redirects=False).headers["location"]
+    # a feed in another language stays where it was put: Local is only flagged, never moved
+    r = client.post("/settings/feed_add", data={"name": "BBC London", "url": "https://feeds.bbci.co.uk/news/england/london/rss.xml",
+                                                 "category": "news"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds?saved=feed_add#feed-bbc-london"
+    assert "category: news" in path.read_text(encoding="utf-8").split("id: bbc-london")[1].split("- id:")[0]
 
 
 def test_lifestyle_pack(client, env):
@@ -159,6 +164,63 @@ def test_lifestyle_pack(client, env):
     client.post("/settings/pack/lifestyle", data={"interest": "1"})
     assert read_profile("interests.md").count("Men's lifestyle and gear") == 1
     assert (env.config / "config.yaml").read_text(encoding="utf-8") == text
+
+
+def test_region_in_general_settings(client, env):
+    general = {"min_final": "5", "daily_usd": "0.5", "summary_language": "English"}
+    r = client.post("/settings/general", data={**general, "country": "Germany", "city": "Berlin", "timezone": "Europe/Berlin",
+                                               "tld": "DE"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/general?saved=general"
+    from newsnest.config import load_config
+    cfg = load_config(env.config).config
+    assert (cfg.region.place, cfg.region.tld, cfg.timezone) == ("Berlin, Germany", ".de", "Europe/Berlin")
+    page = client.get("/settings/general").text
+    assert 'value="Germany"' in page and '<option value="Europe/Berlin">' in page
+    r = client.post("/settings/general", data={**general, "country": "Germany", "city": "", "timezone": "Mars/Base", "tld": ""},
+                    follow_redirects=False)
+    assert "error=" in r.headers["location"] and "time+zone" in r.headers["location"].replace("%20", "+")
+
+
+def test_settings_save_with_options_from_older_versions(client, env):
+    # a config from before Google News and listings were removed still saves; the old options stay put
+    path = env.config / "config.yaml"
+    path.write_text(path.read_text(encoding="utf-8").replace("news_empty_hours: 3", "news_empty_hours: 3\n  listing_failed_runs: 2")
+                    + "\ngoogle_news:\n  enabled: false\nlistings:\n  enabled: false\n", encoding="utf-8")
+    r = client.post("/settings/general", data={"min_final": "5", "daily_usd": "0.5", "summary_language": "English",
+                                               "country": "Slovenia", "city": "Ljubljana", "timezone": "Europe/Ljubljana",
+                                               "tld": ".si"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/general?saved=general"
+    text = path.read_text(encoding="utf-8")
+    assert 'country: "Slovenia"' in text or "country: Slovenia" in text
+    assert "google_news:" in text and "listing_failed_runs: 2" in text
+
+
+def test_onboarding_asks_where_you_live_then_offers_the_pack(client, env):
+    from newsnest.config import load_config
+    from newsnest.packs import SLOVENIA, missing_from
+    assert "Where do you live?" in client.get("/profile").text
+    r = client.post("/settings/region", data={"next": "/profile", "country": "slovenia", "city": "Ljubljana", "timezone": ""},
+                    follow_redirects=False)
+    assert r.headers["location"] == "/profile?saved=region"
+    cfg = load_config(env.config).config
+    assert (cfg.region.country, cfg.region.tld, cfg.timezone) == ("slovenia", ".si", "Europe/Ljubljana")
+    page = client.get("/profile").text
+    assert "Where do you live?" not in page and "Local news for Slovenia" in page
+    missing = len(missing_from(SLOVENIA.feeds, load_config(env.config).config.feeds))
+    r = client.post("/settings/pack/local/si", data={"next": "/profile"}, follow_redirects=False)
+    assert r.headers["location"] == f"/profile?localpack={missing}"
+    assert "Local news for Slovenia" not in client.get("/profile").text
+    # a second tap adds nothing; an unknown pack is a 404; other next= values are ignored
+    r = client.post("/settings/pack/local/si", data={"next": "https://evil.example"}, follow_redirects=False)
+    assert r.headers["location"].startswith("/settings/feeds?localpack=0&")
+    assert client.post("/settings/pack/local/xx").status_code == 404
+    r = client.post("/settings/region", data={"next": "https://evil.example", "country": "Slovenia"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/general?saved=region"
+
+
+def test_feeds_page_offers_local_packs(client, env):
+    page = client.get("/settings/feeds").text
+    assert "Local news packs" in page and "Set your country in General" in page and "/settings/pack/local/si" in page
 
 
 def test_settings_watch_and_keywords(client, env):
@@ -306,8 +368,8 @@ def test_swipe_deck(client):
 def test_settings_pages_use_rows_menus_and_chips(client, env):
     feeds = client.get("/settings/feeds").text
     # a feed is one row: its section in a select, Pause and Remove in the ⋯ menu
-    assert 'id="feed-24ur"' in feeds and 'action="/settings/feed_section"' in feeds and "rowmenu-btn" in feeds
-    assert 'action="/settings/feed_toggle"' in feeds and 'data-confirm="Remove 24ur?"' in feeds
+    assert 'id="feed-theverge"' in feeds and 'action="/settings/feed_section"' in feeds and "rowmenu-btn" in feeds
+    assert 'action="/settings/feed_toggle"' in feeds and 'data-confirm="Remove The Verge?"' in feeds
     assert 'class="seg' not in feeds  # the four-button switch is gone
     topics = client.get("/settings/topics").text
     assert 'data-chipbox' in topics and 'name="mute"' in topics and 'name="must_show"' in topics

@@ -1,0 +1,3 @@
+{# Suggestions for the country and time zone fields: countries that have a Local news pack, and every zone #}
+<datalist id="country-list">{% for p in local_packs %}<option value="{{ p.country }}">{% endfor %}</datalist>
+<datalist id="tz-list">{% for z in time_zones %}<option value="{{ z }}">{% endfor %}</datalist>

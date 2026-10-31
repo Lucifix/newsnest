@@ -29,8 +29,8 @@ MAX_TRIES = 3
 EVENT_RULES = """\
 - event: a short label for the real-world event or story the item is about, lowercase ASCII words \
 joined by hyphens, at most 5 words, e.g. "php2shell-vulnerability", "tesla-q3-earnings", \
-"moharic-mandat-resnica". It must identify THAT event, not a topic: "php-flaw-patches" and \
-"slovenia-raises-cyber-threat-level" are the same event if the threat level was raised because of the \
+"city-council-budget-vote". It must identify THAT event, not a topic: "php-flaw-patches" and \
+"government-raises-cyber-threat-level" are the same event if the threat level was raised because of the \
 PHP flaw, but "cybersecurity" or "politics" are topics and wrong. If the item is about an event \
 listed in <active_events>, or about the same event as another item of this batch, use that exact \
 label, whatever language or angle the article has. Only invent a new label when the item is about \

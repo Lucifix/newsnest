@@ -2,7 +2,7 @@
 {% from "_settings_ui.html" import group, expand, remove_btn %}
 {% block stitle %}Topics &amp; filters{% endblock %}
 {% block page %}
-{% call group('Watches', footnote='Matches are tagged, never hidden. Keywords match at a word start, so use stems: ljubljan matches Ljubljani.') %}
+{% call group('Watches', footnote='Matches are tagged, never hidden. Keywords match at a word start, so use stems: electr matches electric and electricity.') %}
   {% for w in cfg.watches %}
   <div class="srow">
     <span class="srow-main"><span class="srow-title">{{ w.name }}</span><span class="srow-sub">{{ w.keywords|join(', ') }}</span></span>
