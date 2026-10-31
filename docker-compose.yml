@@ -1,15 +1,14 @@
 # NewsNest: production stack (Portainer: Stacks -> Add stack -> Repository, branch main).
-# The image is built on your own server from the Dockerfile. Secrets are set as environment variables
-# in the Portainer stack, never committed. Dev uses docker-compose.dev.yml on top of this file.
+# Pulls the published multi-arch image (linux/amd64 + linux/arm64). In a repo clone,
+# docker-compose.override.yml sits next to this file and builds the image from source instead.
+# Secrets are set as environment variables in the stack, never committed.
+# Dev uses docker-compose.dev.yml on top of this file.
 
 name: newsnest
 
 services:
   newsnest:
-    build: .
-    # Built locally from the Dockerfile; never pulled (there is no registry image)
-    image: newsnest:local
-    pull_policy: build
+    image: ghcr.io/lucifix/newsnest:${NEWSNEST_IMAGE_TAG:-latest}
     container_name: newsnest
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
