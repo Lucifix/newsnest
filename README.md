@@ -262,7 +262,8 @@ Planned work and known limits are tracked in [TODO.md](TODO.md).
 ## Contributing
 
 Bug reports, ideas and pull requests are welcome. Please open an issue first for anything big. Run
-`python -m pytest` before you send a PR, and add a test for what you change.
+`python -m pytest` and `ruff check .` before you send a PR (CI runs the linter on every PR), and add
+a test for what you change.
 
 **A local news pack for your country** is an easy first PR: add a `LocalPack` to `LOCAL_PACKS` in
 [`newsnest/packs.py`](newsnest/packs.py) with 8 to 10 national outlets across the spectrum, each checked

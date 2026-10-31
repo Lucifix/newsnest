@@ -2,3 +2,14 @@
 markers = ["auth: runs with the real login check"]
 
 # Licensed under the MIT License, see LICENSE
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = [".claude"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# fixtures imported from another test module are re-declared as arguments
+"tests/*" = ["F811"]
