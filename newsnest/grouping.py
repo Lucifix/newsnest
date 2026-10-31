@@ -1,7 +1,9 @@
 """Group articles about the same story, by headline word overlap weighted by rarity.
 
-A shared rare word ("php2sh", "cambri") says far more than a shared common one ("sloven"), so
-overlap is measured in IDF weight, not in word count. Items from News and Tech can join the same
+A shared rare word ("php2sh", "cambri") says far more than a shared common one ("govern"), so
+overlap is measured in IDF weight, not in word count. Words in more than COMMON_SHARE of the open
+headlines are filler and ignored, so any language works without word lists. The thresholds below
+were tuned on Slovenian headlines. Items from News and Tech can join the same
 story. The same outlet can join a story it is already in when the new article is a follow-up
 (hours later) or practically the same headline again.
 
@@ -18,9 +20,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from newsnest.db import iso, loads, parse_iso
+from newsnest.textmatch import SEED_STOPWORDS
 
 # Bump when the matcher changes: the runner regroups the last 72 h once after the deploy
-GROUPING_VERSION = "2"
+GROUPING_VERSION = "3"
 
 # Stories stay open for new members this long after their latest item
 STORY_WINDOW = timedelta(hours=36)
@@ -30,6 +33,7 @@ STORY_WINDOW = timedelta(hours=36)
 MIN_SHARED = 2          # at least two shared content words
 MIN_OVERLAP = 0.4       # shared weight / weight of the shorter headline
 MIN_SHARED_WEIGHT = 14.0  # about three ordinary words, or two names / rare terms
+COMMON_SHARE = 0.02     # a stem in this share of the open headlines is filler, not signal
 CORPUS_FLOOR = 1500     # weights assume at least this many headlines, so tiny databases behave like real ones
 SAME_OUTLET_GAP_H = 2.0  # a follow-up from the same outlet joins when this many hours later...
 SAME_OUTLET_OVERLAP = 0.6  # ...and clearly about the same thing
@@ -75,14 +79,19 @@ class StoryIndex:
         # Rarer = heavier; unseen tokens get the maximum
         return math.log((max(len(self.entries), CORPUS_FLOOR) + 2) / (self.df.get(token, 0) + 1))
 
+    def is_common(self, token: str) -> bool:
+        """Filler: an English seed word, or a stem in at least COMMON_SHARE of the open headlines."""
+        return token in SEED_STOPWORDS or self.df[token] >= COMMON_SHARE * max(len(self.entries), CORPUS_FLOOR)
+
     def match(self, tokens: frozenset, source_id: str, ts: float) -> int | None:
         """The story this headline belongs to, or None."""
+        tokens = frozenset(t for t in tokens if not self.is_common(t))
         if len(tokens) < MIN_SHARED:
             return None
         counts: Counter = Counter()
         for t in tokens:
             posting = self.postings.get(t)
-            if posting and len(posting) <= 400:  # a word in hundreds of headlines carries no signal
+            if posting:
                 counts.update(posting)
         weights = {t: self.weight(t) for t in tokens}
         total = sum(weights.values())
@@ -93,7 +102,7 @@ class StoryIndex:
             e = self.entries[idx]
             shared = tokens & e.tokens
             w_shared = sum(weights[t] for t in shared)
-            w_other = sum(self.weight(t) for t in e.tokens)
+            w_other = sum(self.weight(t) for t in e.tokens if not self.is_common(t))
             overlap = w_shared / max(0.001, min(total, w_other))
             if overlap < MIN_OVERLAP or w_shared < MIN_SHARED_WEIGHT:
                 continue

@@ -31,6 +31,11 @@ def test_keyword_pattern_matches_stems_and_diacritics():
     assert not matches(p, "Maribor dobil nov most")
 
 
+def test_title_tokens_keeps_every_word_and_leaves_filler_to_the_index():
+    assert {"the", "munich"} <= title_tokens("The Munich-based Müller's 42 plans")
+    assert {"42"} <= title_tokens("The Munich-based Müller's 42 plans") and "a" not in title_tokens("a b 7")
+
+
 def test_title_tokens_fold_inflections():
     assert {"ljublj", "parkir"} <= title_tokens("Ljubljana uvaja nove parkirne cone")
     assert "ljublj" in title_tokens("V Ljubljani zaprli cesto")
@@ -99,6 +104,73 @@ def test_regroup_merges_existing_items(conn, cfg):
     out = regroup(conn, 72, NOW)
     assert out["stories_before"] == 2 and out["stories_after"] == 1
     assert conn.execute("SELECT source_count FROM stories").fetchone()[0] == 2
+
+
+GERMAN_EVENT = [
+    "Bundesregierung beschließt Rentenreform nach langem Streit",
+    "Rentenreform: Bundesregierung einigt sich nach langem Streit",
+    "Nach langem Streit beschließt die Bundesregierung die Rentenreform",
+    "Koalition einigt sich auf Rentenreform, Streit beigelegt",
+    "Rentenreform beschlossen: Bundesregierung beendet langen Streit",
+]
+GERMAN_OTHER = [
+    "Hochwasser in Passau: Pegel steigt weiter an",
+    "Bayern München gewinnt Heimspiel gegen Leverkusen",
+    "Neue Studie zeigt: Kaffee senkt das Risiko für Diabetes",
+    "Deutsche Bahn kündigt Fahrplanwechsel im Dezember an",
+    "Wetterdienst warnt vor Glatteis im Norden",
+    "Tesla eröffnet neue Ladestation in Hamburg",
+    "Bürgermeister von Köln eröffnet Weihnachtsmarkt",
+    "Polizei findet vermisste Wanderin in den Alpen",
+    "Inflation im Euroraum sinkt auf zwei Prozent",
+    "Berliner Philharmoniker kündigen Tournee durch Asien an",
+    "Lufthansa streicht hundert Flüge wegen Streik",
+    "Forscher entdecken neue Pilzart im Schwarzwald",
+    "Mieten in München steigen erneut deutlich",
+    "Fußballverband sperrt Trainer nach Beleidigung",
+    "Apothekerverband fordert höhere Honorare",
+    "Schüler aus Leipzig gewinnen Robotik-Wettbewerb",
+    "Autobahn A7 nach Unfall stundenlang gesperrt",
+    "Museum in Dresden zeigt seltene Gemälde aus Italien",
+    "Hersteller ruft Kinderspielzeug wegen Verletzungsgefahr zurück",
+    "Landwirte protestieren mit Traktoren vor dem Rathaus",
+]
+
+
+def test_language_without_word_lists_groups_one_event_and_nothing_else(conn, cfg):
+    pf = Prefilter(cfg)
+    # interleave so the event headlines are spread among the unrelated ones
+    titles = [(f"s{i}", t) for i, t in enumerate(GERMAN_OTHER[:10])]
+    for i, t in enumerate(GERMAN_EVENT):
+        titles.append((f"e{i}", t))
+    titles += [(f"s{i + 10}", t) for i, t in enumerate(GERMAN_OTHER[10:])]
+    for n, (sid, t) in enumerate(titles):
+        ingest(conn, src(sid), [item(sid, t, f"https://{sid}.example/{n}")], pf, NOW)
+    rows = conn.execute("SELECT source_id, story_id FROM items").fetchall()
+    event = {r["story_id"] for r in rows if r["source_id"].startswith("e")}
+    assert len(event) == 1
+    assert sum(r["story_id"] in event for r in rows) == 5
+    assert len({r["story_id"] for r in rows}) == 1 + len(GERMAN_OTHER)
+
+
+def test_a_stem_in_many_headlines_is_filler_not_a_shared_word():
+    from newsnest.grouping import COMMON_SHARE, CORPUS_FLOOR, StoryIndex
+    limit = int(COMMON_SHARE * CORPUS_FLOOR)
+
+    def build(n_filler):
+        index = StoryIndex()
+        index.add(1, "a", 0.0, frozenset({"regier", "alphax", "betay"}))
+        for i in range(n_filler):
+            index.add(2 + i, "f", 0.0, frozenset({"regier", f"uniq{i}a", f"uniq{i}b"}))
+        return index
+
+    query = frozenset({"regier", "alphax", "betay"})
+    # while "regier" is still rare enough it adds weight and the two headlines merge...
+    assert build(5).match(query, "b", 0.0) == 1
+    # ...once it is in more than COMMON_SHARE of the headlines only the two other words count: not enough
+    index = build(limit + 5)
+    assert index.is_common("regier") and not index.is_common("alphax")
+    assert index.match(query, "b", 0.0) is None
 
 
 def test_prefilter_watch_beats_mute(conn, cfg):
