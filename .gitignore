@@ -14,5 +14,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Built GitHub Pages site (site/build.sh)
+_site/
+
 # Spike output
 spike-output*.md
