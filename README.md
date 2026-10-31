@@ -15,7 +15,7 @@ into a single card, and uses Claude to rank and summarise what matters to you.
 ![Self-hosted](https://img.shields.io/badge/self--hosted-yes-2ea44f)
 ![Powered by Claude](https://img.shields.io/badge/AI-Claude-D97757)
 
-[Features](#features) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Configuration](#configuration) · [Development](#development)
+[Website](https://lucifix.github.io/newsnest/) · [Features](#features) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Configuration](#configuration) · [Development](#development)
 
 <br>
 
