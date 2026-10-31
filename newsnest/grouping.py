@@ -33,7 +33,7 @@ STORY_WINDOW = timedelta(hours=36)
 MIN_SHARED = 2          # at least two shared content words
 MIN_OVERLAP = 0.4       # shared weight / weight of the shorter headline
 MIN_SHARED_WEIGHT = 14.0  # about three ordinary words, or two names / rare terms
-COMMON_SHARE = 0.02     # a stem in this share of the open headlines is filler, not signal
+COMMON_SHARE = 0.03     # a stem in this share of the open headlines is filler, not signal
 CORPUS_FLOOR = 1500     # weights assume at least this many headlines, so tiny databases behave like real ones
 SAME_OUTLET_GAP_H = 2.0  # a follow-up from the same outlet joins when this many hours later...
 SAME_OUTLET_OVERLAP = 0.6  # ...and clearly about the same thing
