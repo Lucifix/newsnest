@@ -298,7 +298,8 @@ _warned: set[str] = set()
 _REMOVED_SECTIONS = ("google_news", "listings")
 
 
-def _drop_removed(raw: dict) -> list[str]:
+def drop_removed(raw: dict) -> list[str]:
+    """Remove the options older versions understood from a parsed config; returns which were there."""
     dropped = [k for k in _REMOVED_SECTIONS if raw.pop(k, None) is not None]
     heartbeat = raw.get("heartbeat")
     if isinstance(heartbeat, dict) and heartbeat.pop("listing_failed_runs", None) is not None:
@@ -314,7 +315,7 @@ def load_config(config_dir: Path) -> LoadedConfig:
         return LoadedConfig(None, [], [f"{path} not found"])
     except yaml.YAMLError as e:
         return LoadedConfig(None, [], [f"{path}: invalid YAML: {e}"])
-    if isinstance(raw, dict) and (dropped := _drop_removed(raw)):
+    if isinstance(raw, dict) and (dropped := drop_removed(raw)):
         if (note := ", ".join(dropped)) not in _warned:  # the config is re-read every tick: say it once
             _warned.add(note)
             log.warning("config.yaml: ignoring options that no longer exist: %s", note)
