@@ -267,3 +267,10 @@ Bug reports, ideas and pull requests are welcome. Please open an issue first for
 **A local news pack for your country** is an easy first PR: add a `LocalPack` to `LOCAL_PACKS` in
 [`newsnest/packs.py`](newsnest/packs.py) with 8 to 10 national outlets across the spectrum, each checked
 with `newsnest.discovery.check_feed` (https, working, posting in the last two weeks).
+
+## License
+
+[MIT](LICENSE), except the bundled fonts in [`newsnest/static/fonts/`](newsnest/static/fonts/):
+[JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) and
+[Space Grotesk](https://github.com/floriankarsten/space-grotesk) are licensed under the
+[SIL Open Font License 1.1](https://openfontlicense.org); their license files sit next to the fonts.

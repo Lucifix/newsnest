@@ -1,2 +1,4 @@
 [tool.pytest.ini_options]
 markers = ["auth: runs with the real login check"]
+
+# Licensed under the MIT License, see LICENSE
