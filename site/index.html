@@ -70,8 +70,8 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         <a class="btn ghost" href="https://github.com/Lucifix/newsnest">View on GitHub</a>
       </div>
-      <button type="button" class="cmd" data-copy="docker compose up -d --build" aria-label="Copy the start command">
-        <span class="cmd-prompt">$</span><code>docker compose up -d --build</code>
+      <button type="button" class="cmd" data-copy="docker compose up -d" aria-label="Copy the start command">
+        <span class="cmd-prompt">$</span><code>docker compose up -d</code>
         <span class="cmd-copy" data-copy-label>Copy</span>
       </button>
     </div>
@@ -548,11 +548,11 @@
       <div class="term reveal">
         <div class="term-bar"><i></i><i></i><i></i><span class="mono">terminal</span>
           <button type="button" class="term-copy" data-copy-from="install-cmd" aria-label="Copy the install commands"><span data-copy-label>Copy</span></button></div>
-<pre id="install-cmd"><code><span class="c">git clone</span> https://github.com/Lucifix/newsnest.git
-<span class="c">cd</span> newsnest
-<span class="c">cp</span> .env.example .env     <span class="cm"># set NEWSNEST_PASSWORD and ANTHROPIC_API_KEY</span>
+<pre id="install-cmd"><code><span class="c">mkdir</span> newsnest &amp;&amp; <span class="c">cd</span> newsnest
+<span class="c">curl</span> -fsSLO https://raw.githubusercontent.com/Lucifix/newsnest/main/docker-compose.yml
+<span class="c">curl</span> -fsSL https://raw.githubusercontent.com/Lucifix/newsnest/main/.env.example -o .env     <span class="cm"># set NEWSNEST_PASSWORD and ANTHROPIC_API_KEY</span>
 <span class="c">mkdir</span> -p config data
-<span class="c">docker compose</span> up -d --build</code></pre>
+<span class="c">docker compose</span> up -d</code></pre>
       </div>
       <ol class="setup reveal">
         <li><span class="n">1</span><div><h3>Say where you live</h3><p>Your country and city tell Claude whose news is “big”.</p></div></li>
@@ -562,6 +562,9 @@
     </div>
     <p class="note reveal">Open <code>http://localhost:3095</code>, log in with your password, and tap <b>Set up my profile</b>.
       The login is a single shared password, so put NewsNest behind an HTTPS reverse proxy before you expose it to the internet.</p>
+    <p class="note reveal">This pulls the published image for amd64 and arm64, so a Raspberry Pi works too:
+      <code>ghcr.io/lucifix/newsnest</code> or <code>lucifix/newsnest</code> on Docker Hub. For a Portainer stack, or to
+      build from source, see the <a href="https://github.com/Lucifix/newsnest#quick-start">README</a>.</p>
   </section>
 
   <!-- Local packs -->
