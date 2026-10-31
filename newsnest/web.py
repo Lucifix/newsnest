@@ -17,7 +17,7 @@ import zlib
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, available_timezones
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -33,16 +33,16 @@ from newsnest.config import Config, LoadedConfig, load_config, slugify
 from newsnest.config_edit import ConfigEditError, edit_config, remove_where, section_list, section_map
 from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
-from newsnest.discovery import (STARTER_PACK, add_candidates, check_feed, named_sources, parse_opml, promotion_suggestions,
-                             start_check_thread, starter_missing, _signals)
+from newsnest.discovery import (STARTER_PACK, add_candidates, named_sources, parse_opml, promotion_suggestions,
+                             region_words, start_check_thread, starter_missing, _signals)
 from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
                         read_stories, recall, remember, saved_stories, search_stories, story_hidden, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
 from newsnest.missed import handle_missed
 from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
-from newsnest.packs import LIFESTYLE_INTEREST, LIFESTYLE_PACK, add_interest, add_pack, missing_from
+from newsnest.packs import LIFESTYLE_INTEREST, LIFESTYLE_PACK, LOCAL_PACKS, add_interest, add_pack, missing_from, pack_for
 from newsnest.profile_ai import draft_profile
-from newsnest.sections import LABELS, SECTIONS, foreign_local, local_section, looks_slovenian, recent_texts, refile_items
+from newsnest.sections import LABELS, SECTIONS, foreign_local, refile_items
 from newsnest.status import collect_status
 from newsnest.summaries import key_points, summarize_on_demand
 from newsnest.textmatch import normalize_url
@@ -235,7 +235,7 @@ def get_loaded() -> LoadedConfig:
 
 
 def tz_of(loaded: LoadedConfig) -> ZoneInfo:
-    return ZoneInfo(loaded.config.timezone if loaded.config else "Europe/Ljubljana")
+    return ZoneInfo(loaded.config.timezone if loaded.config else "UTC")
 
 
 def feed_host(url: str) -> str:
@@ -774,12 +774,20 @@ def proposal_reject(pid: int, conn=Depends(get_conn)):
 
 # Settings is a few short pages, iOS Settings style; every change lands back on the page it was made on
 SETTINGS_PAGES = ("general", "feeds", "discover", "topics", "more", "app")
-ACTION_PAGE = {"general": "general",
+ACTION_PAGE = {"general": "general", "region": "general",
                "feed_add": "feeds", "feed_section": "feeds", "feed_remove": "feeds", "feed_toggle": "feeds",
                "watch_add": "topics", "watch_remove": "topics", "keywords": "topics",
                "repo_add": "more", "repo_remove": "more"}
 # These are made on the Calibration page and go back there
 CALIBRATION_ACTIONS = ("threshold", "calibration_toggle")
+TIME_ZONES = sorted(available_timezones())
+
+
+def local_pack_context(cfg: Config) -> dict:
+    """The Local news pack for the reader's country (and which of its feeds they don't have yet), plus all packs."""
+    pack = pack_for(cfg.region.country)
+    return {"local_packs": list(LOCAL_PACKS.values()), "local_pack": pack,
+            "local_missing": missing_from(pack.feeds, cfg.feeds) if pack else []}
 
 
 def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
@@ -791,10 +799,13 @@ def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
     ctx = {"nav": {"feeds": len(cfg.feeds), "watches": len(cfg.watches), "earned": len(suggestions),
                    "trial": conn.execute("SELECT COUNT(*) FROM candidates WHERE status = 'candidate'").fetchone()[0]}}
     if page == "general":
-        ctx["spent"] = spent_today(conn, cfg)
+        ctx.update(spent=spent_today(conn, cfg), time_zones=TIME_ZONES, **local_pack_context(cfg))
+    elif page == "profile":
+        ctx.update(time_zones=TIME_ZONES, **local_pack_context(cfg))
     elif page == "feeds":
-        ctx.update(foreign=foreign_local(conn, loaded.sources), lifestyle_missing=missing_from(LIFESTYLE_PACK, cfg.feeds),
-                   lifestyle_interest=LIFESTYLE_INTEREST.lower() in read_profile("interests.md").lower())
+        ctx.update(foreign=foreign_local(conn, loaded.sources, cfg.region.tld), lifestyle_missing=missing_from(LIFESTYLE_PACK, cfg.feeds),
+                   lifestyle_interest=LIFESTYLE_INTEREST.lower() in read_profile("interests.md").lower(),
+                   **local_pack_context(cfg))
     elif page == "discover":
         ctx.update(candidates=candidate_rows(conn), suggestions=suggestions, starter_missing=starter_missing(conn, cfg),
                    starter_total=len(parse_opml(STARTER_PACK.read_bytes())))
@@ -844,18 +855,6 @@ def _lines(text: str) -> list[str]:
     return [line.strip() for line in text.replace(",", "\n").splitlines() if line.strip()]
 
 
-def _local_feed_slovenian(url: str, cfg: Config | None) -> bool | None:
-    """Whether a feed added under Local is in Slovenian: a .si domain is, else fetch it once and read
-    its headlines. None when that can't be told (unreachable, too few entries)."""
-    if looks_slovenian([], url):
-        return True
-    import httpx
-    ua = cfg.http.user_agent if cfg else "newsnest"
-    with httpx.Client(follow_redirects=True, timeout=15, headers={"User-Agent": ua}) as client:
-        res = check_feed(client, url)
-    return res.slovenian if res.ok else None
-
-
 def _refuse_duplicate(feeds: list, url: str) -> None:
     """The same feed twice means twice the requests: sites answer that with 429 and the red banner."""
     key = normalize_url(url.strip())
@@ -885,18 +884,64 @@ async def lifestyle_pack(request: Request):
                             f"&interest={1 if form.get('interest') else 0}#section-lifestyle", status_code=303)
 
 
+def _onboarding_next(form) -> bool:
+    """Region and pack forms on the onboarding page go back there; nothing else is followed."""
+    return form.get("next") == "/profile"
+
+
+def _write_region(data, form) -> None:
+    """Country and city from a form, plus the web domain and time zone when it has them. A country with a
+    Local pack fills in the pack's domain and zone when the form leaves them out (the onboarding form does)."""
+    region = section_map(data, "region")
+    region["country"], region["city"] = form.get("country", "").strip(), form.get("city", "").strip()
+    pack = pack_for(region["country"])
+    if "tld" in form:
+        region["tld"] = form["tld"].strip()
+    elif pack and not region.get("tld"):
+        region["tld"] = pack.tld
+    zone = form.get("timezone", "").strip()
+    if zone:
+        data["timezone"] = zone
+    elif pack:
+        data["timezone"] = pack.timezone
+
+
+@app.post("/settings/pack/local/{code}")
+async def local_pack(code: str, request: Request):
+    """One tap: a country's Local news feeds as regular sources (its tech sites go to Tech), and the
+    country's web domain as the region's when none is set."""
+    pack = LOCAL_PACKS.get(code)
+    if not pack:
+        raise HTTPException(404)
+    form = await request.form()
+    back = "/profile" if _onboarding_next(form) else "/settings/feeds"
+    counts = {}
+
+    def change(data):
+        counts["added"], counts["moved"] = add_pack(section_list(data, "feeds"), pack.feeds, "news")
+        region = section_map(data, "region")
+        if not region.get("tld") and pack_for(region.get("country") or "") is pack:
+            region["tld"] = pack.tld
+
+    try:
+        edit_config(change)
+    except (ConfigEditError, KeyError, ValueError) as e:
+        return RedirectResponse(f"{back}?error={quote(str(e)[:500])}", status_code=303)
+    await asyncio.to_thread(_refile)
+    if back == "/profile":
+        return RedirectResponse(f"/profile?localpack={counts['added']}", status_code=303)
+    return RedirectResponse(f"/settings/feeds?localpack={counts['added']}&packmoved={counts['moved']}&country={quote(pack.country)}"
+                            "#section-news", status_code=303)
+
+
 @app.post("/settings/{action}")
 async def settings_action(action: str, request: Request):
     form = dict(await request.form())
     back = "/calibration" if action in CALIBRATION_ACTIONS else f"/settings/{ACTION_PAGE.get(action, 'general')}"
+    if action == "region" and _onboarding_next(form):
+        back = "/profile"
     if "category" in form and form["category"] not in SECTIONS:
         return RedirectResponse(f"{back}?error={quote('unknown section ' + form['category'])}", status_code=303)
-    moved = ""
-    # Local is Slovenian outlets: a feed that isn't goes to World, and the page says so
-    if action == "feed_add" and form["category"] == "news":
-        slovenian = await asyncio.to_thread(_local_feed_slovenian, form["url"].strip(), load_config(config_dir()).config)
-        if local_section("news", slovenian) == "world":
-            form["category"], moved = "world", form["name"].strip()
 
     def change(data):
         if action == "feed_add":
@@ -938,6 +983,10 @@ async def settings_action(action: str, request: Request):
             data["budget"]["daily_usd"] = float(form["daily_usd"])
             data["scoring"]["summary_language"] = form["summary_language"].strip() or "English"
             section_map(data, "feed")["auto_read_on_scroll"] = form.get("auto_read_on_scroll") == "on"
+            if "country" in form:
+                _write_region(data, form)
+        elif action == "region":
+            _write_region(data, form)
         else:
             raise ConfigEditError(f"unknown action {action}")
 
@@ -945,8 +994,7 @@ async def settings_action(action: str, request: Request):
         edit_config(change)
     except (ConfigEditError, KeyError, ValueError) as e:
         return RedirectResponse(f"{back}?error={quote(str(e)[:500])}", status_code=303)
-    extra = f"&moved={quote(moved)}" if moved else ""
-    anchor = ""
+    extra = anchor = ""
     # Feed changes come back to the feed's own row, so the page doesn't jump to the top
     if action == "feed_section":
         n = await asyncio.to_thread(_refile)
@@ -1002,7 +1050,7 @@ async def discovery_import(request: Request, loaded: LoadedConfig = Depends(get_
             data, origin = r.content, url
         else:
             raise ValueError("choose an OPML file or paste an https link to one")
-        feeds = parse_opml(data, category)
+        feeds = parse_opml(data, category, region_words(cfg))
     except Exception as e:  # bad file, bad link, not OPML
         from urllib.parse import quote
         return RedirectResponse(f"/settings/discover?error={quote(f'OPML import failed: {e}'[:300])}", status_code=303)
@@ -1019,7 +1067,7 @@ def discovery_action(source_id: str, action: str, conn=Depends(get_conn), loaded
     if not row or action not in ("promote", "remove", "restore"):
         raise HTTPException(404)
     if action == "promote":
-        category = local_section(row["category"], looks_slovenian(recent_texts(conn, source_id), row["url"]))
+        category = row["category"]
 
         def change(data):
             _refuse_duplicate(section_list(data, "feeds"), row["url"])

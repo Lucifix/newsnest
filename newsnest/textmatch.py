@@ -28,7 +28,7 @@ def fold(text: str) -> str:
 
 
 def keyword_pattern(keywords: list[str]) -> re.Pattern | None:
-    """Case-insensitive match at a word start, so Slovenian stems catch every inflection."""
+    """Case-insensitive match at a word start, so stems catch every inflection."""
     words = [fold(k) for k in keywords if k.strip()]
     if not words:
         return None
@@ -39,12 +39,8 @@ def matches(pattern: re.Pattern | None, *texts: str | None) -> bool:
     return bool(pattern) and any(pattern.search(fold(t)) for t in texts if t)
 
 
-# Function words that say nothing about which story a headline is about (Slovenian + English)
-_STOPWORDS = set("""
-in je se na za da so ki ne pa bo bi z s v k o od do po pri iz ali tudi kot ter ze še se ga jo ju jih
-smo ste sem si bil bila bilo bili bodo lahko kaj kako kdo kje zakaj tega ta to te ti tem teh tej
-vse vsi več vec nov nova novo nove novi med pred nad pod brez proti zaradi glede dan leta let
-huda hudo hude hudi spet danes foto video pozor letni letnik moski moški zenska ženska
+# Seed for the learned filler words (see newsnest.grouping.StoryIndex.is_common): English function words
+SEED_STOPWORDS = set("""
 the a an of to and or in on at for with by from as is are was were be been it its this that these
 those has have had will would can could not no new how why what who when after over into about
 says said than more most just now out up off your you our their his her they we he she
@@ -52,13 +48,12 @@ says said than more most just now out up off your you our their his her they we 
 
 
 def title_tokens(title: str) -> set[str]:
-    """Content-word stems of a headline. Prefix stemming (6 chars) folds Slovenian inflections:
-    Ljubljana/Ljubljani -> ljublj, Dončić/Dončića -> doncic."""
+    """Word stems of a headline. Prefix stemming (6 chars) folds inflections:
+    Ljubljana/Ljubljani -> ljublj, Munich/Munich's -> munich. Filler words are not removed here:
+    StoryIndex learns them from the headlines themselves."""
     words = re.findall(r"[a-z0-9]+", fold(title))
     out = set()
     for w in words:
-        if w in _STOPWORDS:
-            continue
         if w.isdigit():
             if len(w) >= 2:
                 out.add(w)

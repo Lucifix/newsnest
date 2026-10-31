@@ -65,7 +65,7 @@ def echo_scores(kwargs, topic=7, importance=5, personal=6):
     text = kwargs["messages"][0]["content"][-1]["text"]
     ids = [int(i) for i in re.findall(r"id=(\d+)", text)]
     return json.dumps({"items": [{"id": i, "topic": topic, "importance": importance, "personal": personal,
-                                  "reason": "test", "category": "Ljubljana"} for i in ids]}), "end_turn"
+                                  "reason": "test", "category": "Local"} for i in ids]}), "end_turn"
 
 
 @pytest.fixture(autouse=True)

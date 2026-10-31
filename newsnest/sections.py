@@ -1,8 +1,8 @@
 """The feed sections a source belongs to: Local (stored as "news"), World, Tech and Lifestyle.
 
-Local is Slovenian outlets. A feed filed under Local whose stories are not in Slovenian goes to World
-instead (when it is added, checked or promoted), and the settings page flags any that slipped through.
-Stories keep the section they were fetched with, so refile_items() moves them when a source changes
+Local is whatever the reader files there: news from where they live. A Local feed whose stories don't
+read like the other Local feeds (most likely another language) is flagged on the settings page, never
+moved. The check knows no language: it learns the common words of the other Local feeds. Stories keep the section they were fetched with, so refile_items() moves them when a source changes
 section. A Local outlet's foreign news (Claude's "World" category) is shown under World.
 """
 
@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from collections import Counter
 from datetime import timedelta
 from urllib.parse import urlsplit
 
 from newsnest.config import Source
 from newsnest.db import iso, utcnow
+from newsnest.textmatch import fold
 
 SECTIONS = ("news", "world", "tech", "lifestyle")
 LABELS = {"news": "Local", "world": "World", "tech": "Tech", "lifestyle": "Lifestyle"}
@@ -35,53 +37,57 @@ def tab_of(scope: str) -> str:
     """The dock tab a filter lights up: Local and World both belong to News."""
     return HEADLINES if scope in ("news", "world", HEADLINES) else scope
 
-# Short words that are common in Slovenian headlines and rare in English ("so", "da" left out)
-_SL_WORDS = {"je", "za", "na", "se", "ki", "pri", "bo", "bodo", "tudi", "ali", "iz", "od", "po", "kot", "ter",
-             "pred", "med", "kaj", "kako", "zakaj", "ne", "bi", "še", "več", "lahko", "prvič", "leta"}
-_SL_CHARS = re.compile(r"[čšžČŠŽ]")
-_WORD = re.compile(r"[a-zčšžćđ]+")
+# The local vocabulary: words in at least this share of the other Local feeds' stories, most common first.
+# In any language with spaces between words these are its function words ("je", "und", "the"); in one
+# without (Japanese, Chinese) too few words qualify and the check stays silent.
+VOCAB_SHARE = 0.03
+VOCAB_SIZE = 60
+VOCAB_MIN = 15
+_WORD = re.compile(r"[^\W\d_]{2,}")
 
 
-def _text_slovenian(text: str) -> bool:
-    if _SL_CHARS.search(text):
-        return True
-    return len(set(_WORD.findall(text.lower())) & _SL_WORDS) >= 2
+def text_words(text: str) -> set[str]:
+    return set(_WORD.findall(fold(text)))
 
 
-def looks_slovenian(texts: list[str], url: str | None = None) -> bool | None:
-    """Whether a feed's headlines (and snippets) read as Slovenian; None with too little to go on.
-    A .si domain is enough on its own."""
-    if url and (urlsplit(url).hostname or "").endswith(".si"):
+def vocabulary(texts: list[str]) -> set[str]:
+    """The words that make texts read like this set of texts (see VOCAB_SHARE)."""
+    df: Counter = Counter()
+    for t in texts:
+        df.update(text_words(t))
+    floor = max(3, VOCAB_SHARE * len(texts))
+    return {w for w, n in df.most_common(VOCAB_SIZE) if n >= floor}
+
+
+def looks_local(texts: list[str], url: str | None, vocab: set[str], tld: str = "") -> bool | None:
+    """Whether a feed's stories (headline + snippet) read like the reader's Local feeds; None with too
+    little to go on. A url on the region's domain (tld, e.g. ".si") is enough on its own."""
+    if tld and url and (urlsplit(url).hostname or "").endswith(tld):
         return True
     texts = [t for t in texts if t and t.strip()]
-    if len(texts) < 3:
+    if len(texts) < 3 or len(vocab) < VOCAB_MIN:
         return None
-    return sum(_text_slovenian(t) for t in texts) >= 0.4 * len(texts)
+    return sum(len(text_words(t) & vocab) >= 2 for t in texts) >= 0.4 * len(texts)
 
 
-def recent_texts(conn: sqlite3.Connection, source_id: str, limit: int = 30) -> list[str]:
-    rows = conn.execute("SELECT title, snippet FROM items WHERE source_id = ? ORDER BY id DESC LIMIT ?",
-                        (source_id, limit))
-    return [f"{r['title']} {r['snippet'] or ''}" for r in rows]
-
-
-def local_section(category: str, slovenian: bool | None) -> str:
-    """Local only for Slovenian feeds: a feed filed under Local that is clearly not goes to World."""
-    return "world" if category == "news" and slovenian is False else category
-
-
-def foreign_local(conn: sqlite3.Connection, sources: list[Source], days: int = 3) -> set[str]:
-    """Local sources whose recent stories don't read as Slovenian (flagged on the settings page)."""
+def foreign_local(conn: sqlite3.Connection, sources: list[Source], tld: str = "", days: int = 3) -> set[str]:
+    """Local sources whose recent stories don't read like the other Local feeds (flagged on the settings
+    page). Each feed is measured against the others, so a wrong one can't vouch for itself."""
     local = {s.id: s.url for s in sources if s.category == "news" and s.type == "rss"}
-    if not local:
+    if len(local) < 2:
         return set()
     texts: dict[str, list[str]] = {sid: [] for sid in local}
-    rows = conn.execute("SELECT source_id, title, snippet FROM items WHERE fetched_at >= ? AND category = 'news'",
-                        (iso(utcnow() - timedelta(days=days)),))
+    rows = conn.execute("SELECT source_id, title, snippet FROM items WHERE fetched_at >= ? AND category = 'news' "
+                        "ORDER BY id DESC", (iso(utcnow() - timedelta(days=days)),))
     for r in rows:
         if r["source_id"] in texts and len(texts[r["source_id"]]) < 30:
             texts[r["source_id"]].append(f"{r['title']} {r['snippet'] or ''}")
-    return {sid for sid, t in texts.items() if looks_slovenian(t, local[sid]) is False}
+    flagged = set()
+    for sid, own in texts.items():
+        vocab = vocabulary([t for other, ts in texts.items() if other != sid for t in ts])
+        if looks_local(own, local[sid], vocab, tld) is False:
+            flagged.add(sid)
+    return flagged
 
 
 def refile_items(conn: sqlite3.Connection, sources: list[Source]) -> int:
