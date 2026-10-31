@@ -391,7 +391,8 @@ def test_profile_tuning_groups_and_reset(client):
         conn.execute("INSERT INTO weights (kind, key, weight, updated_at) VALUES (?, ?, ?, ?)", (kind, key, w, iso(NOW)))
     page = client.get("/profile").text
     more, less, small = page.index("Showing more"), page.index("Showing less"), page.index("Small adjustments")
-    title = lambda name: page.index(f'class="srow-title">{name}<')
+    def title(name):
+        return page.index(f'class="srow-title">{name}<')
     assert more < title("24ur") < less < title("Sport") < small < title("Kultura")
     assert 'aria-label="Back to normal: Sport"' in page and "Forget all tuning" in page
     r = client.post("/api/weights/reset", data={"kind": "category", "key": "Sport"}, follow_redirects=False)
@@ -457,7 +458,8 @@ def test_a_connection_can_move_between_threads(conn):
     import threading
     out = []
     t = threading.Thread(target=lambda: out.append(conn.execute("SELECT 1").fetchone()[0]))
-    t.start(); t.join()
+    t.start()
+    t.join()
     assert out == [1]
 
 

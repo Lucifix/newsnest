@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import difflib
 import hmac
 from html import escape as html_escape
 from urllib.parse import quote

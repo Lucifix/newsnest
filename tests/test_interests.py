@@ -2,7 +2,6 @@ import json
 from datetime import datetime, timezone
 
 from newsnest.ai import AIClient
-from newsnest.db import iso
 from newsnest.interests import apply_changes, bullet_diff, bullets, word_diff
 from newsnest.profile import read_profile, write_profile
 from newsnest.profile_ai import weekly_proposal
