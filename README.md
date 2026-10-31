@@ -32,6 +32,10 @@ into a single card, and uses Claude to rank and summarise what matters to you.
   </tr>
 </table>
 
+<sub>Outlets and headlines are made up. Photos from <a href="https://unsplash.com">Unsplash</a> by
+<a href="https://unsplash.com/@afgprogrammer">Mohammad Rahmani</a>, <a href="https://unsplash.com/@gabiontheroad">Gabriella Clare Marino</a>
+and <a href="https://unsplash.com/@amoltyagi2">Amol Tyagi</a>.</sub>
+
 </div>
 
 ## Why NewsNest?
