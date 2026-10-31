@@ -258,3 +258,7 @@ Planned work and known limits are tracked in [TODO.md](TODO.md).
 
 Bug reports, ideas and pull requests are welcome. Please open an issue first for anything big. Run
 `python -m pytest` before you send a PR, and add a test for what you change.
+
+## License
+
+[MIT](LICENSE)
