@@ -7,3 +7,9 @@ data
 *.db
 **/__pycache__
 spike-output*.md
+.claude
+.github
+.DS_Store
+docs
+site
+tests

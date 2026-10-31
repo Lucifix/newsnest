@@ -15,6 +15,9 @@ COPY config.example/ config.example/
 
 # Compose overrides the user with PUID:PGID so bind-mounted files stay owned by the host user
 RUN useradd --uid 1000 --create-home newsnest
+# A named volume takes the owner of the image path it mounts over; without these, Docker creates
+# them root-owned and the app exits because it can't write the config or the database
+RUN mkdir -p /config /data && chown newsnest:newsnest /config /data
 USER newsnest
 
 EXPOSE 8080

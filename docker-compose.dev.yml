@@ -5,7 +5,10 @@ name: newsnest-dev
 
 services:
   newsnest:
+    # -f skips docker-compose.override.yml, so the dev build is spelled out here
+    build: .
     image: newsnest:dev
+    pull_policy: build
     container_name: newsnest-dev
     ports: !override
       - "${NEWSNEST_DEV_PORT:-3096}:8080"

@@ -1,0 +1,8 @@
+# Compose loads this automatically when it sits next to docker-compose.yml, i.e. in a repo clone.
+# It builds the image from source instead of pulling it, so `docker compose up -d --build` works.
+# A Portainer stack or a downloaded docker-compose.yml never sees this file, and pulls the image.
+services:
+  newsnest:
+    build: .
+    image: newsnest:local
+    pull_policy: build

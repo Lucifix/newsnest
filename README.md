@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="newsnest/static/icons/icon-192.png" width="96" height="96" alt="NewsNest logo">
+<img src="https://raw.githubusercontent.com/Lucifix/newsnest/main/newsnest/static/icons/icon-192.png" width="96" height="96" alt="NewsNest logo">
 
 # NewsNest
 
@@ -11,7 +11,9 @@ into a single card, and uses Claude to rank and summarise what matters to you.
 
 ![Status: early (v0.1)](https://img.shields.io/badge/status-early%20(v0.1)-orange)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)
+[![Docker pulls](https://img.shields.io/docker/pulls/lucifix/newsnest?logo=docker&logoColor=white)](https://hub.docker.com/r/lucifix/newsnest)
+![amd64 and arm64 images](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-0b1220)
+[![Build status](https://img.shields.io/github/actions/workflow/status/Lucifix/newsnest/docker-publish.yml?branch=main&label=build)](https://github.com/Lucifix/newsnest/actions/workflows/docker-publish.yml)
 ![Self-hosted](https://img.shields.io/badge/self--hosted-yes-2ea44f)
 ![Powered by Claude](https://img.shields.io/badge/AI-Claude-D97757)
 
@@ -21,9 +23,9 @@ into a single card, and uses Claude to rank and summarise what matters to you.
 
 <table>
   <tr>
-    <td align="center" width="33%"><img src="docs/images/feed.png" alt="The For you feed with a top story, key points and a score"></td>
-    <td align="center" width="33%"><img src="docs/images/swipe.png" alt="The swipe deck for sorting stories with one thumb"></td>
-    <td align="center" width="33%"><img src="docs/images/feed-dark.png" alt="The same feed in dark mode"></td>
+    <td align="center" width="33%"><img src="https://raw.githubusercontent.com/Lucifix/newsnest/main/docs/images/feed.png" alt="The For you feed with a top story, key points and a score"></td>
+    <td align="center" width="33%"><img src="https://raw.githubusercontent.com/Lucifix/newsnest/main/docs/images/swipe.png" alt="The swipe deck for sorting stories with one thumb"></td>
+    <td align="center" width="33%"><img src="https://raw.githubusercontent.com/Lucifix/newsnest/main/docs/images/feed-dark.png" alt="The same feed in dark mode"></td>
   </tr>
   <tr>
     <td align="center"><sub>Feed, ranked for you</sub></td>
@@ -82,15 +84,67 @@ file, and talks to the Anthropic API with your own key.
 ## Quick start
 
 You need [Docker](https://docs.docker.com/get-docker/) with Compose, and, for the AI features, an
-[Anthropic API key](https://console.anthropic.com/).
+[Anthropic API key](https://console.anthropic.com/). Pull the published image (no clone needed, and the
+one to use for a Portainer stack), or build from source.
+
+### Option A: pull the published image
+
+Multi-arch (`linux/amd64` + `linux/arm64`, so a Raspberry Pi or an ARM NAS works too):
+
+- GHCR: `ghcr.io/lucifix/newsnest`
+- Docker Hub: `docker.io/lucifix/newsnest`
+
+Paste this into Portainer (**Stacks → Add stack → Web editor**) or save it as `docker-compose.yml`
+anywhere. Only the password needs filling in:
+
+```yaml
+services:
+  newsnest:
+    image: ghcr.io/lucifix/newsnest:latest
+    container_name: newsnest
+    restart: unless-stopped
+    ports:
+      - 3095:8080
+    environment:
+      NEWSNEST_PASSWORD: change-me   # required: with no password the app refuses all access
+      ANTHROPIC_API_KEY: ""          # optional: enables ranking and summaries
+      TZ: UTC                        # your time zone, e.g. Europe/Ljubljana
+    volumes:
+      - newsnest-config:/config
+      - newsnest-data:/data
+
+volumes:
+  newsnest-config:
+  newsnest-data:
+```
+
+For the full file, with host folders you can open and edit instead of Docker volumes, use
+[`docker-compose.yml`](docker-compose.yml) from this repo:
 
 ```bash
-git clone https://github.com/Lucifix/newsnest.git
-cd newsnest
+mkdir newsnest && cd newsnest
+curl -fsSLO https://raw.githubusercontent.com/Lucifix/newsnest/main/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/Lucifix/newsnest/main/.env.example -o .env
+mkdir -p config data     # so Docker doesn't create them as root
+# edit .env: set NEWSNEST_PASSWORD, and ANTHROPIC_API_KEY for AI
+docker compose up -d
+```
+
+**Update:** `docker compose pull && docker compose up -d`. Set `NEWSNEST_IMAGE_TAG` in `.env` to pin a
+release such as `0.1.0`; the default is `latest`.
+
+### Option B: build from source
+
+```bash
+git clone https://github.com/Lucifix/newsnest.git && cd newsnest
 cp .env.example .env     # set NEWSNEST_PASSWORD, and ANTHROPIC_API_KEY for AI
 mkdir -p config data     # so Docker doesn't create them as root
 docker compose up -d --build
 ```
+
+**Update:** `git pull && docker compose up -d --build`
+
+### First run
 
 Open <http://localhost:3095>, log in with your password, and tap **Set up my profile**:
 
@@ -107,12 +161,6 @@ the file. It is re-read on every run, so there is nothing to restart.
 > [!NOTE]
 > The login is a single shared password over plain HTTP, which is fine on your home network. If you
 > expose NewsNest to the internet, put it behind an HTTPS reverse proxy.
-
-**Update:**
-
-```bash
-git pull && docker compose up -d --build
-```
 
 ## How it works
 
@@ -180,6 +228,8 @@ is running. Copy the `config/` folder too: it holds your feeds and interests, wh
 not include.
 
 **Restore:** stop the container, put the backup in your data folder as `newsnest.db`, and start it again.
+With Docker volumes (the Option A snippet), copy it in while the container is stopped:
+`docker cp backup.db newsnest:/data/newsnest.db`.
 
 </details>
 
@@ -194,12 +244,11 @@ not include.
 2. **Stacks → Add stack → Repository**: use this repository's URL, reference `refs/heads/main`, compose
    path `docker-compose.yml`.
 3. Add the environment variables `NEWSNEST_PASSWORD` and `ANTHROPIC_API_KEY`.
-4. Deploy. The image is built from the Dockerfile on your server. It is never pulled, so there is no
-   registry to log in to.
+4. Deploy. Portainer pulls the published image from `ghcr.io`; nothing is built on your server.
 5. Check `http://<server>:3095/health`, then open `http://<server>:3095/`.
 
-To update, choose **Pull and redeploy** on the stack. The config and database live in `/opt/newsnest`
-and survive redeploys.
+To update, choose **Pull and redeploy** on the stack, with *Re-pull image* turned on. The config and
+database live in `/opt/newsnest` and survive redeploys.
 
 </details>
 
