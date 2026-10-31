@@ -9,6 +9,7 @@ out=${1:-$root/_site}
 rm -rf "$out"
 mkdir -p "$out/fonts" "$out/icons"
 cp "$root"/site/index.html "$root"/site/style.css "$root"/site/main.js "$out/"
+cp "$root"/site/og.png "$out/"
 cp -R "$root"/site/photos "$out/"
 cp "$root"/newsnest/static/fonts/*.woff2 "$root"/newsnest/static/fonts/OFL-*.txt "$out/fonts/"
 cp "$root"/newsnest/static/icons/*.png "$out/icons/"
