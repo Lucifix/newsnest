@@ -50,6 +50,15 @@ def test_digest_with_profile_shows_top_story_and_cross_source(client, env):
     assert "Ljubljana" in r.text  # watch tag
 
 
+def test_feed_why_panel_explains_score_in_words(client, env):
+    (env.config / "interests.md").write_text("## Want\n- world news\n", encoding="utf-8")
+    r = client.get("/")
+    assert "Fits your interests" in r.text and "You&#39;d want to read it" in r.text
+    assert "Covered by 2 outlets" in r.text  # the cross-source bonus
+    assert "Top story: big news" in r.text and "You haven&#39;t seen it yet" in r.text
+    assert "rank " not in r.text and "importance 9" not in r.text  # no raw internals
+
+
 def test_every_page_renders(client):
     for path in ["/archive", "/status", "/calibration", "/missed", "/profile", "/settings", f"/day/{NOW.date()}",
                  "/settings/general", "/settings/feeds", "/settings/discover", "/settings/topics", "/settings/more", "/settings/app"]:

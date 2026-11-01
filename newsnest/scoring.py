@@ -38,8 +38,9 @@ or a major world event scores high even when its topic is outside the profile.
 - personal (0-10): how likely this reader is to actually want to read this specific item, given \
 the profile, the examples and the ratings. Clickbait, advertorials, horoscopes, quizzes and \
 promotional pages score low.
-- reason: at most 8 words in English naming the decisive factor, e.g. "city parking rules; local \
-interest".
+- reason: one short sentence in English, at most 14 words, telling the reader why the item scored \
+as it did: what it is about and how that relates to their interests, e.g. "New parking rules in your \
+city; you follow local news." or "Product promo from a fashion shop; not one of your topics."
 - category: exactly one of the allowed categories.{place_note}
 {event_rules}
 
