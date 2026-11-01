@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from newsnest.config import NEWS, Config, Source
+from newsnest.config import WORLD, Config, Source
 from newsnest.db import loads, parse_iso
 from newsnest.profile import profile_exists
 from newsnest.scoring import final_score
@@ -221,7 +221,7 @@ def build_digest(conn: sqlite3.Connection, cfg: Config, sources: list[Source], d
                 top.append(c)
                 continue
             block = block_of(c.lead.row["category"], c.lead.row["ai_category"])
-            group = groups[block if block in groups else NEWS]
+            group = groups[block if block in groups else WORLD]   # a section removed by hand: not Local's
             label = c.lead.row["ai_category"] or ("Unscored" if c.final is None else "Other")
             section = group.setdefault(label, Section(label))
             if not calibration and not c.must_show and c.final is not None and c.final < cfg.digest.min_final:

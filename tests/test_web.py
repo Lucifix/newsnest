@@ -282,6 +282,31 @@ def test_removing_tech_moves_github_releases_too(client, env):
     assert {f.category for f in cfg.feeds} <= {"news", "world"} and cfg.github_releases.category == "world"
 
 
+def test_a_repo_can_be_added_after_tech_was_removed_without_repos(client, env):
+    for repo in ("home-assistant/core", "jellyfin/jellyfin"):
+        client.post("/settings/repo_remove", data={"repo": repo})
+    client.post("/settings/section_remove", data={"key": "tech", "move_to": "world"})
+    assert env_cfg(env).github_releases.category == "world"   # moved even with no repos
+    r = client.post("/settings/repo_add", data={"repo": "jellyfin/jellyfin"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/more?saved=repo_add"
+    # a section removed by hand: the next repo goes to World instead of failing
+    path = env.config / "config.yaml"
+    path.write_text(path.read_text(encoding="utf-8").replace("category: world\n  repos:", "category: sports\n  repos:"),
+                    encoding="utf-8")
+    r = client.post("/settings/repo_add", data={"repo": "home-assistant/core"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/more?saved=repo_add"
+    assert env_cfg(env).github_releases.category == "world"
+
+
+def test_a_trial_source_from_a_removed_section_is_promoted_to_world(client, env):
+    conn = connect()
+    conn.execute("INSERT INTO candidates (source_id, url, title, category, origin, status, added_at) "
+                 "VALUES ('disc-x', 'https://x.example/rss', 'X', 'lifestyle', 'test', 'candidate', ?)", (iso(NOW),))
+    r = client.post("/discovery/disc-x/promote", follow_redirects=False)
+    assert r.headers["location"] == "/settings/discover?saved=discovery"
+    assert [f.category for f in env_cfg(env).feeds if f.url == "https://x.example/rss"] == ["world"]
+
+
 def test_the_lifestyle_pack_brings_its_section_back(client, env):
     assert "lifestyle" not in section_keys_in(env)   # new installs start with Local, World and Tech
     client.post("/settings/pack/lifestyle", data={})

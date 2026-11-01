@@ -29,8 +29,8 @@ from newsnest.ai import AIClient, AIError, BudgetExceeded, spent_today
 from newsnest.bootstrap import config_dir, env
 from newsnest.calibration import calibration_data, subscore_labels
 from newsnest.config import ICONS, MAX_TABS, NEWS, WORLD, Config, LoadedConfig, load_config, slugify
-from newsnest.config_edit import (ConfigEditError, edit_config, ensure_section, free_section_key, materialize_sections,
-                                  remove_where, section_entry, section_list, section_map, tab_room)
+from newsnest.config_edit import (ConfigEditError, edit_config, ensure_section, free_section_key, keys_in,
+                                  materialize_sections, remove_where, section_entry, section_list, section_map, tab_room)
 from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (STARTER_PACK, add_candidates, named_sources, parse_opml, promotion_suggestions,
@@ -1025,8 +1025,9 @@ async def settings_action(action: str, request: Request):
                 if f.get("category") == key:
                     f["category"] = dest
                     removed["feeds"] += 1
+            # With or without repos: a repo added later would land in the section that is gone
             gh = data.get("github_releases")
-            if gh is not None and gh.get("repos") and gh.get("category", "tech") == key:
+            if gh is not None and gh.get("category", "tech") == key:
                 gh["category"] = dest
             if (caps := data.get("categories")) is not None and key in caps:
                 del caps[key]
@@ -1058,6 +1059,9 @@ async def settings_action(action: str, request: Request):
             data["prefilter"]["must_show_keywords"] = _lines(form.get("must_show", ""))
         elif action == "repo_add":
             section_list(data, "github_releases", "repos").append(form["repo"].strip())
+            gh = data["github_releases"]
+            if gh.get("category", "tech") not in keys_in(data):   # its section was removed (by hand, say)
+                gh["category"] = WORLD
         elif action == "repo_remove":
             repos = section_list(data, "github_releases", "repos")
             remove_where(repos, lambda r: r == form["repo"])
@@ -1161,9 +1165,9 @@ def discovery_action(source_id: str, action: str, conn=Depends(get_conn), loaded
     if not row or action not in ("promote", "remove", "restore"):
         raise HTTPException(404)
     if action == "promote":
-        category = row["category"]
-
         def change(data):
+            # On trial since before its section was removed by hand: it becomes a World feed
+            category = row["category"] if row["category"] in keys_in(data) else WORLD
             _refuse_duplicate(section_list(data, "feeds"), row["url"])
             ids = {f.get("id") for f in section_list(data, "feeds")}
             fid = base = slugify(row["title"] or source_id)

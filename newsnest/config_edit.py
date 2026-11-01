@@ -112,13 +112,23 @@ def materialize_sections(data: CommentedMap) -> CommentedSeq:
     return seq
 
 
+def keys_in(data: CommentedMap) -> set[str]:
+    """The section keys of the file being edited: its `sections:` list (Local and World always count), or the
+    legacy four while it has none."""
+    seq = data.get("sections")
+    if seq is None:
+        return {s.key for s in LEGACY_SECTIONS}
+    return {s.get("key") for s in seq} | {NEWS, WORLD}
+
+
 def tab_room(seq: list) -> bool:
     """Whether one more section can be a tab (News is one, and it counts)."""
     return 2 + sum(1 for s in seq if s.get("key") not in (NEWS, WORLD) and s.get("tab", True)) <= MAX_TABS
 
 
 def free_section_key(seq: list, label: str) -> str:
-    """A key for a new section: its name as a slug, numbered if taken (keys are never reused or renamed)."""
+    """A key for a new section: its name as a slug, numbered if taken. A removed section's key can come back:
+    removing one moved everything stored under it, so nothing old turns up in the new one."""
     taken = {s.get("key") for s in seq} | set(RESERVED_KEYS)
     key = base = slugify(label, 20)
     n = 2
