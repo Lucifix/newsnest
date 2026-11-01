@@ -175,6 +175,162 @@ def test_lifestyle_pack(client, env):
     assert (env.config / "config.yaml").read_text(encoding="utf-8") == text
 
 
+def section_keys_in(env) -> list[str]:
+    from newsnest.config import load_config
+    loaded = load_config(env.config)
+    assert not loaded.errors, loaded.errors
+    return [s.key for s in loaded.config.all_sections]
+
+
+def test_add_rename_reorder_and_remove_a_section(client, env):
+    path = env.config / "config.yaml"
+    r = client.post("/settings/section_add", data={"label": "Sports", "icon": "ball"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds?saved=section_add#sections"
+    text = path.read_text(encoding="utf-8")
+    assert "- {key: sports, label: Sports, icon: ball}" in text and "# Plain RSS / Atom feeds" in text   # comments survive
+    assert section_keys_in(env) == ["news", "world", "tech", "sports"]
+    assert '<option value="sports"' in client.get("/settings/feeds").text   # the section menu of every feed
+
+    # a feed in it, and the tab appears once there is something to read
+    assert 'data-tab="sports"' not in client.get("/").text
+    client.post("/settings/feed_add", data={"name": "Sport24", "url": "https://sport.example/rss", "category": "sports"})
+    page = client.get("/?f=sports").text
+    assert '<a href="/?f=sports" data-tab="sports" aria-current="page">' in page and "<span>Sports</span>" in page
+
+    # renamed, made a chip, moved up
+    client.post("/settings/section_edit", data={"key": "sports", "label": "Sport  talk", "icon": "film"})
+    assert "- {key: sports, label: Sport talk, icon: film, tab: false}" in path.read_text(encoding="utf-8")
+    assert 'data-tab="sports"' not in client.get("/").text
+    client.post("/settings/section_move", data={"key": "sports", "dir": "up"})
+    client.post("/settings/section_move", data={"key": "sports", "dir": "up"})
+    assert section_keys_in(env) == ["news", "sports", "world", "tech"]
+    client.post("/settings/section_move", data={"key": "news", "dir": "up"})   # nothing above the first
+    assert section_keys_in(env) == ["news", "sports", "world", "tech"]
+
+    # stories of the section, then removing it: feeds and stories go where the reader says
+    conn = connect()
+    src = Source(id="sport24", type="rss", category="sports", name="Sport24", url="https://sport.example/rss")
+    ingest(conn, src, [Item("sport24", "sports", "Final tonight", "https://sport.example/1", "s1", NOW)], Prefilter(env_cfg(env)), NOW)
+    r = client.post("/settings/section_remove", data={"key": "sports", "move_to": "world"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds?saved=section_remove&feeds=1&n=1#sections"
+    assert section_keys_in(env) == ["news", "world", "tech"]
+    assert [x[0] for x in conn.execute("SELECT category FROM items WHERE source_id = 'sport24'")] == ["world"]
+    assert "category: world" in path.read_text(encoding="utf-8").split("id: sport24")[1].split("- id:")[0]
+    assert path.with_suffix(".yaml.bak").exists()
+    assert "1 feed and 1 story moved" in client.get(r.headers["location"]).text
+
+
+def env_cfg(env):
+    from newsnest.config import load_config
+    return load_config(env.config).config
+
+
+def test_local_and_world_are_renamed_but_never_removed(client, env):
+    path = env.config / "config.yaml"
+    before = path.read_text(encoding="utf-8")
+    r = client.post("/settings/section_remove", data={"key": "news", "move_to": "world"}, follow_redirects=False)
+    assert "error=" in r.headers["location"] and path.read_text(encoding="utf-8") == before
+    r = client.post("/settings/section_remove", data={"key": "tech", "move_to": "tech"}, follow_redirects=False)   # nowhere to go
+    assert "error=" in r.headers["location"] and path.read_text(encoding="utf-8") == before
+    client.post("/settings/section_edit", data={"key": "news", "label": "Slovenia", "icon": "ball"})
+    assert "- {key: news, label: Slovenia}" in path.read_text(encoding="utf-8")   # no icon or tab switch for News
+    assert "Slovenia" in client.get("/settings/feeds").text
+    assert "<span>News</span>" in client.get("/").text   # the tab keeps its name
+
+
+def test_no_more_than_four_tabs(client, env):
+    path = env.config / "config.yaml"
+    for name in ("Sports", "Science"):   # News and Tech are two; these make four
+        client.post("/settings/section_add", data={"label": name, "icon": "star"})
+    text = path.read_text(encoding="utf-8")
+    assert "key: sports, label: Sports}" in text and "key: science, label: Science}" in text
+    client.post("/settings/section_add", data={"label": "Cinema", "icon": "film"})   # no room: it becomes a chip
+    assert "- {key: cinema, label: Cinema, icon: film, tab: false}" in path.read_text(encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+    r = client.post("/settings/section_edit", data={"key": "cinema", "label": "Cinema", "icon": "film", "tab": "on"},
+                    follow_redirects=False)
+    assert "error=" in r.headers["location"] and "at+most+4+tabs" in r.headers["location"].replace("%20", "+")
+    assert path.read_text(encoding="utf-8") == before
+    assert client.post("/settings/section_add", data={"label": "x", "icon": "rocket"}, follow_redirects=False).headers["location"].count("error=")
+
+
+def test_keys_are_unique_and_never_reserved(client, env):
+    for label in ("Tech", "tech", "All", "Top"):
+        client.post("/settings/section_add", data={"label": label, "icon": "star"})
+    keys = section_keys_in(env)
+    assert keys == ["news", "world", "tech", "tech-2", "tech-3", "all-2", "top-2"]
+
+
+def test_an_old_config_gets_its_sections_written_on_the_first_edit(client, env):
+    import re
+    path = env.config / "config.yaml"
+    path.write_text(re.sub(r"^sections:\n(?:  - .*\n)+", "", path.read_text(encoding="utf-8"), flags=re.M), encoding="utf-8")
+    assert section_keys_in(env) == ["tech", "news", "world", "lifestyle"]   # what every version before had
+    assert "<span>Tech</span>" in client.get("/").text and "<span>News</span>" in client.get("/").text
+    client.post("/settings/section_add", data={"label": "Sports", "icon": "ball"})
+    text = path.read_text(encoding="utf-8")
+    assert section_keys_in(env) == ["tech", "news", "world", "lifestyle", "sports"]
+    assert text.index("\nsections:") < text.index("\nschedules:") < text.index("\nfeeds:")   # above the feeds' own comments
+    assert "Sections: the tabs and chips of the feed" in text and "# Plain RSS / Atom feeds" in text
+
+
+def test_removing_tech_moves_github_releases_too(client, env):
+    r = client.post("/settings/section_remove", data={"key": "tech", "move_to": "world"}, follow_redirects=False)
+    assert "saved=section_remove" in r.headers["location"]
+    assert section_keys_in(env) == ["news", "world"]
+    cfg = env_cfg(env)
+    assert {f.category for f in cfg.feeds} <= {"news", "world"} and cfg.github_releases.category == "world"
+
+
+def test_a_repo_can_be_added_after_tech_was_removed_without_repos(client, env):
+    for repo in ("home-assistant/core", "jellyfin/jellyfin"):
+        client.post("/settings/repo_remove", data={"repo": repo})
+    client.post("/settings/section_remove", data={"key": "tech", "move_to": "world"})
+    assert env_cfg(env).github_releases.category == "world"   # moved even with no repos
+    r = client.post("/settings/repo_add", data={"repo": "jellyfin/jellyfin"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/more?saved=repo_add"
+    # a section removed by hand: the next repo goes to World instead of failing
+    path = env.config / "config.yaml"
+    path.write_text(path.read_text(encoding="utf-8").replace("category: world\n  repos:", "category: sports\n  repos:"),
+                    encoding="utf-8")
+    r = client.post("/settings/repo_add", data={"repo": "home-assistant/core"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/more?saved=repo_add"
+    assert env_cfg(env).github_releases.category == "world"
+
+
+def test_a_trial_source_from_a_removed_section_is_promoted_to_world(client, env):
+    conn = connect()
+    conn.execute("INSERT INTO candidates (source_id, url, title, category, origin, status, added_at) "
+                 "VALUES ('disc-x', 'https://x.example/rss', 'X', 'lifestyle', 'test', 'candidate', ?)", (iso(NOW),))
+    r = client.post("/discovery/disc-x/promote", follow_redirects=False)
+    assert r.headers["location"] == "/settings/discover?saved=discovery"
+    assert [f.category for f in env_cfg(env).feeds if f.url == "https://x.example/rss"] == ["world"]
+
+
+def test_the_lifestyle_pack_brings_its_section_back(client, env):
+    assert "lifestyle" not in section_keys_in(env)   # new installs start with Local, World and Tech
+    client.post("/settings/pack/lifestyle", data={})
+    assert section_keys_in(env) == ["news", "world", "tech", "lifestyle"]
+    assert "- {key: lifestyle, label: Lifestyle, icon: watch}" in (env.config / "config.yaml").read_text(encoding="utf-8")
+    assert '<a href="/?f=lifestyle" data-tab="lifestyle"' in client.get("/").text
+    # a Local pack's tech sites bring Tech back if it was removed
+    client.post("/settings/section_remove", data={"key": "tech", "move_to": "world"})
+    assert "tech" not in section_keys_in(env)
+    client.post("/settings/pack/local/si")
+    assert "tech" in section_keys_in(env)
+
+
+def test_the_digest_has_a_block_per_section(client, env):
+    client.post("/settings/section_add", data={"label": "Sports", "icon": "ball"})
+    conn = connect()
+    src = Source(id="sport24", type="rss", category="sports", name="Sport24", url="https://sport.example/rss")
+    ingest(conn, src, [Item("sport24", "sports", "Final tonight", "https://sport.example/1", "s1", NOW)], Prefilter(env_cfg(env)), NOW)
+    (env.config / "interests.md").write_text("## Want\n- sport\n", encoding="utf-8")
+    page = client.get(f"/day/{NOW.date().isoformat()}").text
+    assert 'data-block="sports"' in page and 'id="sports"' in page and "Final tonight" in page
+    assert 'data-block="news"' in page and 'data-block="world"' in page and 'data-block="tech"' in page
+
+
 def test_region_in_general_settings(client, env):
     general = {"min_final": "5", "daily_usd": "0.5", "summary_language": "English"}
     r = client.post("/settings/general", data={**general, "country": "Germany", "city": "Berlin", "timezone": "Europe/Berlin",

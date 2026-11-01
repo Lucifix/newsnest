@@ -5,7 +5,9 @@
 {% set live_sources = status.sources|rejectattr('health.level', 'equalto', 'disabled')|list %}
 {% set ok_sources = live_sources|rejectattr('health.level', 'equalto', 'failing')|list %}
 {% set hour = now_local.hour %}
-{% set all_cards = digest.top + (digest.news|map(attribute='cards')|sum(start=[])) + (digest.tech|map(attribute='cards')|sum(start=[])) + (digest.world|map(attribute='cards')|sum(start=[])) + (digest.lifestyle|map(attribute='cards')|sum(start=[])) + (digest.by_source|map(attribute='cards')|sum(start=[])) %}
+{% set all_cards = digest.top + (digest.blocks.values()|sum(start=[])|map(attribute='cards')|sum(start=[])) + (digest.by_source|map(attribute='cards')|sum(start=[])) %}
+{# Local and World always get a block; any other section only on a day it has stories #}
+{% set all_blocks = section_labels|join(' ') %}
 
 <header class="masthead">
   <p class="dateline">{{ digest.day.strftime('%A, %d %B %Y') }}</p>
@@ -29,10 +31,10 @@
     <button type="button" class="chip" data-block="all" aria-pressed="true">All</button>
     {% if digest.profile %}
     {% if digest.top %}<button type="button" class="chip" data-block="top" aria-pressed="false">Top <span>{{ digest.top|length }}</span></button>{% endif %}
-    <button type="button" class="chip" data-block="news" aria-pressed="false">Local <span>{{ digest.news|map(attribute='cards')|map('length')|sum }}</span></button>
-    <button type="button" class="chip" data-block="world" aria-pressed="false">World <span>{{ digest.world|map(attribute='cards')|map('length')|sum }}</span></button>
-    <button type="button" class="chip" data-block="tech" aria-pressed="false">Tech <span>{{ digest.tech|map(attribute='cards')|map('length')|sum }}</span></button>
-    {% if digest.lifestyle %}<button type="button" class="chip" data-block="lifestyle" aria-pressed="false">Lifestyle <span>{{ digest.lifestyle|map(attribute='cards')|map('length')|sum }}</span></button>{% endif %}
+    {% for key, label in section_labels.items() %}
+    {% set secs = digest.blocks.get(key, []) %}
+    {% if secs or key in ('news', 'world') %}<button type="button" class="chip" data-block="{{ key }}" aria-pressed="false">{{ label }} <span>{{ secs|map(attribute='cards')|map('length')|sum }}</span></button>{% endif %}
+    {% endfor %}
     {% endif %}
     <span class="chip-sep" aria-hidden="true"></span>
     <button type="button" class="chip toggle" data-unread aria-pressed="false">
@@ -52,14 +54,14 @@
 <p class="filter-empty" hidden>Nothing left here. You're all caught up.</p>
 
 {% if not digest.profile %}
-<div class="callout invite" data-block-section="news tech">
+<div class="callout invite" data-block-section="{{ all_blocks }}">
   <div>
     <h2>Teach NewsNest what you care about</h2>
     <p>Rate about 30 headlines and Claude drafts your interest profile. Until then everything is shown unscored, newest first.</p>
   </div>
   <a class="button" href="/profile">Set up my profile</a>
 </div>
-<div class="block" data-block-section="news tech">
+<div class="block" data-block-section="{{ all_blocks }}">
 {% for s in digest.by_source %}
 <section class="group">
   <h3 class="sec h{{ hue(s.title) }}"><span class="sec-mark" aria-hidden="true"></span>{{ s.title }} <span class="count">{{ s.cards|length }}</span></h3>
@@ -79,34 +81,20 @@
 </section>
 {% endif %}
 
-<section class="block" id="news" data-block-section="news" aria-labelledby="news-title">
-  <h2 class="blocktitle" id="news-title">Local</h2>
-  {{ section_list(digest.news, digest.calibration) }}
-  {% if not digest.news %}<p class="empty">No news items for this day.</p>{% endif %}
-</section>
-
-<section class="block" id="world" data-block-section="world" aria-labelledby="world-title">
-  <h2 class="blocktitle" id="world-title">World</h2>
-  {{ section_list(digest.world, digest.calibration) }}
-  {% if not digest.world %}<p class="empty">No world items for this day.</p>{% endif %}
-</section>
-
-<section class="block" id="tech" data-block-section="tech" aria-labelledby="tech-title">
-  <h2 class="blocktitle" id="tech-title">Tech</h2>
-  {{ section_list(digest.tech, digest.calibration) }}
-  {% if not digest.tech %}<p class="empty">No tech items for this day.</p>{% endif %}
-</section>
-
-{% if digest.lifestyle %}
-<section class="block" id="lifestyle" data-block-section="lifestyle" aria-labelledby="lifestyle-title">
-  <h2 class="blocktitle" id="lifestyle-title">Lifestyle</h2>
-  {{ section_list(digest.lifestyle, digest.calibration) }}
+{% for key, label in section_labels.items() %}
+{% set secs = digest.blocks.get(key, []) %}
+{% if secs or key in ('news', 'world') %}
+<section class="block" id="{{ key }}" data-block-section="{{ key }}" aria-labelledby="{{ key }}-title">
+  <h2 class="blocktitle" id="{{ key }}-title">{{ label }}</h2>
+  {{ section_list(secs, digest.calibration) }}
+  {% if not secs %}<p class="empty">Nothing in {{ label }} for this day.</p>{% endif %}
 </section>
 {% endif %}
+{% endfor %}
 {% endif %}
 
 {% if digest.calibration and digest.muted %}
-<details class="block muted-block" data-block-section="news tech">
+<details class="block muted-block" data-block-section="{{ all_blocks }}">
   <summary><h2 class="blocktitle">Muted by keyword <span class="count">{{ digest.muted|length }}</span></h2></summary>
   <div class="cards">{% for c in digest.muted %}{{ card(c, true) }}{% endfor %}</div>
 </details>

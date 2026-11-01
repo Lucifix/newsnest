@@ -23,11 +23,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from itertools import zip_longest
 
-from newsnest.config import Config, Source
+from newsnest.config import NEWS, WORLD, Config, Source
 from newsnest.db import iso, parse_iso, utcnow
 from newsnest.digest import Card, Member, make_cards
 from newsnest.profile import profile_exists
-from newsnest.sections import HEADLINES, LABELS, SECTIONS, TABS, block_of, scope_blocks, tab_of
+from newsnest.sections import HEADLINES, block_of, dock_tabs, section_keys, section_labels, scope_blocks, tab_of
 
 WEIGHT_MIN, WEIGHT_MAX = 0.2, 2.0
 
@@ -36,7 +36,7 @@ WEIGHT_MIN, WEIGHT_MAX = 0.2, 2.0
 class FeedItem:
     card: Card
     rank: float
-    block: str                # news (Local) | tech | world; a Local outlet's foreign news is world
+    block: str                # the section key (news is Local); a Local outlet's foreign news is world
     category: str
     top: bool
     updated: list[Member] = field(default_factory=list)   # outlets that joined after the story was read
@@ -55,21 +55,21 @@ class FeedItem:
 
 @dataclass
 class Chip:
-    key: str      # all | headlines | news | tech | world | lifestyle | cat:<scope>:<name>
+    key: str      # all | headlines | a section key | cat:<scope>:<name>
     label: str
     count: int
-    scope: bool = False   # All / Local / World: picks the part of the feed, not a category
+    scope: bool = False   # All / Local / World / a section: picks the part of the feed, not a category
     fold: bool = False    # a long-tail category, folded behind More
 
 
 @dataclass
 class Feed:
     items: list[FeedItem]              # the ranked stream for the active filter
-    chips: list[Chip]                  # For you / Tech / News / Lifestyle
-    subchips: list[Chip]               # under News or Tech: All + that block's categories
-    active: str                        # all | headlines | news | tech | world | lifestyle | cat:<scope>:<name>
+    chips: list[Chip]                  # For you, then the dock's tabs
+    subchips: list[Chip]               # under a tab: All + that part's categories
+    active: str                        # all | headlines | a section key | cat:<scope>:<name>
     parent: str                        # the part of the feed shown: all, one section, or headlines (Local + World)
-    tab: str                           # the dock tab that is lit: all | tech | headlines | lifestyle
+    tab: str                           # the dock tab that is lit: all, headlines or a section that is a tab
     profile: bool
     calibration: bool
     unseen: int
@@ -300,6 +300,7 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
     calibration = cfg.scoring.calibration_mode
     top_at = cfg.scoring.top_story_importance
     new_ids = _new_sources(conn, f.new_source_days, discovered_ids, now)
+    sections = section_keys(cfg)
 
     candidates: list[FeedItem] = []
     pool: list[FeedItem] = []   # below digest.min_final
@@ -308,7 +309,7 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
         members = [card.lead, *card.others]
         if card.muted or any(m.row["hidden_at"] for m in members):
             continue
-        if card.lead.row["category"] not in SECTIONS:
+        if card.lead.row["category"] not in sections:
             continue
         top = card.lead.row["importance"] is not None and card.importance >= top_at
         updated: list[Member] = []
@@ -395,11 +396,6 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
     rest = [it for it in pool if not it.extra]
     dropped += cap_into(rest) if calibration else len(rest)
 
-    # The dock: For you / Tech / News (Local + World) / Lifestyle. Inside a tab, one row of chips:
-    # the parts of it (All, Local, World on News) and then its categories.
-    chips = [Chip("all", TABS["all"], len(capped))]
-    chips += [Chip(key, TABS[key], sum(1 for it in capped if it.block in scope_blocks(key)))
-              for key in ("tech", HEADLINES, "lifestyle")]
     affinity = _affinity(conn)
     blocks_of: dict[str, Counter] = defaultdict(Counter)
     for it in capped:
@@ -414,7 +410,7 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
     category = None
     if active.startswith("cat:"):
         scope, _, name = active[4:].partition(":")
-        if (scope in SECTIONS or scope == HEADLINES) and name:
+        if (scope in sections or scope == HEADLINES) and name:
             parent = scope
             if sum(blocks_of[name][b] for b in scope_blocks(scope)):
                 category = name
@@ -426,18 +422,33 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
             active = f"cat:{parent}:{category}"
         else:
             active = parent = "all"
-    elif active == "all" or active in SECTIONS or active == HEADLINES:
+    elif active == "all" or active in sections or active == HEADLINES:
         parent = active
     else:
         active = parent = "all"
-    tab = tab_of(parent)
+
+    # The dock: For you, then the sections that are tabs (News holds Local and World). Inside a tab, one row
+    # of chips: the parts of it (All, Local, World on News) and then its categories. A section that is not
+    # a tab is a chip under For you; opening it lights For you.
+    labels = section_labels(cfg)
+    tabs = dock_tabs(cfg, tab_of(parent))
+    tab_keys = {t.key for t in tabs}
+    tab = tab_of(parent) if tab_of(parent) in tab_keys else "all"
+    chips = [Chip("all", "For you", len(capped))] + [Chip(t.key, t.label, len(in_scope(t.key))) for t in tabs]
+    loose = [Chip(k, labels[k], len(in_scope(k)), scope=True) for k in sections
+             if k not in tab_keys and k not in (NEWS, WORLD) and (in_scope(k) or k == parent)]
     subchips: list[Chip] = []
-    if parent != "all":
+    if parent == "all":
+        if loose:
+            subchips = [Chip("all", "All", len(capped), scope=True), *loose]
+    else:
         shown_here = in_scope(parent)
         if tab == HEADLINES:
             subchips = [Chip(HEADLINES, "All", len(in_scope(HEADLINES)), scope=True),
-                        Chip("news", LABELS["news"], len(in_scope("news")), scope=True),
-                        Chip("world", LABELS["world"], len(in_scope("world")), scope=True)]
+                        Chip(NEWS, labels[NEWS], len(in_scope(NEWS)), scope=True),
+                        Chip(WORLD, labels[WORLD], len(in_scope(WORLD)), scope=True)]
+        elif tab == "all":
+            subchips = [Chip("all", "All", len(capped), scope=True), *loose]
         else:
             subchips = [Chip(parent, "All", len(shown_here), scope=True)]
         counts = Counter(it.category for it in shown_here if it.category != "Unscored")

@@ -198,6 +198,19 @@ Edits made in the Settings pages are written back to `config.yaml`, comments inc
 > The example config comes with international feeds, no region and the time zone `UTC`. Set where you
 > live in **Settings → General** (country, city, time zone), and NewsNest offers your country's local pack.
 
+**Sections.** Every feed belongs to one section, and the sections are the tabs along the bottom of the
+feed. A new install starts with Local, World and Tech. In **Settings → Feeds → Sections** you can rename
+them, add your own (Sports, Science, Cinema…), reorder them, and remove one (its feeds and stories move
+to a section you pick). Local and World are built in: they can be renamed but not removed, and share the
+News tab. A section is a tab once it has a feed; at most four can be tabs, and any further section
+shows as a chip under **For you**. The list is the `sections:` key in `config.yaml`. A `config.yaml`
+from before sections were editable has none and keeps the old four (Tech, Local, World, Lifestyle) until
+you change them, so nothing needs migrating and the database is untouched.
+
+> [!NOTE]
+> Once you edit sections, `config.yaml` has a `sections:` list that older NewsNest versions don't
+> understand. To go back to an older image, restore the `config.yaml.bak` made by the last edit.
+
 <details>
 <summary>Environment variables</summary>
 

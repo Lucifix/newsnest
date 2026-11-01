@@ -28,12 +28,28 @@ http:
   # Give up on a single request after this many seconds.
   timeout_seconds: 20
 
+# -----------------------------------------------------------------------------
+# Sections: the tabs and chips of the feed
+# -----------------------------------------------------------------------------
+# Every feed below belongs to one section (its category:). Manage them in Settings → Feeds, or here.
+# Local (key "news") and World are built in: rename them, but they can't be removed; they share the News tab.
+# key:   fixed id stored with every story (lowercase letters, digits, dashes). Never rename it.
+# label: the name shown.
+# icon:  chip | watch | ball | flask | briefcase | film | leaf | star
+# tab:   false makes the section a chip under "For you" instead of a tab (at most 4 tabs; News is one).
+# poll_minutes: how often its feeds are polled (optional; default comes from schedules below).
+# Without this list a config has the four sections of earlier versions: Tech, Local, World, Lifestyle.
+sections:
+  - {key: news, label: Local}
+  - {key: world, label: World}
+  - {key: tech, label: Tech, icon: chip}
+
 schedules:
-  # How often category "news" sources are polled.
+  # How often feeds in the Local section (key "news") are polled.
   news_minutes: 15
-  # How often category "tech" sources are polled.
+  # How often feeds in Tech and every other section are polled (poll_minutes of a section wins).
   tech_minutes: 30
-  # How often category "world" sources are polled.
+  # How often feeds in the World section are polled.
   world_minutes: 20
 
 # -----------------------------------------------------------------------------
@@ -42,7 +58,8 @@ schedules:
 # id:        short unique name (used in the database and status panel; don't rename lightly)
 # name:      display name in the digest
 # url:       feed URL
-# category:  news | world | tech (decides the poll interval and the section; "news" is shown as Local)
+# category:  the key of one of the sections above (decides the poll interval and where its stories show;
+#            "news" is shown as Local)
 # enabled:   false to pause a feed without deleting it (optional, default true)
 # daily_cap: max items per day from this feed (optional; overrides categories.<cat>)
 # https_links: true rewrites http:// item links to https:// (optional, default false)

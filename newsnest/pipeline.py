@@ -103,7 +103,7 @@ def source_health(source: Source, state: sqlite3.Row | None, cfg: Config, now: d
     if fails >= 2:
         return Health("failing", f"{fails} failed runs in a row: {state['last_error']}")
     last_run = parse_iso(state["last_run"])
-    interval = cfg.schedules.poll_minutes(source.category)
+    interval = cfg.poll_minutes(source.category)
     if now - last_run > timedelta(minutes=interval * 3):
         return Health("failing", f"not fetched since {last_run:%Y-%m-%d %H:%M} UTC (scheduler stalled?)")
     nonempty = parse_iso(state["last_nonempty"])

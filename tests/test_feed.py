@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from newsnest.config import Source
+from newsnest.config import FeedCfg, SectionCfg, Source
 from newsnest.db import connect, iso, migrate
 from newsnest.feed import build_feed
 from newsnest.models import Item
@@ -160,7 +160,7 @@ def test_category_chips_and_filter(db, cfg, monkeypatch):
     feed = build_feed(db, cfg, SOURCES, active="cat:Health")
     assert [it.category for it in feed.items] == ["Health"]
     assert feed.parent == "news" and feed.tab == "headlines"  # the News tab stays lit under a Local category
-    assert [c.key for c in feed.chips] == ["all", "tech", "headlines", "lifestyle"]
+    assert [c.key for c in feed.chips] == ["all", "headlines", "tech"]   # the example config: Local, World, Tech
     assert feed.active == "cat:news:Health"  # an older bare cat:<name> is scoped to its block
     # one row on News: All / Local / World, then the categories of the part shown
     assert [(c.key, c.label) for c in feed.subchips if c.scope] == [("headlines", "All"), ("news", "Local"), ("world", "World")]
@@ -268,6 +268,59 @@ def test_world_block_gets_its_own_chip(db, cfg):
     assert [it.category for it in build_feed(db, cfg, sources, active="cat:headlines:Health").items] == ["Health"]
     assert len(build_feed(db, cfg, sources, active="all").items) == 2
     assert build_feed(db, cfg, sources, active="no-such-tab").active == "all"
+
+
+def sports_source(db, cfg, tab=True, title="Final tonight", url="https://s.example/1"):
+    """Give the config a Sports section with one feed and one scored story in it."""
+    cfg.sections = [SectionCfg(key="news", label="Local"), SectionCfg(key="world", label="World"),
+                    SectionCfg(key="tech", label="Tech", icon="chip"), SectionCfg(key="sports", label="Sports", icon="ball", tab=tab)]
+    cfg.feeds.append(FeedCfg(id="s", url="https://s.example/rss", category="sports"))
+    src = Source(id="s", type="rss", category="sports", name="S", url="https://s.example/rss")
+    ingest(db, src, [Item("s", "sports", title, url, url, NOW)], Prefilter(cfg), NOW)
+    db.execute("UPDATE items SET score_status='scored', topic=7, importance=5, personal=7, reason='r', ai_category='Sports' "
+               "WHERE url = ?", (url,))
+    return [*SOURCES, src]
+
+
+def test_a_custom_section_is_a_tab_with_its_own_stories(db, cfg):
+    sources = sports_source(db, cfg)
+    feed = build_feed(db, cfg, sources, active="sports")
+    assert [c.key for c in feed.chips] == ["all", "headlines", "tech", "sports"]
+    assert [c.label for c in feed.chips][-1] == "Sports"
+    assert (feed.parent, feed.tab) == ("sports", "sports")
+    assert [it.card.lead.row["title"] for it in feed.items] == ["Final tonight"]
+    assert [c.key for c in feed.subchips] == ["sports", "cat:sports:Sports"]
+    assert "Final tonight" in [it.card.lead.row["title"] for it in build_feed(db, cfg, sources, active="all").items]
+    assert build_feed(db, cfg, sources, active="headlines").items == []
+
+
+def test_a_section_that_is_not_a_tab_is_a_chip_under_for_you(db, cfg):
+    sources = sports_source(db, cfg, tab=False)
+    feed = build_feed(db, cfg, sources, active="all")
+    assert [c.key for c in feed.chips] == ["all", "headlines", "tech"]
+    assert [(c.key, c.label) for c in feed.subchips] == [("all", "All"), ("sports", "Sports")]
+    opened = build_feed(db, cfg, sources, active="sports")
+    assert (opened.parent, opened.tab) == ("sports", "all")   # For you stays lit
+    assert [it.card.lead.row["title"] for it in opened.items] == ["Final tonight"]
+    assert [c.key for c in opened.subchips if c.scope] == ["all", "sports"]
+
+
+def test_a_deleted_section_falls_back_to_for_you(db, cfg):
+    sources = sports_source(db, cfg)
+    cfg.sections = [s for s in cfg.sections if s.key != "sports"]
+    cfg.feeds = [f for f in cfg.feeds if f.category != "sports"]
+    for active in ("sports", "cat:sports:Sports"):
+        feed = build_feed(db, cfg, sources, active=active)
+        assert (feed.active, feed.parent, feed.tab) == ("all", "all", "all"), active
+        assert "Final tonight" not in [it.card.lead.row["title"] for it in feed.items]   # no section, no place to show it
+
+
+def test_a_config_without_a_sections_list_keeps_the_four_tabs(db, cfg):
+    cfg.sections = None
+    cfg.feeds.append(FeedCfg(id="gear", url="https://gear.example/rss", category="lifestyle"))
+    feed = build_feed(db, cfg, SOURCES, active="all")
+    assert [c.key for c in feed.chips] == ["all", "tech", "headlines", "lifestyle"]
+    assert [c.label for c in feed.chips] == ["For you", "Tech", "News", "Lifestyle"]
 
 
 def test_weight_strength_buckets():

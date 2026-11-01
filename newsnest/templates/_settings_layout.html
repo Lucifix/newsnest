@@ -3,7 +3,8 @@
 {% block title %}{{ self.stitle() }} · NewsNest{% endblock %}
 {% block content %}
 {% set saved_msgs = {'general': 'Saved', 'feed_add': 'Feed added', 'feed_remove': 'Feed removed', 'feed_toggle': 'Saved',
-  'feed_section': 'Section changed', 'watch_add': 'Watch added', 'watch_remove': 'Watch removed', 'keywords': 'Filters saved',
+  'feed_section': 'Section changed', 'section_add': 'Section added', 'section_edit': 'Section saved', 'section_move': 'Section moved',
+  'section_remove': 'Section removed', 'watch_add': 'Watch added', 'watch_remove': 'Watch removed', 'keywords': 'Filters saved',
   'repo_add': 'Repository added', 'repo_remove': 'Repository removed', 'discovery': 'Saved', 'applied': 'Changes applied', 'threshold': 'Limit changed', 'calibration_toggle': 'Saved'} %}
 <div class="settings{% if root %} is-root{% endif %}"{% if saved and not error %} data-toast="{{ saved_msgs.get(saved, 'Saved') }}"{% endif %}>
   {# The menu: the whole screen at /settings on a phone, a sidebar on wider screens #}
