@@ -20,7 +20,7 @@
   {% call expand('Add a feed…', open=finder is defined) %}
   <form method="post" action="/settings/feed_find" class="sform">
     <label>Website or feed address <input name="address" required value="{{ finder.address if finder is defined }}"
-      placeholder="delo.si" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+      placeholder="example.com" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <p class="muted small">Paste the site's address: its feed is found for you.</p>
     <button class="button" type="submit">Find feed</button>
   </form>
