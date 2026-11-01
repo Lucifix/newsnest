@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NewsNest: a news feed that learns what you care about</title>
-<meta name="description" content="NewsNest is a self-hosted, open-source news reader. It gathers your RSS feeds into one calm stream, folds the same story from different outlets into one card, and uses Claude to rank and summarise what matters to you.">
+<meta name="description" content="NewsNest is a self-hosted, open-source news reader with no ads. It brings together the RSS feeds you choose, folds the same story from different outlets into one card, and uses AI (Anthropic's Claude) to rank and summarise it by your interests.">
 <meta name="theme-color" content="#f2f2ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a0a0c" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="NewsNest: a news feed that learns what you care about">
-<meta property="og:description" content="Self-hosted and open source. Your sources, your interests, and a reason behind every ranking.">
+<meta property="og:description" content="Self-hosted, open source and ad-free. Your sources, your interests, one card per story, ranked by AI, and only what scoring needs leaves your server.">
 <meta property="og:url" content="https://lucifix.github.io/newsnest/">
 <meta property="og:image" content="https://lucifix.github.io/newsnest/og.png">
 <meta property="og:image:width" content="1280">
@@ -38,6 +38,7 @@
     <span>NewsNest</span>
   </a>
   <nav class="nav-links" aria-label="Page">
+    <a href="#why">Why</a>
     <a href="#features">Features</a>
     <a href="#how">How it works</a>
     <a href="#privacy">Privacy</a>
@@ -60,11 +61,11 @@
   <!-- Hero -->
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow"><span class="dot"></span>Self-hosted · Open source · MIT</p>
-      <h1>The news, ranked by what <mark>you</mark> care about.</h1>
-      <p class="lede">NewsNest gathers your RSS feeds into one calm stream, folds the same story from
-        different outlets into a single card, and uses Claude to rank and summarise what matters to you.
-        It runs on your own machine.</p>
+      <p class="eyebrow"><span class="dot"></span>Self-hosted · Open source · No ads</p>
+      <h1>Your news. Your rules. <mark>No noise.</mark></h1>
+      <p class="lede">NewsNest brings together the RSS feeds you choose, folds the same story from different
+        outlets into one card, and uses AI (Anthropic's Claude) to rank and summarise it by your interests. No ads, no
+        tracking, and it runs on your own machine.</p>
       <div class="cta">
         <a class="btn primary" href="#start">Get started
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
@@ -97,7 +98,7 @@
                   <h3>Coastal cities agree on a shared flood-defence fund</h3>
                   <p class="flede">Twelve port cities will pool money for sea walls and pumps, with the first payments due next spring.</p>
                   <div class="kp">
-                    <span class="sumbtn"><svg viewBox="0 0 24 24"><path d="M12 3.5 13.9 8.6 19 10.5l-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9L12 3.5Z"/><path d="M19 16v4M17 18h4"/></svg>Get key points</span>
+                    <span class="sumbtn"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10"/><circle cx="5" cy="6" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="18" r="1.3"/></svg>Key points <b>2</b></span>
                     <div class="kp-open"><div class="kp-box">
                       <p><span class="chip-for">For you</span> Matches your interest in climate policy.</p>
                       <ul><li>Fund starts at €1.2 billion</li><li>Covers sea walls, pumps and sensors</li></ul>
@@ -145,32 +146,50 @@
     </div>
   </div>
 
-  <!-- The deal -->
-  <section class="deal reveal" aria-labelledby="deal-h">
-    <p class="eyebrow">Why NewsNest</p>
-    <h2 id="deal-h">Algorithmic feeds learn what keeps you scrolling.<br><span class="soft">NewsNest learns what you want to read.</span></h2>
-    <div class="versus">
-      <div class="vs-col them">
-        <p class="vs-head">A typical feed</p>
-        <ul>
-          <li>Sources picked for you</li>
-          <li>Ranking you can't see into</li>
-          <li>Your attention is the product</li>
-          <li>The same story five times</li>
-          <li>Scroll forever</li>
-        </ul>
-      </div>
-      <div class="vs-col us">
-        <p class="vs-head"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path class="logo-arc" d="M8.8 13.6A9.6 9.6 0 0 1 18.4 23.2"/><path class="logo-arc" d="M8.8 6.4A16.8 16.8 0 0 1 25.6 23.2"/><circle class="logo-dot" cx="8.8" cy="23.2" r="4.2"/></svg>NewsNest</p>
-        <ul>
-          <li>You choose every source</li>
-          <li>Every score comes with a reason</li>
-          <li>One SQLite file on your machine</li>
-          <li>One card per story, with full coverage</li>
-          <li><span class="new-count">8</span> new, and then you're done</li>
-        </ul>
-      </div>
+  <!-- The five things NewsNest stands for; the feature groups below follow the same order -->
+  <section id="why" class="deal" aria-labelledby="deal-h">
+    <div class="section-head reveal">
+      <p class="eyebrow">Why NewsNest</p>
+      <h2 id="deal-h">Keeping up with the news shouldn't be a second job.<br><span class="soft">NewsNest does the sorting, so you can just read.</span></h2>
     </div>
+    <!-- Each row links to its group of feature tiles below -->
+    <ol class="pillars">
+      <li class="pillar reveal"><a href="#g-control">
+        <span class="p-num mono">01</span>
+        <h3>You're in control</h3>
+        <p>Your sources, your interests, your mute list. Nothing changes without your OK.</p>
+        <span class="p-vis" aria-hidden="true"><span class="v-toggle"><span class="mono">Mute</span>horoscopes<i></i></span></span>
+        <svg class="p-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+      </a></li>
+      <li class="pillar reveal"><a href="#g-bloat">
+        <span class="p-num mono">02</span>
+        <h3>Less bloat</h3>
+        <p>Five outlets, one story, one card. The feed ends when you've seen what matters.</p>
+        <span class="p-vis" aria-hidden="true"><span class="v-merge"><span class="stack"><i></i><i></i><i></i></span>5 outlets → <b>1 card</b></span></span>
+        <svg class="p-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+      </a></li>
+      <li class="pillar reveal"><a href="#g-relevant">
+        <span class="p-num mono">03</span>
+        <h3>Relevant to you</h3>
+        <p>AI scores every story against your interests, and tells you why.</p>
+        <span class="p-vis" aria-hidden="true"><span class="score sm">8.7</span><span class="chip-for">For you</span></span>
+        <svg class="p-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+      </a></li>
+      <li class="pillar reveal"><a href="#g-ads">
+        <span class="p-num mono">04</span>
+        <h3>No ads</h3>
+        <p>No ads, no sponsored posts, no engagement tricks. Clickbait sinks to the bottom.</p>
+        <span class="p-vis" aria-hidden="true"><span class="v-ad mono">Sponsored</span></span>
+        <svg class="p-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+      </a></li>
+      <li class="pillar reveal"><a href="#g-private">
+        <span class="p-num mono">05</span>
+        <h3>Private</h3>
+        <p>One SQLite file on your own server. No telemetry, no trackers.</p>
+        <span class="p-vis" aria-hidden="true"><span class="v-zero"><b>0</b> trackers</span></span>
+        <svg class="p-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+      </a></li>
+    </ol>
   </section>
 
   <!-- Features bento -->
@@ -182,11 +201,104 @@
 
     <div class="bento">
 
+      <p id="g-control" class="group-label reveal"><span class="mono">01</span>You're in control</p>
+
+      <article class="tile t-control reveal">
+        <div class="tile-text">
+          <p class="tag">You set the rules</p>
+          <h3>Your feed does what you tell it.</h3>
+          <p>Mute words you never want to see, make others always show up, and cap how many stories a noisy
+            outlet gets each day. Your interests are a plain file you can read and edit.</p>
+        </div>
+        <ul class="demo rules">
+          <li><span class="mono r-mute">Mute</span>horoscopes</li>
+          <li><span class="mono r-must">Always show</span>heat pumps</li>
+          <li><span class="mono r-watch">Watch</span>Home Assistant</li>
+          <li><span class="mono r-cap">Max 8 a day</span>Wire Desk</li>
+        </ul>
+      </article>
+
+      <article class="tile t-sources reveal">
+        <div class="tile-text">
+          <p class="tag">Your own sources</p>
+          <h3>Any feed you like. Try new ones on trial.</h3>
+          <p>Any RSS or Atom feed, plus GitHub release feeds for software you run. Import an OPML file and
+            its feeds go on trial: you only see their best few stories a day, and the ones you actually
+            read are suggested as regular sources.</p>
+        </div>
+        <div class="demo srcs">
+          <span class="src-pill"><b>RSS</b></span><span class="src-pill"><b>Atom</b></span><span class="src-pill"><b>OPML</b></span>
+          <span class="src-pill gh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 9a9 9 0 0 1-9 9"/></svg>Releases</span>
+          <span class="src-pill trial"><span class="mono">On trial</span>Field Notes<span class="reads" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></span><span class="mono read-n">2 of 3 read</span></span>
+        </div>
+      </article>
+
+      <article class="tile t-learn reveal">
+        <p class="tag">It learns, you decide</p>
+        <div class="demo chips">
+          <span class="pchip up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>More about climate</span>
+          <span class="pchip down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>Less from Daily Buzz</span>
+          <span class="pchip sug"><span class="mono">Weekly</span>3 suggestions to review</span>
+        </div>
+        <p>Likes, dislikes and opens shift what you see. The weekly suggestions for your interests wait
+          for your OK before they apply.</p>
+      </article>
+
+      <article class="tile t-cap reveal">
+        <p class="tag">A hard spending cap</p>
+        <div class="demo meter" style="--p: 0.24">
+          <div class="meter-num"><b>$0.12</b><span>of $0.50 today</span></div>
+          <div class="meter-bar"><i></i></div>
+        </div>
+        <p>AI calls stop for the day when your budget is reached. Without an API key everything still
+          works, with stories shown newest first.</p>
+      </article>
+
+      <p id="g-bloat" class="group-label reveal"><span class="mono">02</span>Less bloat</p>
+
+      <article class="tile t-group reveal">
+        <div class="tile-text">
+          <p class="tag">One story, not five</p>
+          <h3>Same event, one card.</h3>
+          <p>Coverage from several outlets folds into a single card, and wide coverage lifts a story up.
+            When you've seen what matters, the feed tells you you're done.</p>
+        </div>
+        <div class="demo merge" aria-label="Three outlets covering one story become one card">
+          <div class="src s1"><span class="badge" style="--h: var(--h8)">MP</span>Port cities sign flood pact</div>
+          <div class="src s2"><span class="badge" style="--h: var(--h1)">HT</span>12 cities pool flood money</div>
+          <div class="src s3"><span class="badge" style="--h: var(--h3)">DL</span>Shared fund for sea walls</div>
+          <div class="merged"><span class="badge" style="--h: var(--h7)">HD</span>Full coverage · <b>3 articles from 3 outlets</b></div>
+        </div>
+      </article>
+
+      <article class="tile t-keys reveal">
+        <div class="tile-text">
+          <p class="tag">Key points</p>
+          <h3>The gist, and whether to read on.</h3>
+          <p>Top stories come with a one-line lede, a few bullets, a “why this matters to you” line, and a
+            hint whether the full article is worth your time. For anything else, tap <em>Get key points</em>.</p>
+        </div>
+        <div class="demo keys">
+          <p class="keys-head mono"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>Key points <span class="count">3</span></p>
+          <div class="keys-box">
+            <p><span class="chip-for">For you</span> Matches your interest in climate and energy policy.</p>
+            <ul>
+              <li>Fund starts at €1.2 billion, paid in proportion to coastline length</li>
+              <li>Money covers sea walls, pumps and early-warning sensors</li>
+              <li>Smaller cities get priority access to engineering help</li>
+            </ul>
+            <div class="keys-foot"><span class="mono whole">✓ That's the whole story</span><span class="open">Open article ↗</span></div>
+          </div>
+        </div>
+      </article>
+
+      <p id="g-relevant" class="group-label reveal"><span class="mono">03</span>Relevant to you</p>
+
       <article class="tile t-rank reveal">
         <div class="tile-text">
           <p class="tag">Ranked for you</p>
           <h3>Every story, scored against your interests.</h3>
-          <p>Claude rates each story on topic, importance and personal fit, using an interests file that
+          <p>AI rates each story on topic, importance and personal fit, using an interests file that
             you write yourself or draft from a few ratings.</p>
         </div>
         <div class="demo story" aria-label="Example: a story scored 8.7">
@@ -198,20 +310,6 @@
             <div class="bar" style="--v: 0.93"><span>Personal fit</span><i></i><b>9.3</b></div>
           </div>
           <div class="story-foot"><span class="score">8.7</span><span class="why"><span class="chip-for">For you</span> Matches your interest in climate and energy policy.</span></div>
-        </div>
-      </article>
-
-      <article class="tile t-group reveal">
-        <div class="tile-text">
-          <p class="tag">One story, not five</p>
-          <h3>Same event, one card.</h3>
-          <p>Coverage from several outlets folds into a single card, and wide coverage lifts a story up.</p>
-        </div>
-        <div class="demo merge" aria-label="Three outlets covering one story become one card">
-          <div class="src s1"><span class="badge" style="--h: var(--h8)">MP</span>Port cities sign flood pact</div>
-          <div class="src s2"><span class="badge" style="--h: var(--h1)">HT</span>12 cities pool flood money</div>
-          <div class="src s3"><span class="badge" style="--h: var(--h3)">DL</span>Shared fund for sea walls</div>
-          <div class="merged"><span class="badge" style="--h: var(--h7)">HD</span>Full coverage · <b>3 articles from 3 outlets</b></div>
         </div>
       </article>
 
@@ -236,59 +334,6 @@
         </div>
       </article>
 
-      <article class="tile t-keys reveal">
-        <div class="tile-text">
-          <p class="tag">Key points on demand</p>
-          <h3>The gist, and whether to read on.</h3>
-          <p>A one-line lede, a few bullets, a “why this matters to you” line, and a hint whether the full
-            article is worth your time.</p>
-        </div>
-        <div class="demo keys">
-          <p class="keys-head mono"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>Key points <span class="count">3</span></p>
-          <div class="keys-box">
-            <p><span class="chip-for">For you</span> Matches your interest in climate and energy policy.</p>
-            <ul>
-              <li>Fund starts at €1.2 billion, paid in proportion to coastline length</li>
-              <li>Money covers sea walls, pumps and early-warning sensors</li>
-              <li>Smaller cities get priority access to engineering help</li>
-            </ul>
-            <div class="keys-foot"><span class="mono whole">✓ That's the whole story</span><span class="open">Open article ↗</span></div>
-          </div>
-        </div>
-      </article>
-
-      <article class="tile t-cap reveal">
-        <p class="tag">A hard spending cap</p>
-        <div class="demo meter" style="--p: 0.24">
-          <div class="meter-num"><b>$0.12</b><span>of $0.50 today</span></div>
-          <div class="meter-bar"><i></i></div>
-        </div>
-        <p>AI calls stop for the day when your budget is reached. Without an API key everything still
-          works, with stories shown newest first.</p>
-      </article>
-
-      <article class="tile t-learn reveal">
-        <p class="tag">It learns from you</p>
-        <div class="demo chips">
-          <span class="pchip up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>More about climate</span>
-          <span class="pchip down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>Less from Daily Buzz</span>
-          <span class="pchip sug"><span class="mono">Weekly</span>3 suggestions to review</span>
-        </div>
-        <p>Likes, dislikes and opens shift what you see. The weekly suggestions for your interests wait
-          for your OK before they apply.</p>
-      </article>
-
-      <article class="tile t-health reveal">
-        <p class="tag">Knows when a feed breaks</p>
-        <ul class="demo health">
-          <li><i class="ok"></i>Meridian Post<span class="mono">2 min ago</span></li>
-          <li><i class="ok"></i>Harbor Times<span class="mono">6 min ago</span></li>
-          <li><i class="warn"></i>Night Desk<span class="mono">silent 3 d</span></li>
-          <li><i class="bad"></i>Old Blog<span class="mono">HTTP 404</span></li>
-        </ul>
-        <p>A status page and a <code>/health</code> endpoint report sources that fail or go quiet.</p>
-      </article>
-
       <article class="tile t-glass reveal">
         <div class="tile-text">
           <p class="tag">No black box</p>
@@ -303,27 +348,31 @@
         </div>
       </article>
 
-      <article class="tile t-sources reveal">
+      <p id="g-ads" class="group-label reveal"><span class="mono">04</span>No ads</p>
+
+      <article class="tile t-ads reveal">
         <div class="tile-text">
-          <p class="tag">Your own sources</p>
-          <h3>Any feed you like. New ones start on trial.</h3>
-          <p>Any RSS or Atom feed, plus GitHub release feeds for software you run. Import an OPML file
-            and new feeds start on trial: you only see their best few stories a day, and the ones you
-            actually read are suggested as regular sources.</p>
+          <p class="tag">No ads, no clickbait</p>
+          <h3>Nothing in your feed is paid to be there.</h3>
+          <p>NewsNest has no ads, no sponsored posts and nothing tuned for engagement. Advertorials,
+            clickbait and promo pages score low and sink, and key points give you the gist before you open
+            the publisher's page.</p>
         </div>
-        <div class="demo srcs">
-          <span class="src-pill"><b>RSS</b></span><span class="src-pill"><b>Atom</b></span><span class="src-pill"><b>OPML</b></span>
-          <span class="src-pill gh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 9a9 9 0 0 1-9 9"/></svg>Releases</span>
-          <span class="src-pill trial"><span class="mono">On trial</span>Field Notes<span class="reads" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></span><span class="mono read-n">2 of 3 read</span></span>
+        <div class="demo calib">
+          <div class="crow"><span class="score sm">7.9</span><span>Night trains return on four European routes</span></div>
+          <div class="crow dim"><span class="score sm low">1.4</span><span>Ten gadgets you need this winter <em>· product promo, not one of your topics</em></span></div>
+          <div class="crow dim"><span class="score sm low">0.9</span><span>You won't believe what this city did next <em>· clickbait</em></span></div>
         </div>
       </article>
+
+      <p id="g-private" class="group-label reveal"><span class="mono">05</span>Private</p>
 
       <article class="tile t-app reveal">
         <div class="tile-text">
           <p class="tag">Installable and private</p>
           <h3>A phone app, served from your home.</h3>
           <p>A mobile-first web app with light and dark themes that installs to your home screen.
-            Password-protected, with a one-click database backup.</p>
+            Password-protected, with a one-click database backup. <a href="#privacy">What leaves your server</a></p>
         </div>
         <div class="demo appicon" aria-hidden="true">
           <img src="icons/icon-192.png" alt="" width="96" height="96" loading="lazy">
@@ -336,11 +385,9 @@
     <details class="more reveal">
       <summary>And more</summary>
       <ul>
-        <li><b>Keyword watches</b> that always surface a topic, plus mute and must-show filters</li>
         <li><b>Full-text search</b>, <b>saved</b> stories, a <b>read</b> history and a day-by-day <b>archive</b></li>
-        <li><b>Per-source daily caps</b>, so a firehose feed can't drown out everything else</li>
         <li><b>Summaries in the language of your choice</b></li>
-      </ul>
+        <li><b>A status page</b> and a <code>/health</code> endpoint that report feeds that fail or go quiet</li>      </ul>
     </details>
   </section>
 
@@ -376,17 +423,19 @@
       <div class="priv stays reveal">
         <p class="priv-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4zM10 20v-5h4v5"/></svg>Stays on your machine</p>
         <ul>
-          <li>Your feed list</li>
-          <li>Your ratings, likes and reading history</li>
-          <li>The database: one SQLite file</li>
+          <li>Your feed list and the database: one SQLite file</li>
+          <li>Your reading history, saved stories and likes</li>
+          <li>No ads and no trackers in the app</li>
           <li>No telemetry. NewsNest phones home to no one.</li>
         </ul>
       </div>
       <div class="priv goes reveal">
         <p class="priv-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Goes to the Anthropic API, with your key</p>
         <ul>
-          <li>Headlines and snippets, for scoring</li>
-          <li>Article text, when you ask for key points</li>
+          <li>Headlines and snippets, with your interests file and your country and city, for scoring</li>
+          <li>Article text, for key points</li>
+          <li>Headlines you've rated, for drafting your interests and the weekly suggestions</li>
+          <li>Links you paste into <em>Missed this</em></li>
         </ul>
         <p class="fine">No key? Then nothing goes to Anthropic at all, and the feed shows newest first.</p>
       </div>
@@ -448,7 +497,7 @@
       </figure>
 
       <figure class="reveal">
-        <div class="phone device" role="img" aria-label="The swipe deck: one story card with buttons to skip, save for later or like">
+        <div class="phone device" role="img" aria-label="The swipe deck: one story card with buttons to undo, skip, decide later or like">
           <div class="viewport ui-light" aria-hidden="true"><div class="screen">
             <div class="app-top">
               <svg class="logo" viewBox="0 0 32 32"><path class="logo-arc" d="M8.8 13.6A9.6 9.6 0 0 1 18.4 23.2"/><path class="logo-arc" d="M8.8 6.4A16.8 16.8 0 0 1 25.6 23.2"/><circle class="logo-dot" cx="8.8" cy="23.2" r="4.2"/></svg>
@@ -506,7 +555,7 @@
                   <p class="meta"><span class="badge" style="--h: var(--h1)">HT</span><b>Harbor Times</b><span>· 2 h ago</span><span class="pill-new">New</span></p>
                   <h3>Night trains return on four European routes</h3>
                   <p class="flede">Sleeper services restart between six capitals in spring, with bike spaces on every train.</p>
-                  <div class="kp"><span class="sumbtn"><svg viewBox="0 0 24 24"><path d="M12 3.5 13.9 8.6 19 10.5l-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9L12 3.5Z"/><path d="M19 16v4M17 18h4"/></svg>Get key points</span></div>
+                  <div class="kp"><span class="sumbtn"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10"/><circle cx="5" cy="6" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="18" r="1.3"/></svg>Key points <b>3</b></span></div>
                   <div class="ffoot">
                     <span class="score">7.9</span>
                     <span class="acts">
@@ -555,9 +604,9 @@
 <span class="c">docker compose</span> up -d</code></pre>
       </div>
       <ol class="setup reveal">
-        <li><span class="n">1</span><div><h3>Say where you live</h3><p>Your country and city tell Claude whose news is “big”.</p></div></li>
+        <li><span class="n">1</span><div><h3>Say where you live</h3><p>Your country and city decide whose news counts as “big”.</p></div></li>
         <li><span class="n">2</span><div><h3>Add local news</h3><p>Pick the pack for your country, or add your own local feeds.</p></div></li>
-        <li><span class="n">3</span><div><h3>Rate about 30 headlines</h3><p>Claude drafts your interests from them. That's the setup.</p></div></li>
+        <li><span class="n">3</span><div><h3>Rate about 30 headlines</h3><p>NewsNest drafts your interests from them. That's the setup.</p></div></li>
       </ol>
     </div>
     <p class="note reveal">Open <code>http://localhost:3095</code>, log in with your password, and tap <b>Set up my profile</b>.
@@ -587,8 +636,8 @@
 
   <!-- Closing CTA -->
   <section class="final reveal">
-    <h2>Take back your feed.</h2>
-    <p>Free, open source and yours to run.</p>
+    <h2>Your news, on your terms.</h2>
+    <p>Free, open source, ad-free and yours to run.</p>
     <div class="cta center">
       <a class="btn primary" href="#start">Install NewsNest</a>
       <a class="btn ghost" href="https://github.com/Lucifix/newsnest">Star on GitHub</a>
