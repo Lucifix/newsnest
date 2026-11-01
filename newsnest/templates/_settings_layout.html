@@ -29,8 +29,10 @@
     {% call group('You', icons=true) %}
       {{ link_row('/profile', 'Profile & tuning', icon='profile', current=page == 'profile') }}
       {{ link_row('/settings/app', 'Install, backup & log out', icon='app', current=page == 'app') }}
+      {{ link_row('/settings/about', 'About & report a bug', icon='about', value='v' ~ version, current=page == 'about') }}
     {% endcall %}
     {% endif %}
+    <p class="snav-version">NewsNest v{{ version }} · <a href="{{ repo_url }}" target="_blank" rel="noopener">GitHub</a> · <a href="{{ bug_url }}" target="_blank" rel="noopener">Report a bug</a></p>
   </nav>
 
   <div class="spage">

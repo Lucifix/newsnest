@@ -1074,6 +1074,14 @@ a.chip { text-decoration: none; }
 .sgroup { margin: 24px 0 0; }
 .sgroup-title { margin: 0 0 6px 16px; font: 600 0.72rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .slist { background: var(--surface); border: 1px solid var(--edge); border-radius: 12px; box-shadow: var(--chip-shadow); overflow: hidden; }
+.snav-version { margin: 20px 16px 0; font-size: 0.8rem; color: var(--muted); }
+.snav-version a, .spage-foot a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.about-hero { text-align: center; padding: 18px 0 0; }
+.about-hero img { border-radius: 16px; }
+.about-name { margin: 10px 0 0; font: 700 1.3rem var(--display); }
+.about-name .mono { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+.about-tag { margin: 4px auto 0; max-width: 34ch; font-size: 0.9rem; color: var(--muted); }
+.tile-about { --h: var(--h5); }
 .sgroup-foot { margin: 7px 16px 0; font-size: 0.82rem; line-height: 1.4; color: var(--muted); }
 .spage-foot { margin-top: 28px; }
 

@@ -327,7 +327,8 @@ Planned work and known limits are tracked in [TODO.md](TODO.md).
 
 ## Contributing
 
-Bug reports, ideas and pull requests are welcome. Please open an issue first for anything big. Run
+Bug reports, ideas and pull requests are welcome. Found a bug? Settings → *About & report a bug* in the
+app opens a new issue with your version filled in. Please open an issue first for anything big. Run
 `python -m pytest` and `ruff check .` before you send a PR (CI runs the linter on every PR), and add
 a test for what you change.
 

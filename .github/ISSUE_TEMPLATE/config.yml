@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Idea or question
+    url: https://github.com/Lucifix/newsnest/issues/new
+    about: Not a bug? Open a plain issue and say what you would like.

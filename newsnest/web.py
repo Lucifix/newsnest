@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
-from newsnest import __version__
+from newsnest import REPO_URL, WEBSITE_URL, __version__
 from newsnest.ai import AIClient, AIError, BudgetExceeded, spent_today
 from newsnest.bootstrap import config_dir, env
 from newsnest.calibration import calibration_data, subscore_labels
@@ -260,7 +260,9 @@ def template_helpers(loaded: LoadedConfig) -> dict:
         return dt.astimezone(tz).strftime(fmt) if dt else ""
 
     categories = loaded.config.scoring.categories if loaded.config else []
-    return {"cfg": loaded.config, "version": __version__, "asset_version": ASSET_VERSION, "localtime": localtime, "ago": ago, "initials": initials,
+    return {"cfg": loaded.config, "version": __version__, "repo_url": REPO_URL, "website_url": WEBSITE_URL,
+            "bug_url": f"{REPO_URL}/issues/new?template=bug_report.yml&version={__version__}",
+            "asset_version": ASSET_VERSION, "localtime": localtime, "ago": ago, "initials": initials,
             "key_points": key_points, "section_labels": section_labels(loaded.config), "host": feed_host,
             "dock": lambda current=None: [Tab("all", "For you", "star"), *dock_tabs(loaded.config, current)],
             "hue": hue, "cat_hue": lambda c: (categories.index(c) % 8) + 1 if c in categories else 0,
@@ -782,7 +784,7 @@ def proposal_reject(pid: int, conn=Depends(get_conn)):
 # --- settings ---
 
 # Settings is a few short pages, iOS Settings style; every change lands back on the page it was made on
-SETTINGS_PAGES = ("general", "feeds", "discover", "topics", "more", "app")
+SETTINGS_PAGES = ("general", "feeds", "discover", "topics", "more", "app", "about")
 ACTION_PAGE = {"general": "general", "region": "general",
                "feed_add": "feeds", "feed_section": "feeds", "feed_remove": "feeds", "feed_toggle": "feeds",
                "section_add": "feeds", "section_edit": "feeds", "section_move": "feeds", "section_remove": "feeds",
@@ -858,7 +860,7 @@ def database_backup(conn=Depends(get_conn)):
 def settings_page(page: str, request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     if page not in SETTINGS_PAGES:
         raise HTTPException(404)
-    return _settings(request, page, conn, loaded)
+    return _settings(request, page, conn, loaded, require_cfg=page != "about")  # a broken config is when people need the bug link
 
 
 def _lines(text: str) -> list[str]:
