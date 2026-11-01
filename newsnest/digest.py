@@ -1,4 +1,4 @@
-"""Builds a day's digest: story cards grouped as Top / News by category / Tech by category."""
+"""Builds a day's digest: story cards grouped as Top, then each section by category."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from newsnest.config import Config, Source
+from newsnest.config import NEWS, Config, Source
 from newsnest.db import loads, parse_iso
 from newsnest.profile import profile_exists
 from newsnest.scoring import final_score
-from newsnest.sections import block_of
+from newsnest.sections import block_of, section_keys
 
 
 @dataclass
@@ -128,10 +128,7 @@ class Digest:
     profile: bool
     calibration: bool
     top: list[Card]
-    news: list[Section]
-    tech: list[Section]
-    world: list[Section]
-    lifestyle: list[Section]
+    blocks: dict[str, list[Section]]  # per section key (news is Local), in the reader's order
     by_source: list[Section]        # used before a profile exists
     muted: list[Card]
     unseen: int
@@ -212,10 +209,7 @@ def build_digest(conn: sqlite3.Connection, cfg: Config, sources: list[Source], d
     live = [c for c in cards if not c.muted]
 
     top: list[Card] = []
-    news: dict[str, Section] = {}
-    tech: dict[str, Section] = {}
-    world: dict[str, Section] = {}
-    lifestyle: dict[str, Section] = {}
+    groups: dict[str, dict[str, Section]] = {key: {} for key in section_keys(cfg)}
     by_source: dict[str, Section] = {}
     if not profile:
         for c in sorted(live, key=lambda c: c.published or datetime.min.replace(tzinfo=tz), reverse=True):
@@ -226,7 +220,8 @@ def build_digest(conn: sqlite3.Connection, cfg: Config, sources: list[Source], d
             if c.lead.row["importance"] is not None and c.importance >= cfg.scoring.top_story_importance:
                 top.append(c)
                 continue
-            group = {"tech": tech, "world": world, "lifestyle": lifestyle}.get(block_of(c.lead.row["category"], c.lead.row["ai_category"]), news)
+            block = block_of(c.lead.row["category"], c.lead.row["ai_category"])
+            group = groups[block if block in groups else NEWS]
             label = c.lead.row["ai_category"] or ("Unscored" if c.final is None else "Other")
             section = group.setdefault(label, Section(label))
             if not calibration and not c.must_show and c.final is not None and c.final < cfg.digest.min_final:
@@ -244,8 +239,9 @@ def build_digest(conn: sqlite3.Connection, cfg: Config, sources: list[Source], d
         order = {name: i for i, name in enumerate(cfg.scoring.categories)}
         return sorted(sections.values(), key=lambda s: (s.title == "Unscored", order.get(s.title, 999)))
 
-    return Digest(day=day, profile=profile, calibration=calibration, top=top, news=ordered(news),
-                  tech=ordered(tech), world=ordered(world), lifestyle=ordered(lifestyle), by_source=list(by_source.values()), muted=muted,
+    return Digest(day=day, profile=profile, calibration=calibration, top=top,
+                  blocks={key: ordered(sections) for key, sections in groups.items()},
+                  by_source=list(by_source.values()), muted=muted,
                   unseen=sum(1 for c in live if c.unseen), unread=sum(1 for c in live if not c.read), total=len(live))
 
 

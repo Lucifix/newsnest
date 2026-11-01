@@ -1,4 +1,5 @@
-"""The feed sections a source belongs to: Local (stored as "news"), World, Tech and Lifestyle.
+"""The feed sections a source belongs to. The reader's list lives in config.yaml (`sections:`, see config.py);
+Local (stored as "news") and World are built in, the rest are theirs: Tech and Lifestyle are the usual two.
 
 Local is whatever the reader files there: news from where they live. A Local feed whose stories don't
 read like the other Local feeds (most likely another language) is flagged on the settings page, never
@@ -11,21 +12,55 @@ from __future__ import annotations
 import re
 import sqlite3
 from collections import Counter
+from dataclasses import dataclass
 from datetime import timedelta
 from urllib.parse import urlsplit
 
-from newsnest.config import Source
-from newsnest.db import iso, utcnow
+from newsnest.config import LEGACY_SECTIONS, NEWS, WORLD, Config, SectionCfg, Source
+from newsnest.db import iso, transaction, utcnow
 from newsnest.textmatch import fold
 
-SECTIONS = ("news", "world", "tech", "lifestyle")
-LABELS = {"news": "Local", "world": "World", "tech": "Tech", "lifestyle": "Lifestyle"}
-
-# The dock has four tabs plus search, like Apple News. "headlines" is the News tab: Local and World
-# together, with Local | World as chips inside it.
+# The dock is For you, the sections that are tabs, and search, like Apple News. "headlines" is the News tab:
+# Local and World together, with Local | World as chips inside it.
 HEADLINES = "headlines"
-TABS = {"all": "For you", "tech": "Tech", HEADLINES: "News", "lifestyle": "Lifestyle"}
-_TAB_BLOCKS = {HEADLINES: ("news", "world")}
+_TAB_BLOCKS = {HEADLINES: (NEWS, WORLD)}
+
+
+def section_list(cfg: Config | None) -> list[SectionCfg]:
+    """The sections in the reader's order (the legacy four while there is no config)."""
+    return cfg.all_sections if cfg else list(LEGACY_SECTIONS)
+
+
+def section_keys(cfg: Config | None) -> tuple[str, ...]:
+    return tuple(s.key for s in section_list(cfg))
+
+
+def section_labels(cfg: Config | None) -> dict[str, str]:
+    return {s.key: s.label for s in section_list(cfg)}
+
+
+@dataclass(frozen=True)
+class Tab:
+    key: str     # the feed filter it opens: a section key, or HEADLINES for News
+    label: str
+    icon: str
+
+
+def dock_tabs(cfg: Config | None, current: str | None = None) -> list[Tab]:
+    """The dock's tabs after For you, in the section order. News stands in for Local and World at the place
+    of the first of them. A section is a tab when it has `tab: true` and a feed to read (or is the one open),
+    so nobody sees an empty tab. Without a valid config every tab is offered."""
+    used = None if cfg is None else {f.category for f in cfg.feeds if f.enabled}
+    if cfg is not None and cfg.github_releases.repos:
+        used.add(cfg.github_releases.category)
+    tabs: list[Tab] = []
+    for s in section_list(cfg):
+        if s.key in (NEWS, WORLD):
+            if not any(t.key == HEADLINES for t in tabs):
+                tabs.append(Tab(HEADLINES, "News", "newspaper"))
+        elif s.tab and (used is None or s.key in used or s.key == current):
+            tabs.append(Tab(s.key, s.label, s.icon))
+    return tabs
 
 
 def scope_blocks(scope: str) -> tuple[str, ...]:
@@ -90,17 +125,26 @@ def foreign_local(conn: sqlite3.Connection, sources: list[Source], tld: str = ""
     return flagged
 
 
-def refile_items(conn: sqlite3.Connection, sources: list[Source]) -> int:
-    """Move stored stories to their source's current section. Returns how many moved."""
-    want = {s.id: s.category for s in sources if s.category in SECTIONS}
+def refile_items(conn: sqlite3.Connection, sources: list[Source], keys: tuple[str, ...] | None = None) -> int:
+    """Move stored stories to their source's current section (one of `keys`, when given). Returns how many moved."""
+    want = {s.id: s.category for s in sources if keys is None or s.category in keys}
     moved = 0
-    rows = conn.execute(f"SELECT DISTINCT source_id, category FROM items WHERE category IN ({', '.join('?' * len(SECTIONS))})",
-                        SECTIONS).fetchall()
+    rows = conn.execute("SELECT DISTINCT source_id, category FROM items").fetchall()
     for r in rows:
         target = want.get(r["source_id"])
         if target and target != r["category"]:
             moved += conn.execute("UPDATE items SET category = ? WHERE source_id = ? AND category = ?",
                                   (target, r["source_id"], r["category"])).rowcount
+    return moved
+
+
+def move_section(conn: sqlite3.Connection, old: str, new: str) -> int:
+    """Move everything stored under section `old` to `new`: stories, their groups and sources on trial.
+    Used when a section is deleted; also catches the stories of feeds that are gone. Returns the stories moved."""
+    with transaction(conn):
+        moved = conn.execute("UPDATE items SET category = ? WHERE category = ?", (new, old)).rowcount
+        conn.execute("UPDATE stories SET category = ? WHERE category = ?", (new, old))
+        conn.execute("UPDATE candidates SET category = ? WHERE category = ?", (new, old))
     return moved
 
 

@@ -21,23 +21,20 @@
 </head>
 <body class="{% block body_class %}{% endblock %}" data-auto-read="{{ 1 if cfg and cfg.feed.auto_read_on_scroll else 0 }}" data-tab="{{ feed.tab if feed is defined and request.url.path == '/' else '' }}">
 {% set path = request.url.path %}
-{# The dock, like Apple News: four tabs plus search. A chip or category inside a tab lights its tab (feed.tab),
-   other pages light none. News holds Local and World as chips. #}
+{# The dock, like Apple News: For you, the sections that are tabs, and search. A chip or category inside a tab
+   lights its tab (feed.tab), other pages light none. News holds Local and World as chips. #}
 {% set section = feed.tab if feed is defined and path == '/' else none %}
-{# explicit ?f=all: a bare / reopens the section remembered in the filter cookie #}
-{% set sections = [('all', '/?f=all', 'For you'), ('tech', '/?f=tech', 'Tech'), ('headlines', '/?f=headlines', 'News')] %}
-{# Lifestyle is a tab once there is something to read in it #}
-{% if section == 'lifestyle' or (cfg and (cfg.feeds|selectattr('category', 'equalto', 'lifestyle')|list)) %}
-{% set sections = sections + [('lifestyle', '/?f=lifestyle', 'Lifestyle')] %}
-{% endif %}
+{# explicit ?f=all: a bare / reopens the section remembered in the filter cookie. The tabs come from the
+   sections in config.yaml: one shows once it has a feed to read. #}
+{% set sections = dock(section) %}
 <header class="topbar">
   <a class="brand" href="/" aria-label="NewsNest, today's digest">
     {{ logo_mark() }}
     <span>NewsNest</span>
   </a>
   <nav class="sections" aria-label="Sections">
-    {% for key, href, label in sections %}
-    <a href="{{ href }}" data-tab="{{ key }}" {% if key == section %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% for tab in sections %}
+    <a href="/?f={{ tab.key }}" data-tab="{{ tab.key }}" {% if tab.key == section %}aria-current="page"{% endif %}>{{ tab.label }}</a>
     {% endfor %}
   </nav>
   {# Desktop search: the field grows out of the magnifier #}
@@ -87,21 +84,26 @@
 </div>
 {# Phones: the sections float at the bottom, Apple News style, with search in its own circle.
    While searching, the section pill shrinks to the current section's icon and the circle widens into the field. #}
-{% macro section_icon(key) %}
-{% if key == 'tech' %}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 10h4v4h-4zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
-{% elif key == 'headlines' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h12a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7h3z"/><path d="M7 4v14a2 2 0 0 1-3 0V7M10 8h6M10 12h6M10 16h3.5"/></svg>
-{% elif key == 'lifestyle' %}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5V12l1.6 1.2M9 6.8 9.8 2.5h4.4l.8 4.3M9 17.2l.8 4.3h4.4l.8-4.3"/></svg>
+{% macro section_icon(icon) %}
+{% if icon == 'chip' %}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 10h4v4h-4zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+{% elif icon == 'newspaper' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h12a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7h3z"/><path d="M7 4v14a2 2 0 0 1-3 0V7M10 8h6M10 12h6M10 16h3.5"/></svg>
+{% elif icon == 'watch' %}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5V12l1.6 1.2M9 6.8 9.8 2.5h4.4l.8 4.3M9 17.2l.8 4.3h4.4l.8-4.3"/></svg>
+{% elif icon == 'ball' %}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3.6 3.6 3.6 9.2 0 12.8M18.4 5.6c-3.6 3.6-3.6 9.2 0 12.8"/></svg>
+{% elif icon == 'flask' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-5.5 9.5A1.5 1.5 0 0 0 5.8 21h12.4a1.5 1.5 0 0 0 1.3-2.5L14 9V3M7.5 15h9"/></svg>
+{% elif icon == 'briefcase' %}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18"/></svg>
+{% elif icon == 'film' %}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>
+{% elif icon == 'leaf' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 15M5 19l8-8"/></svg>
 {% else %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6l-5.4 2.9 1.2-6-4.5-4.2 6.1-.7z"/></svg>{% endif %}
 {% endmacro %}
 <div class="dock">
 <nav class="tabbar" aria-label="Sections" style="--tabs: {{ sections|length }}">
-  {% for key, href, label in sections %}
-  <a href="{{ href }}" data-tab="{{ key }}" {% if key == section %}aria-current="page"{% endif %}>
-    {{ section_icon(key) }}
-    <span>{{ label }}</span></a>
+  {% for tab in sections %}
+  <a href="/?f={{ tab.key }}" data-tab="{{ tab.key }}" {% if tab.key == section %}aria-current="page"{% endif %}>
+    {{ section_icon(tab.icon) }}
+    <span>{{ tab.label }}</span></a>
   {% endfor %}
   <button type="button" class="tabcurrent" data-search-close aria-label="Close search" title="Close search" tabindex="-1">
-    {{ section_icon(section or 'all') }}</button>
+    {{ section_icon((sections|selectattr('key', 'equalto', section or 'all')|map(attribute='icon')|first) or 'star') }}</button>
 </nav>
 <form class="docksearch" action="/search" role="search">
   <a class="search-open" href="/search" data-search-open aria-label="Search" title="Search"></a>

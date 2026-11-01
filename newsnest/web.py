@@ -28,8 +28,9 @@ from newsnest import __version__
 from newsnest.ai import AIClient, AIError, BudgetExceeded, spent_today
 from newsnest.bootstrap import config_dir, env
 from newsnest.calibration import calibration_data, subscore_labels
-from newsnest.config import Config, LoadedConfig, load_config, slugify
-from newsnest.config_edit import ConfigEditError, edit_config, remove_where, section_list, section_map
+from newsnest.config import ICONS, MAX_TABS, NEWS, WORLD, Config, LoadedConfig, load_config, slugify
+from newsnest.config_edit import (ConfigEditError, edit_config, ensure_section, free_section_key, materialize_sections,
+                                  remove_where, section_entry, section_list, section_map, tab_room)
 from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (STARTER_PACK, add_candidates, named_sources, parse_opml, promotion_suggestions,
@@ -42,7 +43,7 @@ from newsnest.missed import handle_missed
 from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
 from newsnest.packs import LIFESTYLE_INTEREST, LIFESTYLE_PACK, LOCAL_PACKS, add_interest, add_pack, missing_from, pack_for
 from newsnest.profile_ai import draft_profile
-from newsnest.sections import LABELS, SECTIONS, foreign_local, refile_items
+from newsnest.sections import Tab, dock_tabs, foreign_local, move_section, refile_items, section_keys, section_labels
 from newsnest.status import collect_status
 from newsnest.summaries import key_points, summarize_on_demand
 from newsnest.textmatch import normalize_url
@@ -68,15 +69,21 @@ def _start_scheduler():
 
 
 def _refile() -> int:
-    """Stories follow their source when it moves to another section (Local / World / Tech)."""
+    """Stories follow their source when it moves to another section."""
     loaded = load_config(config_dir())
     if not loaded.config:
         return 0
     with session() as conn:
-        moved = refile_items(conn, named_sources(conn, loaded.config, loaded.sources))
+        moved = refile_items(conn, named_sources(conn, loaded.config, loaded.sources), section_keys(loaded.config))
     if moved:
         log.info("moved %d stories to their source's section", moved)
     return moved
+
+
+def _move_section(old: str, new: str) -> int:
+    """A section was deleted: everything stored under it moves to `new`."""
+    with session() as conn:
+        return move_section(conn, old, new)
 
 
 @asynccontextmanager
@@ -254,7 +261,8 @@ def template_helpers(loaded: LoadedConfig) -> dict:
 
     categories = loaded.config.scoring.categories if loaded.config else []
     return {"cfg": loaded.config, "version": __version__, "asset_version": ASSET_VERSION, "localtime": localtime, "ago": ago, "initials": initials,
-            "key_points": key_points, "section_labels": LABELS, "host": feed_host,
+            "key_points": key_points, "section_labels": section_labels(loaded.config), "host": feed_host,
+            "dock": lambda current=None: [Tab("all", "For you", "star"), *dock_tabs(loaded.config, current)],
             "hue": hue, "cat_hue": lambda c: (categories.index(c) % 8) + 1 if c in categories else 0,
             "now_local": datetime.now(tz), "today": datetime.now(tz).date(), "timedelta": timedelta,
             "subscores": subscore_labels(loaded.config) if loaded.config else ()}
@@ -777,6 +785,7 @@ def proposal_reject(pid: int, conn=Depends(get_conn)):
 SETTINGS_PAGES = ("general", "feeds", "discover", "topics", "more", "app")
 ACTION_PAGE = {"general": "general", "region": "general",
                "feed_add": "feeds", "feed_section": "feeds", "feed_remove": "feeds", "feed_toggle": "feeds",
+               "section_add": "feeds", "section_edit": "feeds", "section_move": "feeds", "section_remove": "feeds",
                "watch_add": "topics", "watch_remove": "topics", "keywords": "topics",
                "repo_add": "more", "repo_remove": "more"}
 # These are made on the Calibration page and go back there
@@ -806,7 +815,7 @@ def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
     elif page == "feeds":
         ctx.update(foreign=foreign_local(conn, loaded.sources, cfg.region.tld), lifestyle_missing=missing_from(LIFESTYLE_PACK, cfg.feeds),
                    lifestyle_interest=LIFESTYLE_INTEREST.lower() in read_profile("interests.md").lower(),
-                   **local_pack_context(cfg))
+                   section_icons=ICONS, max_tabs=MAX_TABS, **local_pack_context(cfg))
     elif page == "discover":
         ctx.update(candidates=candidate_rows(conn), suggestions=suggestions, starter_missing=starter_missing(conn, cfg),
                    starter_total=len(parse_opml(STARTER_PACK.read_bytes())))
@@ -900,6 +909,7 @@ async def lifestyle_pack(request: Request):
     counts = {}
 
     def change(data):
+        ensure_section(data, "lifestyle")   # the section comes back if it was deleted
         counts["added"], counts["moved"] = add_pack(section_list(data, "feeds"), LIFESTYLE_PACK, "lifestyle")
 
     try:
@@ -947,6 +957,8 @@ async def local_pack(code: str, request: Request):
     counts = {}
 
     def change(data):
+        for key in {p.category for p in pack.feeds if p.category}:   # the pack's tech sites, say
+            ensure_section(data, key)
         counts["added"], counts["moved"] = add_pack(section_list(data, "feeds"), pack.feeds, "news")
         region = section_map(data, "region")
         if not region.get("tld") and pack_for(region.get("country") or "") is pack:
@@ -969,13 +981,57 @@ async def settings_action(action: str, request: Request):
     back = "/calibration" if action in CALIBRATION_ACTIONS else f"/settings/{ACTION_PAGE.get(action, 'general')}"
     if action == "region" and _onboarding_next(form):
         back = "/profile"
-    if "category" in form and form["category"] not in SECTIONS:
+    if "category" in form and form["category"] not in section_keys(load_config(config_dir()).config):
         return RedirectResponse(f"{back}?error={quote('unknown section ' + form['category'])}", status_code=303)
 
     added = {}
+    removed = {"feeds": 0}
 
     def change(data):
-        if action == "feed_add":
+        if action == "section_add":
+            seq = materialize_sections(data)
+            label = " ".join(form["label"].split())
+            icon = form.get("icon", "star")
+            if icon not in ICONS:
+                raise ConfigEditError(f"unknown icon {icon}")
+            added["key"] = free_section_key(seq, label)
+            seq.append(section_entry(added["key"], label, icon, tab=tab_room(seq)))
+        elif action == "section_edit":
+            seq = materialize_sections(data)
+            entry = next((s for s in seq if s.get("key") == form["key"]), None)
+            if entry is None:
+                raise ConfigEditError(f"unknown section {form['key']}")
+            entry["label"] = " ".join(form["label"].split())
+            if entry["key"] not in (NEWS, WORLD):   # Local and World share the News tab: no icon, no switch
+                entry["icon"] = form.get("icon", "star")
+                if form.get("tab") == "on":
+                    entry.pop("tab", None)   # on is the default
+                else:
+                    entry["tab"] = False
+        elif action == "section_move":
+            seq = materialize_sections(data)
+            i = next((i for i, s in enumerate(seq) if s.get("key") == form["key"]), None)
+            j = None if i is None else i + (-1 if form["dir"] == "up" else 1)
+            if j is not None and 0 <= j < len(seq):
+                seq[i], seq[j] = seq[j], seq[i]
+        elif action == "section_remove":
+            key, dest = form["key"], form["move_to"]
+            if key in (NEWS, WORLD):
+                raise ConfigEditError("Local and World are built in. You can rename them, not remove them")
+            seq = materialize_sections(data)
+            if dest == key or not any(s.get("key") == dest for s in seq):
+                raise ConfigEditError("choose a section for its feeds to move to")
+            for f in section_list(data, "feeds"):
+                if f.get("category") == key:
+                    f["category"] = dest
+                    removed["feeds"] += 1
+            gh = data.get("github_releases")
+            if gh is not None and gh.get("repos") and gh.get("category", "tech") == key:
+                gh["category"] = dest
+            if (caps := data.get("categories")) is not None and key in caps:
+                del caps[key]
+            remove_where(seq, lambda s: s.get("key") == key)
+        elif action == "feed_add":
             feeds = section_list(data, "feeds")
             url = form["url"].strip()
             _refuse_duplicate(feeds, url)
@@ -1031,10 +1087,16 @@ async def settings_action(action: str, request: Request):
     if action == "feed_section":
         n = await asyncio.to_thread(_refile)
         extra += f"&changed={quote(form['id'])}&n={n}"
+    if action == "section_remove":
+        # Stories already stored under the section follow its feeds; this also catches those of feeds that are gone
+        n = await asyncio.to_thread(_move_section, form["key"], form["move_to"])
+        extra += f"&feeds={removed['feeds']}&n={n}"
     if action in ("feed_section", "feed_toggle"):
         anchor = f"#feed-{form['id']}"
     elif action == "feed_add":
         anchor = f"#feed-{added['id']}"
+    elif action.startswith("section_"):
+        anchor = "#sections"
     return RedirectResponse(f"{back}?saved={action}{extra}{anchor}", status_code=303)
 
 
@@ -1059,7 +1121,7 @@ def candidate_rows(conn) -> list[dict]:
 @app.post("/discovery/starter")
 def discovery_starter(conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     cfg = _require_cfg(loaded)
-    added = add_candidates(conn, cfg, parse_opml(STARTER_PACK.read_bytes()), "starter pack")
+    added = add_candidates(conn, cfg, parse_opml(STARTER_PACK.read_bytes(), keys=section_keys(cfg)), "starter pack")
     start_check_thread(cfg)
     return RedirectResponse(f"/settings/discover?saved=discovery&added={added}", status_code=303)
 
@@ -1070,7 +1132,7 @@ async def discovery_import(request: Request, loaded: LoadedConfig = Depends(get_
     cfg = _require_cfg(loaded)
     form = await request.form()
     upload, url = form.get("file"), (form.get("url") or "").strip()
-    category = form.get("category") or "tech"
+    category = form.get("category") or "world"
     try:
         if upload is not None and getattr(upload, "filename", ""):
             data = await upload.read()
@@ -1082,7 +1144,7 @@ async def discovery_import(request: Request, loaded: LoadedConfig = Depends(get_
             data, origin = r.content, url
         else:
             raise ValueError("choose an OPML file or paste an https link to one")
-        feeds = parse_opml(data, category, region_words(cfg))
+        feeds = parse_opml(data, category, region_words(cfg), section_keys(cfg))
     except Exception as e:  # bad file, bad link, not OPML
         from urllib.parse import quote
         return RedirectResponse(f"/settings/discover?error={quote(f'OPML import failed: {e}'[:300])}", status_code=303)

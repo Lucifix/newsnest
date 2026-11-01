@@ -25,10 +25,10 @@ from urllib.parse import urlsplit
 import feedparser
 import httpx
 
-from newsnest.config import Config, Source, slugify
+from newsnest.config import LEGACY_SECTIONS, NEWS, WORLD, Config, Source, slugify
 from newsnest.db import dumps, iso, parse_iso, session, utcnow
 from newsnest.scoring import final_score
-from newsnest.sections import SECTIONS
+from newsnest.sections import section_keys
 from newsnest.textmatch import fold, normalize_url
 
 log = logging.getLogger(__name__)
@@ -42,13 +42,14 @@ HOST_SPACING = 2.0  # seconds between requests to the same host
 class OpmlFeed:
     url: str
     title: str
-    category: str   # news (Local) | world | tech | lifestyle
+    category: str   # a section key: news (Local), world, tech, lifestyle or one of the reader's own
 
 
-def parse_opml(data: bytes | str, default_category: str = "tech", local_words: tuple[str, ...] = ()) -> list[OpmlFeed]:
-    """Every outline with an xmlUrl. Category: the outline's own category attribute (news/world/tech),
+def parse_opml(data: bytes | str, default_category: str = "tech", local_words: tuple[str, ...] = (),
+               keys: tuple[str, ...] = tuple(s.key for s in LEGACY_SECTIONS)) -> list[OpmlFeed]:
+    """Every outline with an xmlUrl. Category: the outline's own category attribute (a section key in `keys`),
     else the parent folder's name mapped to a section, else the default. local_words are extra folder
-    words that mean Local (from region_words)."""
+    words that mean Local (from region_words). Tech and Lifestyle folders only map when those sections exist."""
     root = ET.fromstring(data)
     out: list[OpmlFeed] = []
 
@@ -57,8 +58,8 @@ def parse_opml(data: bytes | str, default_category: str = "tech", local_words: t
             url = child.get("xmlUrl")
             if url:
                 cat = (child.get("category") or "").strip().lower()
-                if cat not in SECTIONS:
-                    cat = _map_folder(folder, local_words) or default_category
+                if cat not in keys:
+                    cat = _map_folder(folder, local_words, keys) or default_category
                 out.append(OpmlFeed(url.strip(), (child.get("title") or child.get("text") or url).strip(), cat))
             else:
                 walk(child, child.get("title") or child.get("text") or folder)
@@ -81,16 +82,17 @@ def region_words(cfg: Config) -> tuple[str, ...]:
     return tuple(fold(w)[:5] for w in (cfg.region.country, cfg.region.city) if len(w.strip()) >= 3)
 
 
-def _map_folder(folder: str | None, local_words: tuple[str, ...] = ()) -> str | None:
+def _map_folder(folder: str | None, local_words: tuple[str, ...] = (),
+                keys: tuple[str, ...] = tuple(s.key for s in LEGACY_SECTIONS)) -> str | None:
     if not folder:
         return None
     f = fold(folder)
-    if _LIFESTYLE_WORDS.search(f):
+    if "lifestyle" in keys and _LIFESTYLE_WORDS.search(f):
         return "lifestyle"
-    if any(w in f for w in _TECH_WORDS):
+    if "tech" in keys and any(w in f for w in _TECH_WORDS):
         return "tech"
     # Local only when the folder says so: a "News" folder in someone's OPML is BBC and the Guardian
-    return "news" if any(w in f for w in _LOCAL_WORDS + local_words) else "world"
+    return NEWS if any(w in f for w in _LOCAL_WORDS + local_words) else WORLD
 
 
 @dataclass
@@ -147,17 +149,20 @@ def known_feed_keys(conn: sqlite3.Connection, cfg: Config) -> set[str]:
 def starter_missing(conn: sqlite3.Connection, cfg: Config) -> list[OpmlFeed]:
     """Starter-pack feeds that are neither regular sources nor candidates yet (empty once the pack was added)."""
     known = known_feed_keys(conn, cfg)
-    return [f for f in parse_opml(STARTER_PACK.read_bytes()) if _key(f.url) not in known]
+    return [f for f in parse_opml(STARTER_PACK.read_bytes(), keys=section_keys(cfg)) if _key(f.url) not in known]
 
 
 def add_candidates(conn: sqlite3.Connection, cfg: Config, feeds: list[OpmlFeed], origin: str) -> int:
     """Queue feeds for checking; duplicates of regular sources or earlier candidates are skipped."""
     known = known_feed_keys(conn, cfg)
     taken = {r["source_id"] for r in conn.execute("SELECT source_id FROM candidates")} | {f.id for f in cfg.feeds}
+    keys = section_keys(cfg)
     added = 0
     for f in feeds:
         if _key(f.url) in known:
             continue
+        if f.category not in keys:   # a section the reader doesn't have (the starter pack's tech feeds, say)
+            f = OpmlFeed(f.url, f.title, WORLD)
         known.add(_key(f.url))
         sid = base = f"disc-{slugify(f.title, 30)}"
         n = 2

@@ -1,9 +1,10 @@
 {% extends "_settings_layout.html" %}
 {% from "_settings_ui.html" import group, fold, expand, feed_row, section_options with context %}
 {% block stitle %}Feeds{% endblock %}
-{% block sintro %}<p class="sub">Local is for news from where you live{% if cfg and cfg.region.place %} ({{ cfg.region.place }}){% endif %}. International news goes to World; gear, style and the good life to Lifestyle.</p>{% endblock %}
+{% block sintro %}<p class="sub">{{ section_labels['news'] }} is for news from where you live{% if cfg and cfg.region.place %} ({{ cfg.region.place }}){% endif %}. International news goes to {{ section_labels['world'] }}; every other section is yours to name and arrange below.</p>{% endblock %}
 {% block page %}
-{% if foreign %}<p class="callout warn">{{ foreign|length }} {{ 'feed' if foreign|length == 1 else 'feeds' }} under Local {{ 'doesn\'t' if foreign|length == 1 else 'don\'t' }} read like your other Local feeds. <a href="#feed-{{ foreign|sort|first }}">Show {{ 'it' if foreign|length == 1 else 'them' }}</a></p>{% endif %}
+{% if foreign %}<p class="callout warn">{{ foreign|length }} {{ 'feed' if foreign|length == 1 else 'feeds' }} under {{ section_labels['news'] }} {{ 'doesn\'t' if foreign|length == 1 else 'don\'t' }} read like your other {{ section_labels['news'] }} feeds. <a href="#feed-{{ foreign|sort|first }}">Show {{ 'it' if foreign|length == 1 else 'them' }}</a></p>{% endif %}
+{% if saved == 'section_remove' %}<p class="callout ok">Section removed. {{ request.query_params.get('feeds', '0') }} {{ 'feed' if request.query_params.get('feeds') == '1' else 'feeds' }} and {{ request.query_params.get('n', '0') }} {{ 'story' if request.query_params.get('n') == '1' else 'stories' }} moved to the section you chose.</p>{% endif %}
 {% if request.query_params.get('pack') is not none %}
 {% set added, pmoved = request.query_params.get('pack')|int, request.query_params.get('packmoved')|int %}
 <p class="callout ok">Added {{ added }} feed{{ 's' if added != 1 }} to Lifestyle{% if pmoved %} and moved {{ pmoved }} you already had{% endif %}.
@@ -46,6 +47,59 @@
   {% endfor %}
   {% endif %}
   {% endcall %}
+{% endcall %}
+
+{# Sections: the tabs and chips of the feed. Local (news) and World are built in: they can be renamed, not removed. #}
+{% call group('Sections', id='sections', footnote='A section can be a tab at the bottom (up to ' ~ max_tabs ~ ', and News counts as one) or a chip under For you. Local and World share the News tab. A section is a tab once it has a feed.') %}
+  {% for s in cfg.all_sections %}
+  {% set n = cfg.feeds|selectattr('category', 'equalto', s.key)|list|length %}
+  {% set builtin = s.key in ('news', 'world') %}
+  {% call expand(s.label, ('News tab' if builtin else 'Tab' if s.tab else 'Chip under For you') ~ ' · ' ~ n ~ (' feed' if n == 1 else ' feeds')) %}
+  <form method="post" action="/settings/section_edit" class="sform">
+    <input type="hidden" name="key" value="{{ s.key }}">
+    <label>Name <input name="label" required maxlength="24" value="{{ s.label }}"></label>
+    {% if not builtin %}
+    <label>Icon <select name="icon">{% for i in section_icons %}<option value="{{ i }}" {% if i == s.icon %}selected{% endif %}>{{ i|capitalize }}</option>{% endfor %}</select></label>
+    <label class="check"><input type="checkbox" name="tab" {% if s.tab %}checked{% endif %}> Show as a tab</label>
+    {% endif %}
+    <button class="button" type="submit">Save</button>
+  </form>
+  <div class="sform" style="display: flex; gap: 8px">
+    {% for dir, text in (('up', 'Move up'), ('down', 'Move down')) %}
+    <form method="post" action="/settings/section_move" class="srow-form">
+      <input type="hidden" name="key" value="{{ s.key }}"><input type="hidden" name="dir" value="{{ dir }}">
+      <button class="button small secondary" type="submit">{{ text }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  {% if not builtin %}
+  <form method="post" action="/settings/section_remove" class="sform" data-confirm="Remove {{ s.label }}? Its feeds and stories move to the section you chose.">
+    <input type="hidden" name="key" value="{{ s.key }}">
+    <label>Move its {{ n }} {{ 'feed' if n == 1 else 'feeds' }} and stories to
+      <select name="move_to">{% for o in cfg.all_sections if o.key != s.key %}<option value="{{ o.key }}" {% if o.key == 'world' %}selected{% endif %}>{{ o.label }}</option>{% endfor %}</select></label>
+    <button class="button small secondary" type="submit">Remove {{ s.label }}</button>
+  </form>
+  {% endif %}
+  {% endcall %}
+  {% endfor %}
+  {% call expand('Add a section…') %}
+  <form method="post" action="/settings/section_add" class="sform">
+    <label>Name <input name="label" required maxlength="24" placeholder="Sports" autocapitalize="words"></label>
+    <label>Icon <select name="icon">{% for i in section_icons %}<option value="{{ i }}" {% if i == 'star' %}selected{% endif %}>{{ i|capitalize }}</option>{% endfor %}</select></label>
+    <p class="muted small">Then give it feeds: add one above, or change a feed's section.</p>
+    <button class="button" type="submit">Add section</button>
+  </form>
+  {% endcall %}
+  {% if 'lifestyle' not in section_labels and lifestyle_missing %}
+  {% call expand('Lifestyle &amp; gear pack'|safe, lifestyle_missing|length ~ ' popular feeds, checked this month') %}
+  <form method="post" action="/settings/pack/lifestyle" class="sform">
+    <p class="muted small">Adds a Lifestyle section with gear, watches, cars, style and design: {{ lifestyle_missing|map(attribute='name')|list|join(', ') }}. Busy sites are capped so none floods the section.</p>
+    {% if not lifestyle_interest %}<label class="check"><input type="checkbox" name="interest" value="1" checked>
+      Add men's lifestyle &amp; gear to my interests, so these stories rank as wanted</label>{% endif %}
+    <button class="button" type="submit">Add {{ lifestyle_missing|length }} feeds</button>
+  </form>
+  {% endcall %}
+  {% endif %}
 {% endcall %}
 
 {% for key in section_labels %}

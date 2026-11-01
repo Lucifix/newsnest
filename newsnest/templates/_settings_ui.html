@@ -129,7 +129,7 @@
   {{ avatar(name) }}
   <span class="srow-main">
     <span class="srow-title">{{ name }}</span>
-    {% if flagged %}<span class="srow-sub warn">Doesn't read like your other Local feeds. Move it to World or Tech</span>
+    {% if flagged %}<span class="srow-sub warn">Doesn't read like your other {{ section_labels['news'] }} feeds. Move it to another section</span>
     {% elif moved %}<span class="srow-sub ok">Moved{% if request.query_params.get('n') %} · {{ request.query_params.get('n') }} stories{% endif %}</span>
     {% else %}<span class="srow-sub" title="{{ f.url }}">{{ host(f.url) }}{% if not f.enabled %} · paused{% endif %}{% if f.daily_cap %} · max {{ f.daily_cap }}/day{% endif %}</span>{% endif %}
   </span>

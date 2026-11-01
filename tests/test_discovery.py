@@ -44,6 +44,27 @@ def test_starter_pack_parses_with_categories():
     assert all(f.url.startswith("https://") for f in feeds)
 
 
+def test_opml_follows_the_readers_sections():
+    opml = """<opml><body><outline text="Cyber security"><outline xmlUrl="https://a.example/feed" text="A"/></outline>
+              <outline xmlUrl="https://b.example/feed" text="B" category="sports"/>
+              <outline text="Gear"><outline xmlUrl="https://c.example/feed" text="C"/></outline></body></opml>"""
+    legacy = ("tech", "news", "world", "lifestyle")
+    # "sports" isn't one of the legacy keys, so B (no folder) gets the default
+    assert [f.category for f in parse_opml(opml, keys=legacy)] == ["tech", "tech", "lifestyle"]
+    own = ("news", "world", "sports")   # no Tech or Lifestyle: their folders fall back to World, an own key is taken
+    assert [(f.title, f.category) for f in parse_opml(opml, "world", keys=own)] == [("A", "world"), ("B", "sports"), ("C", "world")]
+    with_tech = ("news", "world", "tech", "sports")
+    assert [f.category for f in parse_opml(opml, "world", keys=with_tech)] == ["tech", "sports", "world"]
+
+
+def test_candidates_in_a_missing_section_land_in_world(conn, cfg):
+    from newsnest.discovery import OpmlFeed, add_candidates
+    cfg.sections = [s for s in cfg.sections if s.key != "tech"]
+    cfg.feeds = [f for f in cfg.feeds if f.category != "tech"]
+    assert add_candidates(conn, cfg, [OpmlFeed("https://new.example/feed", "New", "tech")], "test") == 1
+    assert conn.execute("SELECT category FROM candidates").fetchone()[0] == "world"
+
+
 def test_opml_folder_maps_category():
     opml = """<opml><body><outline text="Cyber security"><outline xmlUrl="https://a.example/feed" text="A"/></outline>
               <outline text="Science"><outline xmlUrl="https://b.example/feed" text="B"/></outline>

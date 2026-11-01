@@ -19,19 +19,66 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-Category = Literal["news", "tech", "world", "lifestyle"]  # "news" is shown as Local
-
-
 class _Strict(BaseModel):
     # Typos in config.yaml should be reported, not silently ignored
     model_config = ConfigDict(extra="forbid")
+
+
+# Sections: the groups a feed belongs to, shown as tabs and chips. The key is stored with every story, so it
+# never changes; the label is what the reader sees. "news" (Local) and "world" are built in: they can be
+# renamed but not removed, and they share the News tab.
+NEWS, WORLD = "news", "world"
+ICONS = ("chip", "watch", "ball", "flask", "briefcase", "film", "leaf", "star")
+RESERVED_KEYS = ("all", "headlines", "cat", "top")   # filter names of the feed page, block names of the digest
+MAX_SECTIONS = 12
+MAX_TABS = 4                                  # in the dock next to For you; News counts as one
+_KEY = re.compile(r"^[a-z0-9][a-z0-9-]{0,23}$")
+
+
+class SectionCfg(_Strict):
+    key: str
+    label: str
+    icon: str = "star"
+    # Shown in the dock. Off: the section is a chip under For you. Ignored for Local and World (the News tab).
+    tab: bool = True
+    # Poll its feeds this often; empty = the schedules: values
+    poll_minutes: int | None = Field(default=None, ge=1)
+
+    @field_validator("key")
+    @classmethod
+    def _key_ok(cls, v: str) -> str:
+        if not _KEY.match(v) or v in RESERVED_KEYS:
+            raise ValueError(f"section key {v!r} must be 1-24 lowercase letters, digits or dashes (not {', '.join(RESERVED_KEYS)})")
+        return v
+
+    @field_validator("label")
+    @classmethod
+    def _label_ok(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if not v or len(v) > 24:
+            raise ValueError("a section name needs 1-24 characters")
+        return v
+
+    @field_validator("icon")
+    @classmethod
+    def _icon_ok(cls, v: str) -> str:
+        if v not in ICONS:
+            raise ValueError(f"unknown icon {v!r}, use one of: {', '.join(ICONS)}")
+        return v
+
+
+# What a config without a `sections:` list has always had: the order is the dock's (Tech, News, Lifestyle).
+LEGACY_SECTIONS = (SectionCfg(key="tech", label="Tech", icon="chip"), SectionCfg(key=NEWS, label="Local"),
+                   SectionCfg(key=WORLD, label="World"), SectionCfg(key="lifestyle", label="Lifestyle", icon="watch"))
+# Sections that packs and OPML folders know by name, created on demand when a pack needs one that isn't there
+KNOWN_SECTIONS = {s.key: s for s in LEGACY_SECTIONS}
 
 
 class FeedCfg(_Strict):
     id: str
     name: str | None = None
     url: str
-    category: Category
+    category: str   # a section key
     enabled: bool = True
     daily_cap: int | None = None
     # Rewrite http:// item links to https:// (for feeds that still publish http links)
@@ -56,7 +103,7 @@ class WatchCfg(_Strict):
 
 
 class GithubReleasesCfg(_Strict):
-    category: Category = "tech"
+    category: str = "tech"   # a section key
     repos: list[str] = Field(default_factory=list)
     daily_cap: int | None = None
     # Betas and release candidates (2026.10.0b5, v10.9.0-rc1) are skipped unless true
@@ -214,6 +261,9 @@ class Config(_Strict):
     max_item_age_days: float = 3
     http: HttpCfg = Field(default_factory=HttpCfg)
     schedules: SchedulesCfg = Field(default_factory=SchedulesCfg)
+    # None: the sections every version before this one had (LEGACY_SECTIONS). The first edit in Settings
+    # writes the list into the file.
+    sections: list[SectionCfg] | None = None
     feeds: list[FeedCfg] = Field(default_factory=list)
     github_releases: GithubReleasesCfg = Field(default_factory=GithubReleasesCfg)
     categories: dict[str, CategoryCfg] = Field(default_factory=dict)
@@ -235,6 +285,40 @@ class Config(_Strict):
         except (ValueError, KeyError):  # ZoneInfoNotFoundError is a KeyError
             raise ValueError(f"unknown time zone {v!r}, e.g. Europe/Berlin or America/New_York") from None
         return v
+
+    @property
+    def all_sections(self) -> list[SectionCfg]:
+        """The sections in order: the configured list, or the legacy one."""
+        return list(LEGACY_SECTIONS) if self.sections is None else self.sections
+
+    def poll_minutes(self, category: str) -> int:
+        """How often a section's feeds are polled: its own setting, else the schedules: values."""
+        for s in self.all_sections:
+            if s.key == category and s.poll_minutes:
+                return s.poll_minutes
+        return self.schedules.poll_minutes(category)
+
+    @model_validator(mode="after")
+    def _sections_ok(self) -> "Config":
+        if self.sections is not None:
+            keys = [s.key for s in self.sections]
+            if dupes := sorted({k for k in keys if keys.count(k) > 1}):
+                raise ValueError(f"sections: duplicate key {', '.join(dupes)}")
+            # Local and World are built in: put back one that was deleted by hand
+            self.sections[:0] = [SectionCfg(key=k, label=KNOWN_SECTIONS[k].label) for k in (NEWS, WORLD) if k not in keys]
+            if len(self.sections) > MAX_SECTIONS:
+                raise ValueError(f"sections: at most {MAX_SECTIONS} sections")
+            tabs = 1 + sum(s.tab for s in self.sections if s.key not in (NEWS, WORLD))
+            if tabs > MAX_TABS:
+                raise ValueError(f"sections: at most {MAX_TABS} tabs, and News is one of them. "
+                                 "Turn off 'tab' for a section to make it a chip under For you")
+        known = {s.key for s in self.all_sections}
+        for f in self.feeds:
+            if f.category not in known:
+                raise ValueError(f"feed '{f.id}' is in section '{f.category}', which isn't listed under sections:")
+        if self.github_releases.repos and self.github_releases.category not in known:
+            raise ValueError(f"github_releases is in section '{self.github_releases.category}', which isn't listed under sections:")
+        return self
 
 
 @dataclass

@@ -38,8 +38,7 @@ def is_due(source: Source, state: sqlite3.Row | None, cfg: Config, now: datetime
     blocked = parse_iso(state["blocked_until"])
     if blocked and blocked > now:
         return False
-    minutes = source.params.get("interval") or (
-        cfg.schedules.poll_minutes(source.category))
+    minutes = source.params.get("interval") or cfg.poll_minutes(source.category)
     # 30 s slack so a 15 min schedule on a 60 s tick does not drift to 16 min
     return now - parse_iso(state["last_run"]) >= timedelta(minutes=minutes, seconds=-30)
 
