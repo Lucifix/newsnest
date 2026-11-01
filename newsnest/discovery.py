@@ -10,6 +10,7 @@ one that never produces anything good, or keeps failing, is retired automaticall
 from __future__ import annotations
 
 import calendar
+import io
 import logging
 import re
 import sqlite3
@@ -114,7 +115,7 @@ def check_feed(client: httpx.Client, url: str) -> CheckResult:
         return CheckResult(False, f"HTTP {r.status_code}")
     if r.url.scheme != "https":
         return CheckResult(False, "redirects to plain http")
-    parsed = feedparser.parse(r.content)
+    parsed = feedparser.parse(io.BytesIO(r.content))  # never the bytes: feedparser opens a body that is a local path
     entries = parsed.entries
     if not entries:
         return CheckResult(False, "no entries")

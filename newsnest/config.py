@@ -12,6 +12,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 import yaml
 from zoneinfo import ZoneInfo
@@ -40,6 +41,9 @@ class FeedCfg(_Strict):
 
     @model_validator(mode="after")
     def _https_only(self) -> "FeedCfg":
+        parts = urlsplit(self.url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError(f"feed '{self.id}' needs a web address starting with https://")
         if self.url.startswith("http://") and not self.allow_http:
             raise ValueError(f"feed '{self.id}' uses http://: use https, or set allow_http: true")
         return self

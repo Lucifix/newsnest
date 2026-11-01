@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import re
 
 import feedparser
@@ -28,7 +29,8 @@ def parse_feed(source: Source, ctx: FetchContext) -> tuple[feedparser.FeedParser
         # Unchanged since the last fetch: same entries as before, nothing new to parse
         return None, FetchResult(source.id, FetchStatus.OK, http_status=304,
                                  raw_count=source.params.get("prev_raw") or 0)
-    parsed = feedparser.parse(r.content, response_headers={"content-type": r.headers.get("content-type", "")})
+    # A file object, never the bytes: feedparser opens a body like "/dev/zero" as a local path
+    parsed = feedparser.parse(io.BytesIO(r.content), response_headers={"content-type": r.headers.get("content-type", "")})
     result = FetchResult(source.id, FetchStatus.OK, http_status=r.status_code, raw_count=len(parsed.entries),
                          etag=r.headers.get("etag"), last_modified=r.headers.get("last-modified"))
     if str(r.url) != source.url:

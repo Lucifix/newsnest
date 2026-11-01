@@ -34,6 +34,7 @@ from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (STARTER_PACK, add_candidates, named_sources, parse_opml, promotion_suggestions,
                              region_words, start_check_thread, starter_missing, _signals)
+from newsnest.feedfinder import FinderError, find_feeds, finder_client
 from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
                         read_stories, recall, remember, saved_stories, search_stories, story_hidden, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
@@ -812,10 +813,10 @@ def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
     return ctx
 
 
-def _settings(request: Request, page: str, conn, loaded: LoadedConfig, root: bool = False) -> HTMLResponse:
+def _settings(request: Request, page: str, conn, loaded: LoadedConfig, root: bool = False, **extra) -> HTMLResponse:
     return render(request, f"settings_{page}.html", conn, loaded, page=page, root=root,
                   error=request.query_params.get("error"), saved=request.query_params.get("saved"),
-                  **settings_context(page, conn, loaded))
+                  **settings_context(page, conn, loaded), **extra)
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -861,6 +862,34 @@ def _refuse_duplicate(feeds: list, url: str) -> None:
     for f in feeds:
         if normalize_url(str(f.get("url", ""))) == key:
             raise ConfigEditError(f"{f.get('name') or f.get('id')} is already a feed (same address)")
+
+
+def _free_id(feeds: list, name: str) -> str:
+    """A slug of the name, numbered when another feed already has it (two papers both called "Novice")."""
+    base = fid = slugify(name)
+    taken = {f.get("id") for f in feeds}
+    n = 2
+    while fid in taken:
+        fid, n = f"{base}-{n}", n + 1
+    return fid
+
+
+@app.post("/settings/feed_find", response_class=HTMLResponse)
+def feed_find(request: Request, address: str = Form(""), conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
+    """Look up the feeds behind a website address and show them with a preview, each with its own Add."""
+    cfg = _require_cfg(loaded)
+    error = None
+    try:
+        with finder_client(cfg) as client:
+            found = find_feeds(client, address[:2000])
+        if not found:
+            error = "No feed found there. Try the address of the site's news page, or ask the site whether it has RSS."
+    except FinderError as e:
+        found, error = [], str(e)
+    known = {normalize_url(f.url): f.name or f.id for f in cfg.feeds}
+    for f in found:
+        f.known = known.get(normalize_url(f.url))
+    return _settings(request, "feeds", conn, loaded, finder={"address": address, "found": found, "error": error})
 
 
 @app.post("/settings/pack/lifestyle")
@@ -943,13 +972,16 @@ async def settings_action(action: str, request: Request):
     if "category" in form and form["category"] not in SECTIONS:
         return RedirectResponse(f"{back}?error={quote('unknown section ' + form['category'])}", status_code=303)
 
+    added = {}
+
     def change(data):
         if action == "feed_add":
             feeds = section_list(data, "feeds")
-            _refuse_duplicate(feeds, form["url"])
-            fid = slugify(form.get("id") or form["name"])
-            entry = {"id": fid, "name": form["name"].strip(), "url": form["url"].strip(), "category": form["category"]}
-            feeds.append(entry)
+            url = form["url"].strip()
+            _refuse_duplicate(feeds, url)
+            name = " ".join(form["name"].split())[:80] or feed_host(url)
+            added["id"] = _free_id(feeds, form.get("id") or name)
+            feeds.append({"id": added["id"], "name": name, "url": url, "category": form["category"]})
         elif action == "feed_section":
             for f in section_list(data, "feeds"):
                 if f.get("id") == form["id"]:
@@ -1002,7 +1034,7 @@ async def settings_action(action: str, request: Request):
     if action in ("feed_section", "feed_toggle"):
         anchor = f"#feed-{form['id']}"
     elif action == "feed_add":
-        anchor = f"#feed-{slugify(form.get('id') or form['name'])}"
+        anchor = f"#feed-{added['id']}"
     return RedirectResponse(f"{back}?saved={action}{extra}{anchor}", status_code=303)
 
 
