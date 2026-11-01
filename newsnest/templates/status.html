@@ -1,5 +1,5 @@
 {% extends "_settings_layout.html" %}
-{% from "_settings_ui.html" import group, fold, action_row with context %}
+{% from "_settings_ui.html" import group, fold, action_row, ext_row with context %}
 {% block stitle %}Status{% endblock %}
 {% block sintro %}<p class="sub">Last run {{ localtime(status.last_tick, '%d.%m. %H:%M:%S') or 'never' }}</p>{% endblock %}
 
@@ -23,6 +23,11 @@
 {% endmacro %}
 
 {% block page %}
+{% if banner or status.config_errors %}
+{% call group(footnote='Something looks like a bug? The report asks what happened; nothing from this page is sent.') %}
+  {{ ext_row(bug_url, 'Report this on GitHub') }}
+{% endcall %}
+{% endif %}
 {% if status.config_errors %}
 {% call group('config.yaml errors', footnote='Nothing is fetched until these are fixed on the server.') %}
   {% for e in status.config_errors %}<div class="srow"><span class="srow-main"><span class="srow-title wrap mono">{{ e }}</span></span></div>{% endfor %}

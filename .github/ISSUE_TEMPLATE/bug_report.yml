@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in NewsNest is broken or behaves unexpectedly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Please do not paste your API key or your login password.
+  - type: input
+    id: version
+    attributes:
+      label: NewsNest version
+      description: Shown in Settings, under "About & report a bug".
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker (docker compose)
+        - Docker (plain docker run)
+        - From source (python -m newsnest)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or status errors
+      description: The red banner or the errors on the Status page, or `docker compose logs newsnest`. Remove anything private.
+      render: shell
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      description: Only if it is a display problem.
+      placeholder: Safari on iPhone 15

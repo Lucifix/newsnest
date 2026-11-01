@@ -1,0 +1,25 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, ext_row %}
+{% block stitle %}About NewsNest{% endblock %}
+{% block page %}
+<div class="about-hero">
+  <img src="/static/icons/icon-192.png" width="72" height="72" alt="">
+  <p class="about-name">NewsNest <span class="mono">v{{ version }}</span></p>
+  <p class="about-tag">A self-hosted news feed that learns what you care about. Free and open source.</p>
+</div>
+
+{% call group('Help', footnote='A bug report only contains what you type. Nothing from your feeds, interests or API key is sent.') %}
+  {{ ext_row(bug_url, 'Report a bug', 'Opens a new issue on GitHub with the version filled in') }}
+  {{ ext_row(repo_url ~ '/issues', 'Ideas and known issues') }}
+  {{ ext_row(repo_url ~ '/releases', "What's new", 'Release notes for every version') }}
+{% endcall %}
+
+{% call group('Project', footnote='If NewsNest is useful to you, a ⭐ on GitHub helps other people find it.') %}
+  {{ ext_row(repo_url, 'Source code on GitHub', 'Lucifix/newsnest') }}
+  {{ ext_row(website_url, 'Website') }}
+  {{ ext_row(repo_url ~ '/blob/main/LICENSE', 'MIT License', 'Free to use, change and share') }}
+{% endcall %}
+
+<p class="sgroup-foot spage-foot">Summaries and scores come from <a href="https://www.anthropic.com/claude" target="_blank" rel="noopener">Claude</a>
+  with your own API key. Fonts: JetBrains Mono and Space Grotesk, under the SIL Open Font License.</p>
+{% endblock %}
