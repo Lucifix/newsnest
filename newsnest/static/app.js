@@ -134,7 +134,12 @@ document.addEventListener("submit", async (event) => {
   const button = event.submitter;
   if (!button) return;
 
-  if (form.classList.contains("rate")) {
+  if (form.dataset.checking) {
+    // The server fetches the feed before saving: say so, and don't let a second tap start another check
+    const label = button.textContent;
+    setTimeout(() => { button.disabled = true; button.textContent = form.dataset.checking; }, 0);
+    addEventListener("pageshow", () => { button.disabled = false; button.textContent = label; }, { once: true });
+  } else if (form.classList.contains("rate")) {
     event.preventDefault();
     try {
       const { rating } = await postForm(form.action, { value: button.value });

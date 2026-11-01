@@ -122,7 +122,14 @@ def test_go_marks_read_and_redirects(client):
     assert connect().execute("SELECT read_at FROM items WHERE id = 1").fetchone()[0]
 
 
-def test_settings_edit_keeps_comments_and_validates(client, env):
+@pytest.fixture
+def feed_ok(monkeypatch):
+    """Adding a feed fetches it first; these tests are about the config edit, so every address is a valid feed."""
+    from newsnest.fetchers.rss import FeedCheck
+    monkeypatch.setattr("newsnest.web.check_new_feed", lambda cfg, url: FeedCheck(True, title="Feed Title"))
+
+
+def test_settings_edit_keeps_comments_and_validates(client, env, feed_ok):
     path = env.config / "config.yaml"
     before = path.read_text(encoding="utf-8")
     r = client.post("/settings/feed_add", data={"name": "Primorske novice", "url": "https://www.primorske.si/rss",
@@ -482,3 +489,38 @@ def test_calibration_page_picks_a_limit_in_one_tap(client, env):
     before = "calibration_mode: true" in (env.config / "config.yaml").read_text(encoding="utf-8")
     client.post("/settings/calibration_toggle")
     assert ("calibration_mode: true" in (env.config / "config.yaml").read_text(encoding="utf-8")) != before
+
+
+def test_feed_add_checks_the_feed_before_saving(client, env, monkeypatch):
+    from newsnest.fetchers.rss import FeedCheck
+    path = env.config / "config.yaml"
+    before = path.read_text(encoding="utf-8")
+    seen = []
+
+    def fake_check(cfg, url):
+        seen.append(url)
+        return FeedCheck(False, "Couldn't reach feed.example.") if "down" in url else FeedCheck(True, title="City Magazine")
+    monkeypatch.setattr("newsnest.web.check_new_feed", fake_check)
+
+    # a feed that fails the check is not saved; the form comes back with what was typed
+    r = client.post("/settings/feed_add", data={"name": "Mine", "url": "https://down.example/rss", "category": "news"},
+                    follow_redirects=False)
+    assert r.headers["location"].startswith("/settings/feeds?error=Couldn%27t%20reach%20feed.example.")
+    assert "&name=Mine&url=https%3A//down.example/rss&category=news" in r.headers["location"]
+    assert path.read_text(encoding="utf-8") == before
+    page = client.get(r.headers["location"]).text
+    assert "Couldn&#39;t reach feed.example." in page and 'value="https://down.example/rss"' in page
+    assert "<details class=\"srow-expand\" open>" in page  # the Add form is open again
+
+    # a pasted markdown link is cleaned up, and an empty name is taken from the feed's title
+    r = client.post("/settings/feed_add", data={"name": "", "url": "[/](https://citymagazine.si/feed/)", "category": "news"},
+                    follow_redirects=False)
+    assert seen[-1] == "https://citymagazine.si/feed/"
+    assert r.headers["location"] == "/settings/feeds?saved=feed_add#feed-city-magazine"
+    assert "name: City Magazine" in path.read_text(encoding="utf-8")
+
+    # the same address is refused before any request is made
+    n = len(seen)
+    r = client.post("/settings/feed_add", data={"name": "", "url": "citymagazine.si/feed", "category": "news"},
+                    follow_redirects=False)
+    assert "already%20a%20feed" in r.headers["location"] and len(seen) == n

@@ -17,11 +17,13 @@
 {% endif %}
 
 {% call group() %}
-  {% call expand('Add a feed…') %}
-  <form method="post" action="/settings/feed_add" class="sform">
-    <label>Name <input name="name" required placeholder="My local paper"></label>
-    <label>Feed URL (https) <input name="url" type="url" required placeholder="https://…/rss"></label>
-    <label>Section <select name="category">{{ section_options('world') }}</select></label>
+  {# After a refused add the form opens again with what was typed #}
+  {% set typed_url = request.query_params.get('url', '') %}
+  {% call expand('Add a feed…', open=error and typed_url) %}
+  <form method="post" action="/settings/feed_add" class="sform" data-checking="Checking the feed…">
+    <label>Name <input name="name" value="{{ request.query_params.get('name', '') }}" placeholder="Taken from the feed if empty"></label>
+    <label>Feed URL (https) <input name="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" required value="{{ typed_url }}" placeholder="https://…/rss"></label>
+    <label>Section <select name="category">{{ section_options(request.query_params.get('category') or 'world') }}</select></label>
     <button class="button" type="submit">Add feed</button>
   </form>
   {% endcall %}

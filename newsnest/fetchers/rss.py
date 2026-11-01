@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 import feedparser
 
-from newsnest.config import Source
-from newsnest.fetchers.base import FetchContext, FetchFailed, html_to_text, http_get, struct_to_dt
+from newsnest.config import Config, Source
+from newsnest.fetchers.base import FetchContext, FetchFailed, html_to_text, http_get, make_client, struct_to_dt
 from newsnest.models import FetchResult, FetchStatus, Item
 
 _HN_POINTS = re.compile(r"Points:\s*(\d+)")
@@ -43,6 +45,64 @@ def parse_feed(source: Source, ctx: FetchContext) -> tuple[feedparser.FeedParser
         # An encoding override (declared us-ascii, actually utf-8) is harmless: text decodes fine
         result.warnings.append(f"feed is malformed but readable: {parsed.get('bozo_exception')}")
     return parsed, result
+
+
+_MARKDOWN_LINK = re.compile(r"^\[[^\]]*\]\(\s*(\S+?)\s*\)$")
+
+
+def clean_feed_url(raw: str) -> str:
+    """What a reader meant by what they pasted: trimmed, a markdown link ([text](url), copied from rendered
+    chat or docs) reduced to its URL, and https:// assumed when no scheme was typed."""
+    url = raw.strip()
+    if m := _MARKDOWN_LINK.match(url):
+        url = m.group(1)
+    url = url.strip("<>")
+    if url and "://" not in url:
+        url = "https://" + url
+    return url
+
+
+@dataclass
+class FeedCheck:
+    """Whether a feed address can be added: `ok` with the feed's own title, or `message` saying what is wrong."""
+
+    ok: bool
+    message: str = ""
+    title: str | None = None
+
+
+def check_new_feed(cfg: Config, url: str, client=None) -> FeedCheck:
+    """Fetch and parse a feed the reader is about to add, with the same code the poller uses, so
+    "valid" means "NewsNest can actually read it". Never raises."""
+    parts = urlsplit(url)
+    if parts.scheme != "https" or not parts.hostname:
+        return FeedCheck(False, "That isn't a feed address. It must be a full link starting with https://")
+    source = Source(id="feed-check", type="rss", category="news", name="", url=url)
+    try:
+        if client is not None:
+            parsed, _ = parse_feed(source, FetchContext(cfg, client))
+        else:
+            with make_client(cfg) as c:
+                parsed, _ = parse_feed(source, FetchContext(cfg, c))
+    except FetchFailed as e:
+        return FeedCheck(False, _failure_message(e, parts.hostname))
+    except Exception as e:  # an odd response must end in a message, not a server error
+        return FeedCheck(False, f"Couldn't check this address ({type(e).__name__})")
+    title = html_to_text(parsed.feed.get("title"), limit=80) if parsed is not None else ""
+    return FeedCheck(True, title=title or None)
+
+
+def _failure_message(e: FetchFailed, host: str) -> str:
+    match e.status:
+        case FetchStatus.NETWORK_ERROR:
+            return f"Couldn't reach {host}. Check the address, or try again in a minute if the site is down."
+        case FetchStatus.BLOCKED:
+            return f"{host} refused the request (HTTP {e.http_status or 'bot check'}), so NewsNest couldn't read it."
+        case FetchStatus.HTTP_ERROR:
+            hint = " Check the address." if e.http_status == 404 else ""
+            return f"{host} answered HTTP {e.http_status}.{hint}"
+        case _:
+            return "That address works but isn't an RSS or Atom feed. Look for the site's feed link."
 
 
 def entry_to_item(entry, source: Source) -> Item | None:

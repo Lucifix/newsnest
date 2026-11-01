@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 from html import escape as html_escape
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 import hashlib
 import logging
 import os
@@ -34,6 +34,7 @@ from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (STARTER_PACK, add_candidates, named_sources, parse_opml, promotion_suggestions,
                              region_words, start_check_thread, starter_missing, _signals)
+from newsnest.fetchers.rss import check_new_feed, clean_feed_url
 from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
                         read_stories, recall, remember, saved_stories, search_stories, story_hidden, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
@@ -934,8 +935,14 @@ async def local_pack(code: str, request: Request):
                             "#section-news", status_code=303)
 
 
+def _feed_add_refused(form: dict, message: str) -> RedirectResponse:
+    """Back to the Add form with what was typed, so a typo is one edit away from working."""
+    typed = "".join(f"&{k}={quote(form.get(k, ''))}" for k in ("name", "url", "category"))
+    return RedirectResponse(f"/settings/feeds?error={quote(message[:500])}{typed}", status_code=303)
+
+
 @app.post("/settings/{action}")
-async def settings_action(action: str, request: Request):
+async def settings_action(action: str, request: Request, loaded: LoadedConfig = Depends(get_loaded)):
     form = dict(await request.form())
     back = "/calibration" if action in CALIBRATION_ACTIONS else f"/settings/{ACTION_PAGE.get(action, 'general')}"
     if action == "region" and _onboarding_next(form):
@@ -943,12 +950,28 @@ async def settings_action(action: str, request: Request):
     if "category" in form and form["category"] not in SECTIONS:
         return RedirectResponse(f"{back}?error={quote('unknown section ' + form['category'])}", status_code=303)
 
+    if action == "feed_add":
+        # Check the feed before saving anything: a typo or a homepage address would otherwise sit in the list
+        # and never deliver a story. The checked title fills in a name the reader left empty.
+        form["url"] = clean_feed_url(form.get("url", ""))
+        if not form["url"]:
+            return _feed_add_refused(form, "Enter the feed address.")
+        for f in loaded.config.feeds if loaded.config else []:
+            if normalize_url(f.url) == normalize_url(form["url"]):
+                return _feed_add_refused(form, f"{f.name or f.id} is already a feed (same address)")
+        if loaded.config:
+            check = await asyncio.to_thread(check_new_feed, loaded.config, form["url"])
+            if not check.ok:
+                return _feed_add_refused(form, check.message)
+            form["name"] = form.get("name", "").strip() or check.title or urlsplit(form["url"]).hostname
+        form.setdefault("name", "")
+
     def change(data):
         if action == "feed_add":
             feeds = section_list(data, "feeds")
             _refuse_duplicate(feeds, form["url"])
             fid = slugify(form.get("id") or form["name"])
-            entry = {"id": fid, "name": form["name"].strip(), "url": form["url"].strip(), "category": form["category"]}
+            entry = {"id": fid, "name": form["name"].strip(), "url": form["url"], "category": form["category"]}
             feeds.append(entry)
         elif action == "feed_section":
             for f in section_list(data, "feeds"):
@@ -993,6 +1016,8 @@ async def settings_action(action: str, request: Request):
     try:
         edit_config(change)
     except (ConfigEditError, KeyError, ValueError) as e:
+        if action == "feed_add":
+            return _feed_add_refused(form, str(e))
         return RedirectResponse(f"{back}?error={quote(str(e)[:500])}", status_code=303)
     extra = anchor = ""
     # Feed changes come back to the feed's own row, so the page doesn't jump to the top
