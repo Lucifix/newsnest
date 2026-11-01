@@ -717,7 +717,13 @@ a.chip { text-decoration: none; }
 .whybar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 34%) 2.2em; gap: 10px; align-items: center; font-size: 0.82rem; }
 .whylabel small { color: var(--muted); font: 500 0.7rem var(--mono); margin-left: 2px; }
 .whytrack { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
-.whytrack i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.whytrack i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transform-origin: left; }
+/* Opening: the panel eases in and the bars fill from zero, one after another, so the eye lands on the breakdown */
+.whybox[open] .whyfull { animation: tldr-in .18s ease-out; }
+.whybox[open] .whytrack i { animation: why-fill .5s cubic-bezier(.2, .7, .2, 1) both; }
+.whybox[open] .whybar:nth-child(2) .whytrack i { animation-delay: 60ms; }
+.whybox[open] .whybar:nth-child(3) .whytrack i { animation-delay: 120ms; }
+@keyframes why-fill { from { transform: scaleX(0); } }
 .whybar b { font: 700 0.76rem var(--mono); text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
 .whyhead { font: 700 0.66rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .whyplace { list-style: none; margin: -4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 0.82rem; }
@@ -1021,6 +1027,7 @@ a.chip { text-decoration: none; }
 @keyframes tldr-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .sumbtn[aria-busy="true"] svg, .bodytext.fresh .tldr-body, .bodytext.fresh .lede { animation: none; }
+  .whybox[open] .whyfull, .whybox[open] .whytrack i { animation: none; }
   /* search: no morph or slide, just a fade */
   .tabbar, .docksearch, .topsearch input { transition: opacity 0.2s ease !important; }
   .searchlayer, body.searching .searchlayer { transform: none; transition: opacity 0.2s ease, visibility 0s linear 0.2s; }
