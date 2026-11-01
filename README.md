@@ -131,7 +131,7 @@ docker compose up -d
 ```
 
 **Update:** `docker compose pull && docker compose up -d`. Set `NEWSNEST_IMAGE_TAG` in `.env` to pin a
-release such as `0.1.0`; the default is `latest`.
+release such as `0.2.0`; the default is `latest`.
 
 ### Option B: build from source
 
