@@ -1170,6 +1170,11 @@ input.sinput:invalid { border-color: var(--danger); }
 .sform .button { justify-self: start; }
 .sform p { margin: 0; }
 @media (min-width: 640px) { .sform { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sform > p, .sform > .check, .sform > .button { grid-column: 1 / -1; } }
+/* a feed found from a website address: title, how often it posts, its latest headlines, then Add */
+.sbody > .callout { margin: 14px 0 0; }
+.found-feed { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.found-headlines { grid-column: 1 / -1; margin: 0; padding-left: 18px; color: var(--text-2); }
+.found-headlines li { overflow-wrap: anywhere; }
 
 /* the section of a feed as gray text; the real <select> sits invisibly on top */
 .vselect { position: relative; display: inline-flex; align-items: center; gap: 2px; min-height: 40px; color: var(--muted); }

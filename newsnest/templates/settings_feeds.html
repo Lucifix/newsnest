@@ -17,13 +17,34 @@
 {% endif %}
 
 {% call group() %}
-  {% call expand('Add a feed…') %}
-  <form method="post" action="/settings/feed_add" class="sform">
-    <label>Name <input name="name" required placeholder="My local paper"></label>
-    <label>Feed URL (https) <input name="url" type="url" required placeholder="https://…/rss"></label>
+  {% call expand('Add a feed…', open=finder is defined) %}
+  <form method="post" action="/settings/feed_find" class="sform">
+    <label>Website or feed address <input name="address" required value="{{ finder.address if finder is defined }}"
+      placeholder="delo.si" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <p class="muted small">Paste the site's address: its feed is found for you.</p>
+    <button class="button" type="submit">Find feed</button>
+  </form>
+  {% if finder is defined %}
+  {% if finder.error %}<p class="callout error">{{ finder.error }}</p>{% endif %}
+  {% for f in finder.found %}
+  <form method="post" action="/settings/feed_add" class="sform found-feed">
+    <input type="hidden" name="url" value="{{ f.url }}">
+    <p><strong>{{ f.name }}</strong><br><span class="muted small" title="{{ f.url }}">{{ host(f.url) }} ·
+      {% if not f.entries %}no posts yet
+      {% elif f.newest_days is none %}{{ f.entries }} posts, undated
+      {% elif f.newest_days > 14 %}last post {{ f.newest_days|int }} days ago
+      {% elif f.per_day >= 1 %}about {{ f.per_day|round|int }} posts a day
+      {% else %}about {{ (f.per_day * 7)|round|int or 1 }} a week{% endif %}</span></p>
+    {% if f.headlines %}<ul class="found-headlines small">{% for h in f.headlines %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
+    {% if f.known %}<p class="muted small">Already added as {{ f.known }}.</p>
+    {% else %}
+    <label>Name <input name="name" required maxlength="80" value="{{ f.name }}"></label>
     <label>Section <select name="category">{{ section_options('world') }}</select></label>
     <button class="button" type="submit">Add feed</button>
+    {% endif %}
   </form>
+  {% endfor %}
+  {% endif %}
   {% endcall %}
 {% endcall %}
 

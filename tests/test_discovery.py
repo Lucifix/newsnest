@@ -103,6 +103,17 @@ def test_conditional_get_returns_304_without_items(cfg):
     assert calls == [None, '"v1"']
 
 
+def test_a_body_that_is_a_local_path_is_not_opened(cfg, tmp_path):
+    """feedparser opens a string it is given as a path: a server answering "/dev/zero" or the path of a feed on this
+    machine must get a parse error, not this machine's file."""
+    local = tmp_path / "local.xml"
+    local.write_text(rss(), encoding="utf-8")
+    c = client_for({"https://x.example/feed": (str(local), 200)})
+    src = Source(id="x", type="rss", category="tech", name="X", url="https://x.example/feed")
+    assert run_fetch(RssFetcher(), src, FetchContext(cfg, c)).status == FetchStatus.PARSE_ERROR
+    assert check_feed(c, "https://x.example/feed").reason == "no entries"
+
+
 @pytest.fixture
 def trial(conn, cfg):
     """A live candidate with two scored stories: one weak, one strong."""
