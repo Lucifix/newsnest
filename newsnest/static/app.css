@@ -692,10 +692,14 @@ a.chip { text-decoration: none; }
 .mastrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; }
 .caughtup .readall { display: flex; justify-content: center; }
 
-.slimfoot { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+/* The score toggle sits on the left of the footer row and the buttons are pinned top-right, so opening
+   the "why" panel drops it below the whole row at full width and the buttons never move */
+.slimfoot { position: relative; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
 .card .slimfoot { grid-column: 1 / -1; }
-.whybox { flex: 1; min-width: 0; }
-.whybox > summary { display: flex; align-items: center; gap: 8px; min-height: 34px; cursor: pointer; list-style: none; }
+.slimfoot > .acts.slim { position: absolute; top: 8px; right: 0; z-index: 3; }
+.whybox { min-width: 0; }
+.whybox > summary { display: flex; width: fit-content; align-items: center; gap: 8px; min-height: 34px; cursor: pointer; list-style: none; }
+.whybox:not(:has(.whycaret)) > summary { cursor: default; }
 .whybox > summary::-webkit-details-marker { display: none; }
 .scorechip {
   flex: none; font: 800 0.78rem/1 var(--sans); font-variant-numeric: tabular-nums; padding: 5px 8px; border-radius: 999px;
@@ -706,8 +710,27 @@ a.chip { text-decoration: none; }
 /* The reason and score breakdown stay one tap away; the card face shows only the score and a caret */
 .whycaret { width: 7px; height: 7px; border: solid var(--muted); border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); transition: transform .15s; }
 .whybox[open] .whycaret { transform: translateY(1px) rotate(-135deg); }
-.whyfull { padding: 2px 0 4px; font-size: 0.86rem; color: var(--text-2); }
-.whyfull p { margin: 4px 0; }
+.whyfull { display: grid; gap: 10px; padding: 8px 0 4px; font-size: 0.86rem; color: var(--text-2); }
+.whyfull p { margin: 0; }
+.whyreason { color: var(--text); font-size: 0.92rem; }
+.whybars { display: grid; gap: 6px; }
+.whybar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 34%) 2.2em; gap: 10px; align-items: center; font-size: 0.82rem; }
+.whylabel small { color: var(--muted); font: 500 0.7rem var(--mono); margin-left: 2px; }
+.whytrack { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.whytrack i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transform-origin: left; }
+/* Opening: the panel eases in and the bars fill from zero, one after another, so the eye lands on the breakdown */
+.whybox[open] .whyfull { animation: tldr-in .18s ease-out; }
+.whybox[open] .whytrack i { animation: why-fill .5s cubic-bezier(.2, .7, .2, 1) both; }
+.whybox[open] .whybar:nth-child(2) .whytrack i { animation-delay: 60ms; }
+.whybox[open] .whybar:nth-child(3) .whytrack i { animation-delay: 120ms; }
+@keyframes why-fill { from { transform: scaleX(0); } }
+.whybar b { font: 700 0.76rem var(--mono); text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.whyhead { font: 700 0.66rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.whyplace { list-style: none; margin: -4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 0.82rem; }
+.whyplace li { position: relative; padding-left: 18px; }
+.whyplace li::before { position: absolute; left: 0; width: 12px; text-align: center; font: 700 0.9rem/1.45 var(--mono); color: var(--muted); content: "·"; }
+.whyplace li.up::before { content: "↑"; color: var(--ok); }
+.whyplace li.down::before { content: "↓"; color: var(--danger); }
 .acts.slim { gap: 2px; }
 .acts.slim .act { width: 34px; height: 34px; background: transparent; }
 .acts.slim .act:hover { background: var(--surface-2); }
@@ -1004,6 +1027,7 @@ a.chip { text-decoration: none; }
 @keyframes tldr-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .sumbtn[aria-busy="true"] svg, .bodytext.fresh .tldr-body, .bodytext.fresh .lede { animation: none; }
+  .whybox[open] .whyfull, .whybox[open] .whytrack i { animation: none; }
   /* search: no morph or slide, just a fade */
   .tabbar, .docksearch, .topsearch input { transition: opacity 0.2s ease !important; }
   .searchlayer, body.searching .searchlayer { transform: none; transition: opacity 0.2s ease, visibility 0s linear 0.2s; }

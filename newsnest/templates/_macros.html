@@ -187,6 +187,35 @@
 </button>
 {% endmacro %}
 
+{# The score, taken apart: the AI's reason, the three sub-scores with their share of the score, and
+   what moved the story up or down the feed. Opens below the footer row, so the buttons stay put. #}
+{% macro why_panel(it) %}
+{% set c = it.card %}{% set r = c.lead.row %}
+<div class="whyfull">
+  {% if r.reason %}<p class="whyreason">{{ r.reason }}</p>{% endif %}
+  {% if r.topic is not none %}
+  <div class="whybars">
+    {% for key, label in subscores %}{% set v = r[key] or 0 %}
+    <div class="whybar"><span class="whylabel">{{ label }} <small>{{ ((cfg.scoring.weights|attr(key)) * 100)|round|int }}%</small></span>
+      <span class="whytrack" aria-hidden="true"><i style="width: {{ [100, v * 10]|min }}%"></i></span><b>{{ v }}</b></div>
+    {% endfor %}
+    {% if (r.source_count or 1) >= 2 and cfg.scoring.cross_source_bonus %}
+    <div class="whybar bonus"><span class="whylabel">Covered by {{ r.source_count }} outlets</span><span></span><b>+{{ '%g'|format(cfg.scoring.cross_source_bonus) }}</b></div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% set cutoff = '%g'|format(cfg.digest.min_final) %}
+  {% set lead_note = [(0, 'Outside your usual topics, shown to explore')] if it.extra == 'exploring'
+       else [(0, 'From a source you added recently')] if it.extra == 'new source'
+       else [(-1, 'Below your ' ~ cutoff ~ ' cut-off; shown because calibration mode is on')] if it.below else [] %}
+  {% set notes = lead_note + it.why %}
+  {% if notes %}
+  <p class="whyhead">In your feed because</p>
+  <ul class="whyplace">{% for d, t in notes %}<li class="{{ 'up' if d > 0 else 'down' if d < 0 else 'info' }}">{{ t }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endmacro %}
+
 {% macro feed_foot(it, calibration) %}
 {% set c = it.card %}{% set r = c.lead.row %}
 <div class="slimfoot">
@@ -196,10 +225,7 @@
       {% if c.final is none %}<span class="reasonline">Not scored yet</span>{% endif %}
       {% if r.reason or r.topic is not none %}<span class="whycaret" aria-hidden="true"></span>{% endif %}
     </summary>
-    <div class="whyfull">
-      {% if r.reason %}<p>{{ r.reason }}</p>{% endif %}
-      <p class="subs">{% if r.topic is not none %}Topic {{ r.topic }} · importance {{ r.importance }} · personal {{ r.personal }} · {% endif %}rank {{ it.rank }}{% if r.event %} · event {{ r.event }}{% endif %}</p>
-    </div>
+    {{ why_panel(it) }}
   </details>
   <div class="acts slim">
     <button type="button" class="act like" data-lead="{{ c.lead.id }}" aria-pressed="{{ 'true' if r.rating == 1 else 'false' }}"

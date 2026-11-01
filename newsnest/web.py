@@ -27,7 +27,7 @@ from starlette.background import BackgroundTask
 from newsnest import __version__
 from newsnest.ai import AIClient, AIError, BudgetExceeded, spent_today
 from newsnest.bootstrap import config_dir, env
-from newsnest.calibration import calibration_data
+from newsnest.calibration import calibration_data, subscore_labels
 from newsnest.config import Config, LoadedConfig, load_config, slugify
 from newsnest.config_edit import ConfigEditError, edit_config, remove_where, section_list, section_map
 from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
@@ -255,7 +255,8 @@ def template_helpers(loaded: LoadedConfig) -> dict:
     return {"cfg": loaded.config, "version": __version__, "asset_version": ASSET_VERSION, "localtime": localtime, "ago": ago, "initials": initials,
             "key_points": key_points, "section_labels": LABELS, "host": feed_host,
             "hue": hue, "cat_hue": lambda c: (categories.index(c) % 8) + 1 if c in categories else 0,
-            "now_local": datetime.now(tz), "today": datetime.now(tz).date(), "timedelta": timedelta}
+            "now_local": datetime.now(tz), "today": datetime.now(tz).date(), "timedelta": timedelta,
+            "subscores": subscore_labels(loaded.config) if loaded.config else ()}
 
 
 def render(request: Request, name: str, conn, loaded: LoadedConfig, **context) -> HTMLResponse:

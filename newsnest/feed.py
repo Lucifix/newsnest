@@ -44,6 +44,9 @@ class FeedItem:
     discovered: bool = False  # from a candidate source still on trial
     first: bool = False       # only the first story's image loads eagerly
     extra: str = ""           # "new source" | "exploring": shown below the score threshold to widen the feed
+    below: bool = False       # under digest.min_final; only shown as an extra or in calibration mode
+    # What moved the story up or down the feed, in words, for the card's "why" panel: (+1 | -1, text)
+    why: list[tuple[int, str]] = field(default_factory=list)
 
     @property
     def read_ids(self) -> str:
@@ -164,6 +167,19 @@ def resurfaced(card: Card, read_at: datetime, key: bool, now: datetime) -> list[
         fresh = now - timedelta(hours=UPDATE_FRESH_HOURS)
         back = len(joined) >= UPDATE_OUTLETS and any(parse_iso(m.row["fetched_at"]) >= fresh for m in joined)
     return joined if back else []
+
+
+def _age(hours: float) -> str:
+    return f"{max(1, round(hours * 60))} min" if hours < 1 else f"{round(hours)} h" if hours < 48 else f"{round(hours / 24)} d"
+
+
+def _taste(weight: float, name: str) -> list[tuple[int, str]]:
+    """A learned source/category weight, in words; small drifts from 1.0 aren't worth a line."""
+    if weight >= 1.1:
+        return [(1, f"You tend to like {name}")]
+    if weight <= 0.9:
+        return [(-1, f"You've passed on {name} before")]
+    return []
 
 
 def _category(card: Card) -> str:
@@ -326,21 +342,35 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
         freshness = f.freshness_floor + (1 - f.freshness_floor) * 0.5 ** (age_h / f.half_life_hours)
         base = final if final is not None else 5.0
         rank = base * freshness
+        why: list[tuple[int, str]] = []
         if top:
             rank *= 1.3
+            why.append((1, "Top story: big news"))
         if card.must_show:
             rank *= 1.15
-        if card.unseen:
-            rank *= 1.1
+            why.append((1, "Matches one of your watches"))
         if updated:
             rank *= 1.2
+            why.append((1, "New coverage since you read it"))
+        if card.unseen:
+            rank *= 1.1
+            why.append((1, "You haven't seen it yet"))
+        if age_h < f.half_life_hours / 2:
+            why.append((1, f"Fresh: {_age(age_h)} old"))
+        elif age_h >= f.half_life_hours:
+            why.append((-1, f"Older: {_age(age_h)} old"))
         rank *= 0.85 ** impressions
-        rank *= weights.get(("source", card.lead.row["source_id"]), 1.0)
-        rank *= weights.get(("category", _category(card)), 1.0)
+        if impressions:
+            why.append((-1, f"Already shown to you {impressions}×"))
+        source_w = weights.get(("source", card.lead.row["source_id"]), 1.0)
+        category_w = weights.get(("category", _category(card)), 1.0)
+        rank *= source_w * category_w
+        why += _taste(source_w, card.lead.source_name)
+        why += _taste(category_w, _category(card))
         (pool if below else candidates).append(
             FeedItem(card, round(rank, 3), block_of(card.lead.row["category"], card.lead.row["ai_category"]),
                      _category(card), top, updated,
-                     discovered=discovered))
+                     discovered=discovered, below=below, why=why))
 
     candidates.sort(key=lambda it: it.rank, reverse=True)
     pool.sort(key=lambda it: it.rank, reverse=True)
