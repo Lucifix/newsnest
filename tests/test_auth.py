@@ -58,7 +58,10 @@ def test_non_ascii_password(app, monkeypatch):
 def test_password_change_logs_out_and_next_is_local_only(app, monkeypatch):
     monkeypatch.setenv("NEWSNEST_PASSWORD", "one")
     with TestClient(app) as c:
-        r = c.post("/login", data={"password": "one", "next": "//evil.example"}, follow_redirects=False)
-        assert r.headers["location"] == "/"
+        for target in ("//evil.example", "/\\evil.example", "/\t/evil.example", "https://evil.example/"):
+            r = c.post("/login", data={"password": "one", "next": target}, follow_redirects=False)
+            assert r.headers["location"] == "/"
+        r = c.post("/login", data={"password": "one", "next": "/settings/feeds?saved=x#a"}, follow_redirects=False)
+        assert r.headers["location"] == "/settings/feeds?saved=x#a"
         monkeypatch.setenv("NEWSNEST_PASSWORD", "two")
         assert c.get("/", follow_redirects=False).status_code == 303

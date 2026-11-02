@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import feedparser
 
@@ -124,7 +124,7 @@ class RssFetcher:
         parsed, result = parse_feed(source, ctx)
         if parsed is None:
             return result
-        is_hn = "hnrss.org" in source.url
+        is_hn = urlsplit(source.url).hostname == "hnrss.org"
         plain_http = 0
         for entry in parsed.entries:
             item = entry_to_item(entry, source)

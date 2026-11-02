@@ -31,6 +31,7 @@ from selectolax.lexbor import LexborHTMLParser
 
 from newsnest.config import Source
 from newsnest.db import dumps, iso, loads, parse_iso, transaction
+from newsnest.feedfinder import resolves_public
 from newsnest.models import FeedMeta
 
 log = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ MAX_PAGE_BYTES = 1024 * 1024
 MIN_SIZE = 16        # smaller than this is not worth showing
 GOOD_SIZE = 64       # a 22-34 px badge on a 2-3x phone screen
 MAX_LINK_ICONS = 6   # <link> candidates tried per site
+MAX_REDIRECTS = 5
 REFRESH_FOUND = timedelta(days=30)
 RETRY_MISSING = timedelta(days=7)
 PER_TICK = 4         # sources looked at per tick, so one tick never stalls on slow sites
@@ -182,27 +184,37 @@ def fetchable(url: str) -> bool:
     if host == "localhost" or host.endswith((".localhost", ".local", ".lan", ".internal", ".home.arpa")):
         return False
     try:
-        ip = ipaddress.ip_address(host)
+        return ipaddress.ip_address(host).is_global
     except ValueError:
-        return True
-    return ip.is_global
+        pass
+    # A public-looking name can still point at the home network: what it resolves to decides
+    try:
+        return resolves_public(host, parts.port or (443 if parts.scheme == "https" else 80))
+    except (OSError, ValueError):   # doesn't resolve, or a port that isn't a number
+        return False
 
 
 def _download(client: httpx.Client, url: str, limit: int) -> httpx.Response | None:
     """GET with a size cap; None on any failure, an error status, a redirect off the web or a body too large."""
-    if not fetchable(url):
-        return None
     try:
-        with client.stream("GET", url) as r:
-            if r.status_code != 200 or not fetchable(str(r.url)):
+        # Redirects are followed here, not by the client, so every hop is checked before it is requested
+        for _ in range(MAX_REDIRECTS + 1):
+            if not fetchable(url):
                 return None
-            body = bytearray()
-            for chunk in r.iter_bytes():
-                body += chunk
-                if len(body) > limit:
+            with client.stream("GET", url, follow_redirects=False) as r:
+                if r.is_redirect:
+                    url = urljoin(url, r.headers["location"])
+                    continue
+                if r.status_code != 200:
                     return None
-            r._content = bytes(body)  # lets .content / .text work after the stream closed
-            return r
+                body = bytearray()
+                for chunk in r.iter_bytes():
+                    body += chunk
+                    if len(body) > limit:
+                        return None
+                r._content = bytes(body)  # lets .content / .text work after the stream closed
+                return r
+        return None
     except Exception as e:  # network trouble, but also a malformed address in a page's <link> (httpx.InvalidURL)
         log.debug("icon download failed: %s: %s", url, e)
         return None

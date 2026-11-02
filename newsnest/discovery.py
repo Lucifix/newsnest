@@ -123,7 +123,7 @@ def check_feed(client: httpx.Client, url: str) -> CheckResult:
         return CheckResult(False, "no entries")
     media = sum(1 for e in entries if e.get("itunes_duration") or any(
         enc.get("type", "").startswith(("audio", "video")) for enc in e.get("enclosures") or []))
-    if media >= len(entries) / 2 or "youtube.com" in str(r.url):
+    if media >= len(entries) / 2 or r.url.host == "youtube.com" or r.url.host.endswith(".youtube.com"):
         return CheckResult(False, "podcast or video channel")
     dates = [calendar.timegm(e.get("published_parsed") or e.get("updated_parsed"))
              for e in entries if e.get("published_parsed") or e.get("updated_parsed")]

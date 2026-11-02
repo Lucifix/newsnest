@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 from html import escape as html_escape
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 import hashlib
 import logging
 import os
@@ -35,7 +35,7 @@ from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (STARTER_PACK, add_candidates, named_sources, parse_opml, promotion_suggestions,
                              region_words, start_check_thread, starter_missing, _signals)
-from newsnest.feedfinder import FinderError, find_feeds, finder_client
+from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
 from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
                         read_stories, recall, remember, saved_stories, search_stories, story_hidden, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
@@ -190,7 +190,12 @@ button{{font:inherit;font-weight:700;padding:12px;border:0;border-radius:6px;bac
 
 
 def _safe_next(target: str) -> str:
-    return target if target.startswith("/") and not target.startswith("//") else "/"
+    """A path on this site, or /. Browsers read "/\\evil.com" and "/<tab>/evil.com" as //evil.com, another site."""
+    parts = urlsplit(target)
+    if (not target.startswith("/") or target.startswith("//") or parts.scheme or parts.netloc
+            or any(c == "\\" or ord(c) < 0x20 or ord(c) == 0x7f for c in target)):
+        return "/"
+    return target
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -258,7 +263,6 @@ def tz_of(loaded: LoadedConfig) -> ZoneInfo:
 
 def feed_host(url: str) -> str:
     """The site a feed comes from, short enough for one line on a phone (img.rtvslo.si → rtvslo.si)."""
-    from urllib.parse import urlsplit
     parts = (urlsplit(url).hostname or url).split(".")
     return ".".join(parts[-2:]) if len(parts) > 2 and parts[-2] not in ("co", "com") else ".".join(parts)
 
@@ -1182,10 +1186,11 @@ async def discovery_import(request: Request, loaded: LoadedConfig = Depends(get_
             data = await upload.read()
             origin = upload.filename
         elif url.startswith("https://"):
-            import httpx
-            r = httpx.get(url, follow_redirects=True, timeout=20, headers={"User-Agent": cfg.http.user_agent})
-            r.raise_for_status()
-            data, origin = r.content, url
+            # The link is someone else's: https and public hosts only (redirects included), size capped
+            def download() -> bytes:
+                with finder_client(cfg) as client:
+                    return capped_get(client, url)[1]
+            data, origin = await asyncio.to_thread(download), url
         else:
             raise ValueError("choose an OPML file or paste an https link to one")
         feeds = parse_opml(data, category, region_words(cfg), section_keys(cfg))

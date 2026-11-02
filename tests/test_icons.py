@@ -16,6 +16,12 @@ NOW = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
 SOURCE = Source(id="verge", type="rss", category="tech", name="The Verge", url="https://feeds.example/verge.xml")
 
 
+@pytest.fixture(autouse=True)
+def public_dns(monkeypatch):
+    """Test hosts don't resolve; treat every name as a public one unless a test says otherwise."""
+    monkeypatch.setattr(icons, "resolves_public", lambda host, port: True)
+
+
 def png(w: int, h: int) -> bytes:
     return b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + struct.pack(">II", w, h) + b"\x08\x06\x00\x00\x00" + b"\0" * 16
 
@@ -121,6 +127,25 @@ def test_nothing_on_the_home_network_is_fetched(url):
 
 def test_public_addresses_are_fetched():
     assert icons.fetchable("https://www.site.example/favicon.ico") and icons.fetchable("http://8.8.8.8/x.png")
+
+
+def test_a_name_pointing_at_the_home_network_is_not_fetched(monkeypatch):
+    monkeypatch.setattr(icons, "resolves_public", lambda host, port: host != "nas.site.example")
+    assert not icons.fetchable("https://nas.site.example/favicon.ico")
+    assert icons.fetchable("https://www.site.example/favicon.ico")
+
+
+def test_every_redirect_hop_is_checked_before_it_is_requested():
+    seen: list[str] = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        if request.url.host == "site.example":
+            return httpx.Response(302, headers={"location": "http://192.168.1.1/favicon.ico"})
+        return httpx.Response(200, content=png(64, 64), headers={"content-type": "image/png"})
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    assert icons._download(client, "https://site.example/favicon.ico", icons.MAX_ICON_BYTES) is None
+    assert seen == ["https://site.example/favicon.ico"]
 
 
 # ---------- choosing ----------
