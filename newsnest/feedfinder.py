@@ -73,15 +73,22 @@ def public_https_only(request: httpx.Request) -> None:
         raise FinderError(f"{request.url.host} sends to a plain http address (https only)")
     host = request.url.host
     try:
-        infos = socket.getaddrinfo(host, request.url.port or 443, proto=socket.IPPROTO_TCP)
+        public = resolves_public(host, request.url.port or 443)
     except (socket.gaierror, UnicodeError):
         raise FinderError(f"{host} doesn't exist") from None
-    for info in infos:
+    if not public:
+        raise FinderError(f"{host} is not on the public internet")
+
+
+def resolves_public(host: str, port: int) -> bool:
+    """Every address the host resolves to is on the public internet. Raises socket.gaierror when it doesn't resolve."""
+    for info in socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP):
         ip = ipaddress.ip_address(info[4][0])
         if ip.version == 6 and ip.ipv4_mapped:
             ip = ip.ipv4_mapped
         if not ip.is_global:
-            raise FinderError(f"{host} is not on the public internet")
+            return False
+    return True
 
 
 def normalize_address(address: str) -> str:
@@ -105,7 +112,7 @@ def normalize_address(address: str) -> str:
 
 def find_feeds(client: httpx.Client, address: str) -> list[FoundFeed]:
     """The feeds behind an address, best first. Empty when the site has none we could read."""
-    url, body, content_type = _get(client, normalize_address(address))
+    url, body, content_type = capped_get(client, normalize_address(address))
     if feed := _as_feed(url, body, content_type):
         return [_named(feed, None)]
     text = body.decode("utf-8", errors="replace")
@@ -127,7 +134,7 @@ def _search_page(client: httpx.Client, url: str, text: str) -> list[FoundFeed]:
             continue
         tried.add(candidate)
         try:
-            final, body, kind = _get(client, candidate)
+            final, body, kind = capped_get(client, candidate)
         except FinderError:
             continue
         if feed := _as_feed(final, body, kind):
@@ -166,7 +173,7 @@ def _feeds_among(client: httpx.Client, urls: list[str]) -> list[FoundFeed]:
         if len(found) >= MAX_CANDIDATES:
             break
         try:
-            final, body, kind = _get(client, url)
+            final, body, kind = capped_get(client, url)
         except FinderError:
             continue
         feed = _as_feed(final, body, kind)
@@ -175,7 +182,7 @@ def _feeds_among(client: httpx.Client, urls: list[str]) -> list[FoundFeed]:
     return found
 
 
-def _get(client: httpx.Client, url: str) -> tuple[str, bytes, str]:
+def capped_get(client: httpx.Client, url: str) -> tuple[str, bytes, str]:
     """Final address, body (at most MAX_BYTES) and content type. Every failure is a FinderError."""
     host = urlsplit(url).hostname
     try:

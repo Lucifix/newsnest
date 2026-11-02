@@ -16,9 +16,12 @@ PROFILE_FILES = ("interests.md", "seed_examples.md")
 
 
 def profile_path(name: str) -> Path:
-    if name not in PROFILE_FILES:
-        raise ValueError(f"not a profile file: {name}")
-    return config_dir() / name
+    # The path is built from our own constant, never from the name that was passed in
+    try:
+        known = PROFILE_FILES[PROFILE_FILES.index(name)]
+    except ValueError:
+        raise ValueError(f"not a profile file: {name}") from None
+    return config_dir() / known
 
 
 def read_profile(name: str) -> str:

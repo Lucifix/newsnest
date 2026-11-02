@@ -150,6 +150,23 @@ def test_redirect_to_http_is_refused(monkeypatch):
         find_feeds(c, "x.example")
 
 
+def test_opml_link_is_fetched_only_from_the_public_internet(client, monkeypatch):
+    """The OPML link goes through the finder's client: a link (or its redirect) to the home network is refused."""
+    from newsnest import web
+    monkeypatch.setattr(web, "start_check_thread", lambda cfg: None)
+    seen: list[str] = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(301, headers={"location": "https://router.example/admin"})
+    monkeypatch.setattr(web, "finder_client", lambda cfg: httpx.Client(
+        transport=httpx.MockTransport(handler), follow_redirects=True, event_hooks={"request": [public_https_only]}))
+    monkeypatch.setattr(socket, "getaddrinfo", lambda host, *a, **k: [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.1" if host == "router.example" else "93.184.215.14", 443))])
+    r = client.post("/discovery/import", data={"url": "https://x.example/list.opml"}, follow_redirects=False)
+    assert "public%20internet" in r.headers["location"] and seen == ["https://x.example/list.opml"]
+
+
 def test_find_then_add(client, env, monkeypatch):
     from newsnest import web
     hostile = rss(2, title="<script>alert(1)</script>Story {i}")
