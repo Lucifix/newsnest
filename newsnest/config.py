@@ -200,7 +200,7 @@ class HomeFeedCfg(_Strict):
 
 
 class DiscoveryCfg(_Strict):
-    # Candidate sources from OPML imports / the starter pack (managed in Settings)
+    # Candidate sources from OPML imports / the feed catalog (managed in Settings)
     enabled: bool = True
     # Candidates are polled this often (gentler than regular feeds)
     poll_minutes: int = 90

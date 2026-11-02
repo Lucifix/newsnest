@@ -1,5 +1,5 @@
 {% extends "_settings_layout.html" %}
-{% from "_settings_ui.html" import group, fold, expand, action_row, avatar, menu, menu_item, section_options with context %}
+{% from "_settings_ui.html" import group, fold, expand, link_row, avatar, menu, menu_item, section_options with context %}
 {% block stitle %}Discover{% endblock %}
 {% block sintro %}<p class="sub">Feeds on trial show only their best stories ({{ cfg.discovery.min_final }}+, at most {{ cfg.discovery.daily_cap_per_source }} a day each).</p>{% endblock %}
 {% block page %}
@@ -42,12 +42,7 @@
 {% endif %}
 
 {% call group('Add sources') %}
-  {% if starter_missing %}
-  {{ action_row('/discovery/starter', ('Add ' ~ starter_missing|length ~ ' new starter feed' ~ ('s' if starter_missing|length != 1 else '')) if starter_missing|length < starter_total else ('Add the starter pack (' ~ starter_total ~ ' feeds)'),
-                'World, science, business, tech, security and self-hosting') }}
-  {% else %}
-  <div class="srow"><span class="srow-main"><span class="srow-title">Starter pack added ✓</span><span class="srow-sub">All {{ starter_total }} feeds are on trial or regular sources</span></span></div>
-  {% endif %}
+  {{ link_row('/settings/discover/catalog', 'Browse the feed catalog', value=catalog_size ~ ' feeds') }}
   {% call expand('Import OPML…', 'From a link or a file') %}
   <form method="post" action="/discovery/import" enctype="multipart/form-data" class="sform">
     <label>OPML link <input name="url" type="url" placeholder="https://…/feeds.opml"></label>

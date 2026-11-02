@@ -25,7 +25,7 @@ def test_login_flow_and_api_protection(app, monkeypatch):
         r = c.get("/settings", follow_redirects=False)
         assert r.status_code == 303 and r.headers["location"] == "/login?next=/settings"
         assert c.get("/settings/feeds", follow_redirects=False).headers["location"] == "/login?next=/settings/feeds"
-        for path in ("/api/read", "/api/saved", "/api/feedback", "/api/run", "/settings/feed_add", "/discovery/starter", "/missed"):
+        for path in ("/api/read", "/api/saved", "/api/feedback", "/api/run", "/settings/feed_add", "/discovery/catalog", "/missed"):
             assert c.post(path, data={}).status_code == 401, path
         assert c.get("/feed/more?token=x&offset=0").status_code == 401
         assert c.get("/go/1", follow_redirects=False).status_code == 303

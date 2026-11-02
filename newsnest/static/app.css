@@ -1154,7 +1154,7 @@ input.sinput:invalid { border-color: var(--danger); }
 .srow-end .iconbtn { margin-right: -8px; }
 .srow-end .button { margin: 0; min-height: 34px; }
 
-/* a button that looks like a row (starter pack, "Forget all tuning") */
+/* a button that looks like a row ("Forget all tuning") */
 .sact { width: 100%; border: 0; background: transparent; cursor: pointer; text-align: left; font-family: inherit; }
 .sact-accent .srow-title { color: var(--accent-text); font-weight: 600; }
 .sact-danger .srow-title { color: var(--danger); font-weight: 600; }
@@ -1179,6 +1179,27 @@ input.sinput:invalid { border-color: var(--danger); }
 .sform .button { justify-self: start; }
 .sform p { margin: 0; }
 @media (min-width: 640px) { .sform { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sform > p, .sform > .check, .sform > .button { grid-column: 1 / -1; } }
+/* the feed catalog: topic chips, a list per topic with its destination below, and a bar that follows the scroll */
+.catalog-topics { flex: none; margin-top: 16px; }
+.ctopic { scroll-margin-top: 72px; }
+.ctopic-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 6px; min-height: 30px; }
+.ctopic-head .sgroup-title { margin-bottom: 0; }
+.ctopic-head .button { min-height: 30px; margin-right: 2px; }
+.cfeed input { flex: none; margin: 0; width: 22px; min-height: 22px; cursor: pointer; }
+.cfeed.is-taken { cursor: default; }
+.cfeed.is-taken .srow-title, .cfeed.is-taken .savatar { opacity: 0.55; }
+@media (hover: hover) { .slist label.cfeed.is-taken:hover { background: transparent; } }
+.ctopic-dest label { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; font: inherit; color: inherit; }
+.ctopic-dest select { width: auto; min-height: 34px; padding: 4px 8px; font-size: 16px; }   /* 16px: iOS doesn't zoom in */
+.cbar {
+  position: sticky; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; margin: 24px 0 0; padding: 8px 8px 8px 18px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--edge); box-shadow: var(--shadow-hi);
+}
+@media (max-width: 760px) { .cbar { bottom: calc(86px + env(safe-area-inset-bottom)); } }   /* above the dock */
+.cbar-count { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cbar .button { margin: 0; }
+
 /* a feed found from a website address: title, how often it posts, its latest headlines, then Add */
 .sbody > .callout { margin: 14px 0 0; }
 .found-feed { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }

@@ -251,7 +251,7 @@ feed:
   auto_read_on_scroll: false
 
 discovery:
-  # Discovered sources: feeds on trial from OPML imports or the starter pack (Settings → Discovered sources).
+  # Discovered sources: feeds on trial from OPML imports or the feed catalog (Settings → Discover).
   enabled: true
   # Candidates are polled this often (gentler than regular feeds).
   poll_minutes: 90

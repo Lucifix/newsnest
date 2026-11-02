@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from newsnest.config import Source
 from newsnest.db import iso
-from newsnest.discovery import (STARTER_PACK, OpmlFeed, add_candidates, cap_trial_scoring, check_feed, discovery_sources, named_sources,
+from newsnest.discovery import (OpmlFeed, add_candidates, cap_trial_scoring, check_feed, discovery_sources, named_sources,
                              parse_opml, promotion_suggestions, retire_candidates)
 from newsnest.feed import build_feed
 from newsnest.fetchers.base import FetchContext, run_fetch
@@ -35,13 +35,6 @@ def client_for(routes: dict) -> httpx.Client:
         body, status = routes.get(str(request.url), ("", 404))
         return httpx.Response(status, text=body, headers={"content-type": "application/rss+xml", "etag": '"v1"'})
     return httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
-
-
-def test_starter_pack_parses_with_categories():
-    feeds = parse_opml(STARTER_PACK.read_bytes())
-    assert len(feeds) >= 40
-    assert {f.category for f in feeds} == {"world", "tech"}
-    assert all(f.url.startswith("https://") for f in feeds)
 
 
 def test_opml_follows_the_readers_sections():
@@ -196,23 +189,6 @@ def test_retirement(conn, cfg, trial):
     assert retire_candidates(conn, cfg) == []  # it did produce a good story
     conn.execute("UPDATE items SET topic = 3, importance = 3, personal = 3")
     assert retire_candidates(conn, cfg) == [trial.id]
-
-
-def test_settings_panel_and_starter_import(conn, cfg, env, monkeypatch):
-    monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
-    import newsnest.web as web
-    monkeypatch.setattr(web, "start_check_thread", lambda cfg: None)  # no network in tests
-    with TestClient(web.app) as client:
-        page = client.get("/settings/discover").text
-        assert "Feeds on trial" in page and 'action="/discovery/starter"' in page
-        r = client.post("/discovery/starter", follow_redirects=False)
-        assert r.headers["location"].startswith("/settings/discover?") and "added=" in r.headers["location"]
-        # once every starter feed is known the button goes away; a feed missing again brings back "Add 1 new"
-        page = client.get("/settings/discover").text
-        assert 'action="/discovery/starter"' not in page and "Starter pack added" in page
-        conn.execute("DELETE FROM candidates WHERE id = (SELECT MIN(id) FROM candidates)")
-        assert "Add 1 new starter feed</span>" in client.get("/settings/discover").text
-    assert conn.execute("SELECT COUNT(*) FROM candidates WHERE status = 'checking'").fetchone()[0] >= 40
 
 
 def test_trial_rows_show_progress_toward_promotion(conn, cfg, env, trial, monkeypatch):
