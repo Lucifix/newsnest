@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 # often load reCAPTCHA scripts, so the body alone is not evidence) or Cloudflare's challenge marker
 _BLOCK_TITLE_MARKERS = ("just a moment", "captcha", "are you a robot", "access denied", "attention required")
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+_CLOUDFLARE_CHALLENGE = re.compile(r"cf-chl-|challenges\.cloudflare\.com")
 
 
 @dataclass
@@ -70,7 +71,7 @@ def http_get(ctx: FetchContext, url: str, **kwargs) -> httpx.Response:
 
 def is_challenge_page(html: str) -> bool:
     head = html[:20000]
-    if "cf-chl-" in head or "challenges.cloudflare.com" in head:
+    if _CLOUDFLARE_CHALLENGE.search(head):
         return True
     m = _TITLE.search(head)
     title = m.group(1).strip().lower() if m else ""
