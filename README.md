@@ -150,8 +150,9 @@ Open <http://localhost:3095>, log in with your password, and tap **Set up my pro
 
 1. **Say where you live.** Your country and city tell Claude whose news is "big", and your time zone is
    picked up from the browser.
-2. **Add local news.** NewsNest offers the local pack for your country (Slovenia, Germany, the United
-   States and the United Kingdom so far), or add your own feeds under Local in **Settings → Feeds**.
+2. **Add local news.** NewsNest offers the local pack for your country (Australia, Austria, Canada,
+   Croatia, France, Germany, Italy, Slovenia, the United Kingdom and the United States so far), or add your
+   own feeds under Local in **Settings → Feeds**.
 3. **Rate about 30 headlines**, and Claude drafts your interests from them.
 
 On first start NewsNest copies a starter [`config.yaml`](config.example/config.yaml) into `config/`, with

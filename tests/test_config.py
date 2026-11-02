@@ -68,6 +68,8 @@ def test_local_pack_lookup_and_add():
     from newsnest.packs import SLOVENIA, add_pack, pack_for
     assert pack_for("slovenia") is SLOVENIA and pack_for("SI") is SLOVENIA and pack_for("Atlantis") is None
     assert pack_for("USA").code == "us" and pack_for("Deutschland").code == "de" and pack_for("England").code == "uk"
+    assert pack_for("Österreich").code == "at" and pack_for("Hrvatska").code == "hr" and pack_for("Italia").code == "it"
+    assert pack_for("France").code == "fr" and pack_for("canada").code == "ca" and pack_for("AU").code == "au"
     feeds = [{"id": "rtvslo", "url": "https://img.rtvslo.si/feeds/00.xml", "category": "world"}]
     added, moved = add_pack(feeds, SLOVENIA.feeds, "news")
     assert (added, moved) == (len(SLOVENIA.feeds) - 1, 1)
@@ -75,3 +77,17 @@ def test_local_pack_lookup_and_add():
     assert feeds[0]["category"] == "news"
     assert by_name["Slo-Tech"]["category"] == "tech" and by_name["Slo-Tech"]["https_links"] is True
     assert add_pack(feeds, SLOVENIA.feeds, "news") == (0, 0)
+
+
+def test_local_packs_are_well_formed():
+    from zoneinfo import ZoneInfo
+
+    from newsnest.packs import LOCAL_PACKS, pack_for
+    from newsnest.textmatch import normalize_url
+    for pack in LOCAL_PACKS.values():
+        ZoneInfo(pack.timezone)
+        for name in (pack.code, pack.country, *pack.aliases):
+            assert pack_for(name) is pack, name
+        urls = [normalize_url(f.url) for f in pack.feeds]
+        assert len(urls) == len(set(urls)), pack.code
+        assert all(f.url.startswith("https://") for f in pack.feeds), pack.code

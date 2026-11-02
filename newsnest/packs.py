@@ -132,7 +132,112 @@ UNITED_KINGDOM = LocalPack("uk", "United Kingdom", "Europe/London", ".uk", [
     PackFeed("TechRadar", "https://www.techradar.com/rss", 10, category="tech"),
 ], aliases=("gb", "great britain", "britain", "england", "scotland", "wales", "northern ireland"))
 
-LOCAL_PACKS: dict[str, LocalPack] = {p.code: p for p in (SLOVENIA, GERMANY, UNITED_STATES, UNITED_KINGDOM)}
+# Checked 2026-11-02. No working feed for Heute, oe24 or the Wiener Zeitung; the Salzburger Nachrichten feed is
+# mostly event listings.
+AUSTRIA = LocalPack("at", "Austria", "Europe/Vienna", ".at", [
+    PackFeed("ORF", "https://rss.orf.at/news.xml"),
+    PackFeed("Der Standard", "https://www.derstandard.at/rss", 20),
+    PackFeed("Die Presse", "https://www.diepresse.com/rss"),
+    PackFeed("Kurier", "https://kurier.at/xml/rss"),
+    PackFeed("Kleine Zeitung", "https://www.kleinezeitung.at/rss/top"),
+    PackFeed("Kronen Zeitung", "https://api.krone.at/v1/rss/rssfeed-google.xml?id=2311992", 20),
+    PackFeed("profil", "https://www.profil.at/xml/rss"),
+    PackFeed("Falter", "https://www.falter.at/rss"),
+    # Austrian tech
+    PackFeed("Futurezone", "https://futurezone.at/xml/rss", category="tech"),
+], aliases=("österreich", "osterreich"))
+
+# Checked 2026-11-02. HRT has no feed.
+CROATIA = LocalPack("hr", "Croatia", "Europe/Zagreb", ".hr", [
+    PackFeed("Index.hr", "https://www.index.hr/rss", 20),
+    PackFeed("Jutarnji list", "https://www.jutarnji.hr/feed", 20),
+    PackFeed("Večernji list", "https://www.vecernji.hr/feeds/latest"),
+    PackFeed("24sata", "https://www.24sata.hr/feeds/aktualno.xml"),
+    PackFeed("N1 Hrvatska", "https://n1info.hr/feed/", 20),
+    PackFeed("Telegram", "https://www.telegram.hr/feed/"),
+    PackFeed("Slobodna Dalmacija", "https://slobodnadalmacija.hr/feed", 20),
+    PackFeed("Novi list", "https://www.novilist.hr/feed/"),
+    PackFeed("Tportal", "https://www.tportal.hr/rss-najnovije.xml"),
+    PackFeed("Dnevnik.hr", "https://dnevnik.hr/assets/feed/articles/"),
+    PackFeed("Net.hr", "https://net.hr/najnovije/rss.xml", 20),
+    # Croatian tech
+    PackFeed("Bug", "https://www.bug.hr/rss", 10, category="tech"),
+    PackFeed("Netokracija", "https://www.netokracija.com/feed", category="tech"),
+], aliases=("hrvatska",))
+
+# Checked 2026-11-02. Corriere della Sera's feeds stopped months ago; Il Giornale has none and Il Messaggero's
+# stories have no dates.
+ITALY = LocalPack("it", "Italy", "Europe/Rome", ".it", [
+    PackFeed("ANSA", "https://www.ansa.it/sito/ansait_rss.xml"),
+    PackFeed("la Repubblica", "https://www.repubblica.it/rss/homepage/rss2.0.xml"),
+    PackFeed("La Stampa", "https://www.lastampa.it/rss/copertina.xml"),
+    PackFeed("Il Sole 24 Ore", "https://www.ilsole24ore.com/rss/italia.xml"),
+    PackFeed("Il Fatto Quotidiano", "https://www.ilfattoquotidiano.it/feed/"),
+    PackFeed("Il Post", "https://www.ilpost.it/italia/feed/"),
+    PackFeed("Rai News", "https://www.rainews.it/rss/tutti", 20),
+    PackFeed("TGCom24", "https://www.tgcom24.mediaset.it/rss/homepage.xml"),
+    PackFeed("Libero", "https://www.liberoquotidiano.it/rss.xml", 20),
+    PackFeed("Domani", "https://www.editorialedomani.it/rss", 20),
+    # Italian tech
+    PackFeed("HDblog", "https://www.hdblog.it/feed/", 10, category="tech"),
+    PackFeed("DDay", "https://www.dday.it/rss", category="tech"),
+    PackFeed("Punto Informatico", "https://www.punto-informatico.it/feed/", 10, category="tech"),
+], aliases=("italia",))
+
+# Checked 2026-11-02. Le Point (404) and Les Echos (503) failed the check; Le Parisien's stories have no dates.
+FRANCE = LocalPack("fr", "France", "Europe/Paris", ".fr", [
+    PackFeed("Le Monde", "https://www.lemonde.fr/rss/une.xml"),
+    PackFeed("Le Figaro", "https://www.lefigaro.fr/rss/figaro_actualites.xml"),
+    PackFeed("Libération", "https://www.liberation.fr/arc/outboundfeeds/rss-all/?outputType=xml", 20),
+    PackFeed("franceinfo", "https://www.franceinfo.fr/titres.rss"),
+    PackFeed("20 Minutes", "https://www.20minutes.fr/feeds/rss-une.xml"),
+    PackFeed("Ouest-France", "https://www.ouest-france.fr/rss/une"),
+    PackFeed("L'Express", "https://www.lexpress.fr/arc/outboundfeeds/rss/alaune.xml"),
+    PackFeed("BFMTV", "https://www.bfmtv.com/rss/news-24-7/"),
+    PackFeed("L'Humanité", "https://www.humanite.fr/feed"),
+    PackFeed("Mediapart", "https://www.mediapart.fr/articles/feed"),
+    # French tech
+    PackFeed("Numerama", "https://www.numerama.com/feed/", category="tech"),
+    PackFeed("Frandroid", "https://www.frandroid.com/feed", category="tech"),
+    PackFeed("Next", "https://next.ink/feed/", category="tech"),
+])
+
+# Checked 2026-11-02. The Toronto Star refused the check (429) and the National Post's feeds were empty.
+CANADA = LocalPack("ca", "Canada", "America/Toronto", ".ca", [
+    PackFeed("CBC News", "https://www.cbc.ca/webfeed/rss/rss-canada"),
+    PackFeed("Radio-Canada", "https://ici.radio-canada.ca/info/rss/info/a-la-une"),
+    PackFeed("CTV News", "https://www.ctvnews.ca/arc/outboundfeeds/rss/category/canada/"),
+    PackFeed("Global News", "https://globalnews.ca/canada/feed/"),
+    PackFeed("The Globe and Mail", "https://www.theglobeandmail.com/arc/outboundfeeds/rss/category/canada/"),
+    PackFeed("Toronto Sun", "https://torontosun.com/category/news/national/feed"),
+    PackFeed("Maclean's", "https://macleans.ca/feed/"),
+    PackFeed("iPolitics", "https://www.ipolitics.ca/feed/"),
+    PackFeed("The Hub", "https://thehub.ca/feed/"),
+    PackFeed("The Tyee", "https://thetyee.ca/rss2.xml"),
+    # Canadian tech
+    PackFeed("MobileSyrup", "https://mobilesyrup.com/feed/", category="tech"),
+    PackFeed("BetaKit", "https://betakit.com/feed/", category="tech"),
+])
+
+# Checked 2026-11-02. News Corp (The Australian, news.com.au, Herald Sun, Sky News) served empty feeds or 403.
+AUSTRALIA = LocalPack("au", "Australia", "Australia/Sydney", ".au", [
+    PackFeed("ABC News", "https://www.abc.net.au/news/feed/2942460/rss.xml"),
+    PackFeed("SBS News", "https://www.sbs.com.au/news/topic/australia/feed"),
+    PackFeed("Guardian Australia", "https://www.theguardian.com/australia-news/rss"),
+    PackFeed("Sydney Morning Herald", "https://www.smh.com.au/rss/national.xml"),
+    PackFeed("The Age", "https://www.theage.com.au/rss/national.xml"),
+    PackFeed("The West Australian", "https://thewest.com.au/news/rss", 20),
+    PackFeed("7NEWS", "https://7news.com.au/news/rss", 20),
+    PackFeed("Daily Mail Australia", "https://www.dailymail.com/auhome/index.rss", 20),
+    PackFeed("Crikey", "https://www.crikey.com.au/feed/"),
+    PackFeed("Quadrant", "https://quadrant.org.au/feed/"),
+    # Australian tech
+    PackFeed("iTnews", "https://www.itnews.com.au/RSS/rss.ashx", category="tech"),
+    PackFeed("Channel News", "https://www.channelnews.com.au/feed/", category="tech"),
+])
+
+LOCAL_PACKS: dict[str, LocalPack] = {p.code: p for p in (SLOVENIA, GERMANY, UNITED_STATES, UNITED_KINGDOM, AUSTRIA,
+                                                         CROATIA, ITALY, FRANCE, CANADA, AUSTRALIA)}
 
 
 def pack_for(country: str) -> LocalPack | None:
