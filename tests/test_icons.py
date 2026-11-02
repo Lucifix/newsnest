@@ -258,3 +258,29 @@ def test_a_feed_without_known_metadata_is_read_in_full_once(env, conn, monkeypat
     assert icons.load(conn, "verge")["mime"] == "image/x-icon"
     runner.fetch_sources(conn, loaded, force=True)
     assert seen == [None, '"v1"']        # from now on, conditional again
+
+
+def test_a_bad_link_address_moves_on_to_the_next_candidate():
+    client = client_for({
+        "https://site.example/": ('<base href="http://[x"><link rel="apple-touch-icon" href="https://[bad/x.png">', "text/html"),
+        "https://site.example/favicon.ico": (ico(64), "image/x-icon"),
+    })
+    icon = icons.discover(client, FeedMeta("https://site.example/", []), SOURCE.url)
+    assert icon.origin == "https://site.example/favicon.ico"
+
+
+def test_a_source_that_crashes_does_not_hold_up_the_others(conn, monkeypatch):
+    other = Source(id="other", type="rss", category="tech", name="Other", url="https://other.example/rss")
+    icons.note_feed(conn, SOURCE, FeedMeta("https://site.example/", []))
+    icons.note_feed(conn, other, FeedMeta("https://other.example/", []))
+    real = icons.discover
+
+    def discover(client, meta, feed_url):
+        if feed_url == SOURCE.url:
+            raise RuntimeError("odd site")
+        return real(client, meta, feed_url)
+    monkeypatch.setattr(icons, "discover", discover)
+    client = client_for({"https://other.example/favicon.ico": (ico(64), "image/x-icon")})
+    assert icons.refresh(conn, [SOURCE, other], client, NOW, limit=1) == 1          # the crash, marked as looked at
+    assert icons.refresh(conn, [SOURCE, other], client, NOW, limit=1) == 1          # so the next tick gets to "other"
+    assert set(icons.versions(conn)) == {"other"}
