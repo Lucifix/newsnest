@@ -762,6 +762,52 @@ document.addEventListener("DOMContentLoaded", () => {
   applyFilters();
 });
 
+// ---------- feed catalog: the selected count, Select all per topic, and logos that arrive while the page is open ----------
+const catalogForm = document.getElementById("catalog");
+if (catalogForm) {
+  const boxes = (root) => [...root.querySelectorAll('input[name="url"]')];
+  const syncCatalog = () => {
+    const picked = boxes(catalogForm).filter((b) => b.checked).length;
+    catalogForm.querySelector("[data-count]").textContent = String(picked);
+    catalogForm.querySelector("[data-try]").disabled = picked === 0;
+    catalogForm.querySelectorAll("[data-select-all]").forEach((button) => {
+      button.hidden = false;
+      button.textContent = boxes(button.closest("[data-topic]")).every((b) => b.checked) ? "Clear" : "Select all";
+    });
+  };
+  catalogForm.addEventListener("change", syncCatalog);
+  catalogForm.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-select-all]");
+    if (!button) return;
+    const own = boxes(button.closest("[data-topic]"));
+    const on = !own.every((b) => b.checked);
+    own.forEach((b) => { b.checked = on; });
+    syncCatalog();
+  });
+  syncCatalog();
+  window.addEventListener("pageshow", syncCatalog);  // Back restores ticked boxes
+
+  // The server starts looking up missing logos when the page opens: swap each in as it is found, for a minute at most
+  const started = Date.now();
+  const pollIcons = async () => {
+    if (!catalogForm.querySelector("[data-icon]")) return;
+    let data;
+    try {
+      data = await (await fetch(catalogForm.dataset.icons, { headers: { Accept: "application/json" } })).json();
+    } catch {
+      return;
+    }
+    catalogForm.querySelectorAll("[data-icon]").forEach((badge) => {
+      const src = data.icons[badge.dataset.icon];
+      if (!src) return;
+      const img = Object.assign(document.createElement("img"), { className: "savatar logo", src, alt: "", decoding: "async" });
+      badge.replaceWith(img);
+    });
+    if (data.running && Date.now() - started < 60000) setTimeout(pollIcons, 3000);
+  };
+  setTimeout(pollIcons, 1500);
+}
+
 // ---------- search: the dock (phones) or the top bar (desktop) turns into a field; results fill a layer ----------
 // Without JS the magnifier is a link to /search and the fields submit there.
 const searchLayer = document.querySelector(".searchlayer");

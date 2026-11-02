@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
-from newsnest import REPO_URL, WEBSITE_URL, __version__, icons
+from newsnest import REPO_URL, WEBSITE_URL, __version__, catalog, icons
 from newsnest.ai import AIClient, AIError, BudgetExceeded, spent_today
 from newsnest.bootstrap import config_dir, env
 from newsnest.calibration import calibration_data, subscore_labels
@@ -33,8 +33,8 @@ from newsnest.config_edit import (ConfigEditError, edit_config, ensure_section, 
                                   materialize_sections, remove_where, section_entry, section_list, section_map, tab_room)
 from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
-from newsnest.discovery import (STARTER_PACK, add_candidates, named_sources, parse_opml, promotion_suggestions,
-                             region_words, start_check_thread, starter_missing, _signals)
+from newsnest.discovery import (OpmlFeed, add_candidates, named_sources, parse_opml, promotion_suggestions,
+                             region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
 from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
                         read_stories, recall, remember, saved_stories, search_stories, story_hidden, weight_strength)
@@ -855,8 +855,11 @@ def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
                    lifestyle_interest=LIFESTYLE_INTEREST.lower() in read_profile("interests.md").lower(),
                    section_icons=ICONS, max_tabs=MAX_TABS, **local_pack_context(cfg))
     elif page == "discover":
-        ctx.update(candidates=candidate_rows(conn), suggestions=suggestions, starter_missing=starter_missing(conn, cfg),
-                   starter_total=len(parse_opml(STARTER_PACK.read_bytes())))
+        ctx.update(candidates=candidate_rows(conn), suggestions=suggestions, catalog_size=catalog.catalog_size())
+    elif page == "catalog":
+        sections = cfg.all_sections
+        ctx.update(topics=catalog.load_catalog(), states=catalog.feed_states(conn, cfg), sections=sections,
+                   dest={t.key: catalog.destination(t, sections) for t in catalog.load_catalog()})
     return ctx
 
 
@@ -890,6 +893,21 @@ def database_backup(conn=Depends(get_conn)):
     name = f"newsnest-{datetime.now().strftime('%Y-%m-%d-%H%M')}.db"
     return FileResponse(tmp, media_type="application/vnd.sqlite3", filename=name,
                         headers={"Cache-Control": "no-store"}, background=BackgroundTask(os.unlink, tmp))
+
+
+@app.get("/settings/discover/catalog", response_class=HTMLResponse)
+def settings_catalog(request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
+    """The feed catalog, under Discover. Opening it starts the lookup of the logos it doesn't have yet."""
+    if loaded.config:
+        catalog.start_icon_thread(loaded.config)
+    return render(request, "settings_catalog.html", conn, loaded, page="discover", sub="catalog",
+                  error=request.query_params.get("error"), **settings_context("catalog", conn, loaded))
+
+
+@app.get("/settings/discover/catalog/icons")
+def catalog_icons(conn=Depends(get_conn)):
+    """The catalog logos found so far, while the page waits for the rest."""
+    return {"running": catalog.warming(), "icons": catalog.found_icons(conn)}
 
 
 @app.get("/settings/{page}", response_class=HTMLResponse)
@@ -1168,10 +1186,46 @@ def candidate_rows(conn) -> list[dict]:
     return out
 
 
-@app.post("/discovery/starter")
-def discovery_starter(conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
+@app.post("/discovery/catalog")
+async def discovery_catalog(request: Request, loaded: LoadedConfig = Depends(get_loaded)):
+    """Picked catalog feeds go on trial. Each topic's feeds go to the section its `section.<topic>` field names:
+    one the reader has, or "new" for the topic's suggested section, created here (once, if topics share it)."""
     cfg = _require_cfg(loaded)
-    added = add_candidates(conn, cfg, parse_opml(STARTER_PACK.read_bytes(), keys=section_keys(cfg)), "starter pack")
+    form = await request.form()
+    picks = catalog.find(form.getlist("url"))
+    if not picks:
+        return RedirectResponse("/settings/discover/catalog", status_code=303)
+    keys = set(section_keys(cfg))
+    wanted = {}
+    for t, _ in picks:
+        home = catalog.destination(t, cfg.all_sections)
+        asked = form.get(f"section.{t.key}")
+        wanted[t.key] = home if home and asked in (None, "new") else asked or WORLD   # never a second Science
+    created: dict[str, str] = {}   # suggested key -> the key it got
+
+    def change(data):
+        seq = materialize_sections(data)
+        for t, _ in picks:
+            if wanted[t.key] == "new" and t.section not in created:
+                created[t.section] = free_section_key(seq, t.section_label)
+                seq.append(section_entry(created[t.section], t.section_label, t.icon, tab=tab_room(seq)))
+
+    if any(v == "new" for v in wanted.values()):
+        try:
+            edit_config(change)
+        except (ConfigEditError, KeyError, ValueError) as e:
+            return RedirectResponse(f"/settings/discover/catalog?error={quote(str(e)[:500])}", status_code=303)
+        cfg = _require_cfg(load_config(config_dir()))
+        keys = set(section_keys(cfg))
+
+    def section_of(t: catalog.Topic) -> str:
+        want = created.get(t.section) if wanted[t.key] == "new" else wanted[t.key]
+        return want if want in keys else WORLD
+
+    feeds = [OpmlFeed(f.url, f.name, section_of(t)) for t, f in picks]
+    with session() as conn:
+        added = add_candidates(conn, cfg, feeds, "catalog")
+        catalog.copy_icons(conn, [f for _, f in picks])
     start_check_thread(cfg)
     return RedirectResponse(f"/settings/discover?saved=discovery&added={added}", status_code=303)
 

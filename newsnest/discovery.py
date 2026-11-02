@@ -1,6 +1,6 @@
 """Discovered sources: a pool of candidate feeds that have to earn their place.
 
-Feeds come from an OPML file (a link or an upload) or from the bundled starter pack. Each is checked
+Feeds come from an OPML file (a link or an upload) or from the feed catalog (catalog.py). Each is checked
 once (https, working, real and recent entries, not a podcast or video channel, not a duplicate),
 then polled gently. Their stories reach the feed only when they clear the score threshold, tagged
 "Discovered". A candidate whose stories I open or 👍 is suggested for promotion to a regular source;
@@ -19,7 +19,6 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import timedelta
-from pathlib import Path
 from urllib.parse import urlsplit
 
 import feedparser
@@ -33,7 +32,6 @@ from newsnest.textmatch import fold, normalize_url
 
 log = logging.getLogger(__name__)
 
-STARTER_PACK = Path(__file__).parent / "discovery_starter.opml"
 STALE_DAYS = 14
 HOST_SPACING = 2.0  # seconds between requests to the same host
 
@@ -146,12 +144,6 @@ def known_feed_keys(conn: sqlite3.Connection, cfg: Config) -> set[str]:
     return keys
 
 
-def starter_missing(conn: sqlite3.Connection, cfg: Config) -> list[OpmlFeed]:
-    """Starter-pack feeds that are neither regular sources nor candidates yet (empty once the pack was added)."""
-    known = known_feed_keys(conn, cfg)
-    return [f for f in parse_opml(STARTER_PACK.read_bytes(), keys=section_keys(cfg)) if _key(f.url) not in known]
-
-
 def add_candidates(conn: sqlite3.Connection, cfg: Config, feeds: list[OpmlFeed], origin: str) -> int:
     """Queue feeds for checking; duplicates of regular sources or earlier candidates are skipped."""
     known = known_feed_keys(conn, cfg)
@@ -161,7 +153,7 @@ def add_candidates(conn: sqlite3.Connection, cfg: Config, feeds: list[OpmlFeed],
     for f in feeds:
         if _key(f.url) in known:
             continue
-        if f.category not in keys:   # a section the reader doesn't have (the starter pack's tech feeds, say)
+        if f.category not in keys:   # a section the reader doesn't have (an OPML file's tech folder, say)
             f = OpmlFeed(f.url, f.title, WORLD)
         known.add(_key(f.url))
         sid = base = f"disc-{slugify(f.title, 30)}"
