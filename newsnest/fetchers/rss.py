@@ -64,7 +64,9 @@ def feed_meta(feed, feed_url: str) -> FeedMeta:
 
 
 def entry_to_item(entry, source: Source) -> Item | None:
-    title = html_to_text(entry.get("title"), limit=300)
+    # feedparser has decoded a text/plain title once; some feeds encode twice, so it may still hold entities
+    plain = (entry.get("title_detail") or {}).get("type") == "text/plain"
+    title = html_to_text(entry.get("title"), limit=300, plain=plain)
     link = entry.get("link")
     if not title or not link:
         return None
