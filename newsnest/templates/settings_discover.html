@@ -14,7 +14,7 @@
 {% call group('Earned a place', footnote='You opened or liked their stories a lot this week.') %}
   {% for sgg in suggestions %}
   <div class="srow">
-    {{ avatar(sgg.title) }}
+    {{ avatar(sgg.title, sgg.source_id) }}
     <span class="srow-main"><span class="srow-title">{{ sgg.title }}</span><span class="srow-sub">{{ sgg.signals }} stories opened or liked this week</span></span>
     <span class="srow-end"><form method="post" action="/discovery/{{ sgg.source_id }}/promote" class="srow-form"><button class="button small" type="submit">Keep</button></form></span>
   </div>
@@ -26,7 +26,7 @@
 {% call group('On trial · ' ~ live|length, footnote='Open or like ' ~ need ~ ' of a source\'s stories in a week and it is suggested as a regular source. Nothing good in ' ~ cfg.discovery.retire_after_days ~ ' days and it is retired.' ~ ((' Checking ' ~ checking|length ~ ' more feeds…') if checking else '')) %}
   {% for c in live %}
   <div class="srow">
-    {{ avatar(c.title) }}
+    {{ avatar(c.title, c.source_id) }}
     <span class="srow-main"><span class="srow-title">{{ c.title }}</span>
       <span class="srow-sub">{{ section_labels.get(c.category, c.category) }}{% if c.check.per_day %} · ~{{ c.check.per_day }}/day{% endif %} · {{ c["items"] }} {{ 'story' if c["items"] == 1 else 'stories' }}</span></span>
     <span class="srow-end">

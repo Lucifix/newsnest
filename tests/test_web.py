@@ -638,3 +638,34 @@ def test_calibration_page_picks_a_limit_in_one_tap(client, env):
     before = "calibration_mode: true" in (env.config / "config.yaml").read_text(encoding="utf-8")
     client.post("/settings/calibration_toggle")
     assert ("calibration_mode: true" in (env.config / "config.yaml").read_text(encoding="utf-8")) != before
+
+
+def test_source_icons_are_served_and_shown_unless_turned_off(client, env):
+    from newsnest import icons
+    from newsnest.icons import Icon
+    from newsnest.models import FeedMeta
+    data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + bytes(8) + b"\x08\x06\x00\x00\x00"
+    conn = connect()
+    verge = Source(id="theverge", type="rss", category="tech", name="The Verge", url="https://theverge.com/rss")
+    icons.note_feed(conn, verge, FeedMeta("https://www.theverge.com/", []))
+    icons.store(conn, "theverge", Icon(data, "image/png", 180, 180, "https://www.theverge.com/touch.png"), NOW)
+    version = icons.versions(conn)["theverge"]
+    conn.close()
+
+    r = client.get(f"/icon/theverge?v={version}")
+    assert r.status_code == 200 and r.content == data and r.headers["content-type"] == "image/png"
+    assert "immutable" in r.headers["cache-control"] and r.headers["x-content-type-options"] == "nosniff"
+    assert client.get("/icon/24ur").status_code == 404
+
+    src = f'src="/icon/theverge?v={version}"'
+    assert src in client.get("/").text                       # the story card's badge
+    assert src in client.get("/settings/feeds").text         # the feed's row
+    assert '<span class="badge h' in client.get("/").text    # sources without an icon keep their initials
+
+    client.post("/settings/feed_favicon", data={"id": "theverge"})
+    assert "favicon: false" in (env.config / "config.yaml").read_text(encoding="utf-8")
+    assert src not in client.get("/").text and src not in client.get("/settings/feeds").text
+    assert "Show logo" in client.get("/settings/feeds").text
+    client.post("/settings/feed_favicon", data={"id": "theverge"})
+    assert "favicon: false" not in (env.config / "config.yaml").read_text(encoding="utf-8")
+    assert src in client.get("/").text

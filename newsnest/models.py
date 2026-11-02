@@ -38,6 +38,13 @@ class Item:
 
 
 @dataclass
+class FeedMeta:
+    """What a feed says about itself, for the source's icon: its website and any logo images."""
+    site_url: str | None = None
+    images: list[str] = field(default_factory=list)
+
+
+@dataclass
 class FetchResult:
     source_id: str
     status: FetchStatus
@@ -52,4 +59,6 @@ class FetchResult:
     error: str | None = None
     warnings: list[str] = field(default_factory=list)
     duration_ms: int = 0
+    # Set when the feed was read in full (not on 304 Not Modified)
+    feed_meta: FeedMeta | None = None
     fetched_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

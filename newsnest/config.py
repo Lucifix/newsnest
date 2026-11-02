@@ -85,6 +85,8 @@ class FeedCfg(_Strict):
     https_links: bool = False
     # Plain-http feed URLs are rejected unless explicitly allowed
     allow_http: bool = False
+    # Show the site's logo next to its stories; false shows its initials instead
+    favicon: bool = True
 
     @model_validator(mode="after")
     def _https_only(self) -> "FeedCfg":
@@ -353,7 +355,7 @@ def build_sources(cfg: Config) -> list[Source]:
     for f in cfg.feeds:
         sources.append(Source(id=f.id, type="rss", category=f.category, name=f.name or f.id,
                               url=f.url, enabled=f.enabled, daily_cap=cap(f.daily_cap, f.category),
-                              params={"https_links": f.https_links}))
+                              params={"https_links": f.https_links, "favicon": f.favicon}))
 
     gh = cfg.github_releases
     for repo in gh.repos:

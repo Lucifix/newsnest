@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
-from newsnest import REPO_URL, WEBSITE_URL, __version__
+from newsnest import REPO_URL, WEBSITE_URL, __version__, icons
 from newsnest.ai import AIClient, AIError, BudgetExceeded, spent_today
 from newsnest.bootstrap import config_dir, env
 from newsnest.calibration import calibration_data, subscore_labels
@@ -241,6 +241,17 @@ def get_loaded() -> LoadedConfig:
     return load_config(config_dir())
 
 
+@app.get("/icon/{source_id}")
+def source_icon(source_id: str, conn=Depends(get_conn)):
+    """A source's stored icon. The address carries the icon's hash (?v=), so it can be cached for good."""
+    row = icons.load(conn, source_id)
+    if row is None:
+        raise HTTPException(404)
+    return Response(row["data"], media_type=row["mime"], headers={
+        "Cache-Control": "private, max-age=31536000, immutable", "ETag": f'"{row["hash"]}"',
+        "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox"})
+
+
 def tz_of(loaded: LoadedConfig) -> ZoneInfo:
     return ZoneInfo(loaded.config.timezone if loaded.config else "UTC")
 
@@ -250,6 +261,24 @@ def feed_host(url: str) -> str:
     from urllib.parse import urlsplit
     parts = (urlsplit(url).hostname or url).split(".")
     return ".".join(parts[-2:]) if len(parts) > 2 and parts[-2] not in ("co", "com") else ".".join(parts)
+
+
+def icon_lookup(loaded: LoadedConfig):
+    """icon(source_id) -> the address of the source's stored icon, or None (the badge shows initials).
+    The table is read once per page, and only if the page shows a badge."""
+    off = {f.id for f in loaded.config.feeds if not f.favicon} if loaded.config else set()
+    found: dict[str, str] | None = None
+
+    def icon(source_id: str | None) -> str | None:
+        nonlocal found
+        if not source_id or source_id in off:
+            return None
+        if found is None:
+            with session() as conn:
+                found = icons.versions(conn)
+        version = found.get(source_id)
+        return f"/icon/{quote(source_id, safe='')}?v={version}" if version else None
+    return icon
 
 
 def template_helpers(loaded: LoadedConfig) -> dict:
@@ -263,6 +292,7 @@ def template_helpers(loaded: LoadedConfig) -> dict:
     return {"cfg": loaded.config, "version": __version__, "repo_url": REPO_URL, "website_url": WEBSITE_URL,
             "bug_url": f"{REPO_URL}/issues/new?template=bug_report.yml&version={__version__}",
             "asset_version": ASSET_VERSION, "localtime": localtime, "ago": ago, "initials": initials,
+            "icon": icon_lookup(loaded),
             "key_points": key_points, "section_labels": section_labels(loaded.config), "host": feed_host,
             "dock": lambda current=None: [Tab("all", "For you", "star"), *dock_tabs(loaded.config, current)],
             "hue": hue, "cat_hue": lambda c: (categories.index(c) % 8) + 1 if c in categories else 0,
@@ -787,6 +817,7 @@ def proposal_reject(pid: int, conn=Depends(get_conn)):
 SETTINGS_PAGES = ("general", "feeds", "discover", "topics", "more", "app", "about")
 ACTION_PAGE = {"general": "general", "region": "general",
                "feed_add": "feeds", "feed_section": "feeds", "feed_remove": "feeds", "feed_toggle": "feeds",
+               "feed_favicon": "feeds",
                "section_add": "feeds", "section_edit": "feeds", "section_move": "feeds", "section_remove": "feeds",
                "watch_add": "topics", "watch_remove": "topics", "keywords": "topics",
                "repo_add": "more", "repo_remove": "more"}
@@ -1051,6 +1082,13 @@ async def settings_action(action: str, request: Request):
             for f in section_list(data, "feeds"):
                 if f.get("id") == form["id"]:
                     f["enabled"] = not f.get("enabled", True)
+        elif action == "feed_favicon":
+            for f in section_list(data, "feeds"):
+                if f.get("id") == form["id"]:
+                    if f.get("favicon", True):
+                        f["favicon"] = False
+                    else:
+                        f.pop("favicon", None)   # the default: no need to spell it out
         elif action == "watch_add":
             section_list(data, "watches").append({"name": form["name"].strip(), "keywords": _lines(form["keywords"])})
         elif action == "watch_remove":
