@@ -59,12 +59,13 @@ class Card:
         return sorted(self.others, key=lambda m: m.row["published"] or m.row["fetched_at"], reverse=True)
 
     @property
-    def other_outlets(self) -> list[str]:
-        seen: list[str] = []
+    def other_outlets(self) -> list[Member]:
+        """The newest article of each other outlet, newest first."""
+        seen: dict[str, Member] = {}
         for m in self.timeline:
             if m.source_name != self.lead.source_name and m.source_name not in seen:
-                seen.append(m.source_name)
-        return seen
+                seen[m.source_name] = m
+        return list(seen.values())
 
     @property
     def newest(self) -> datetime | None:

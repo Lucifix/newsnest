@@ -22,6 +22,7 @@ from newsnest.config import Config, LoadedConfig, Source, load_config
 from newsnest.discovery import HOST_SPACING, discovery_sources, retire_candidates
 from newsnest.db import dumps, get_meta, iso, migrate, parse_iso, session, set_meta, transaction, utcnow
 from newsnest.grouping import GROUPING_VERSION, regroup
+from newsnest import icons
 from newsnest.fetchers import build_registry
 from newsnest.fetchers.base import FetchContext, make_client, run_fetch
 from newsnest.notify import get_notifier
@@ -50,9 +51,11 @@ def fetch_sources(conn: sqlite3.Connection, loaded: LoadedConfig, force: bool = 
     all_sources = loaded.sources + discovery_sources(conn, cfg)
     feeds = [s for s in all_sources if s.enabled
              and (force or is_due(s, states.get(s.id), cfg, now))]
+    have_meta = icons.known_sources(conn)
     for s in feeds:  # conditional requests: unchanged feeds answer 304 with no body
         st = states.get(s.id)
-        if st is not None:
+        # ...except once for a feed whose site and logo aren't known yet (installs from before source icons)
+        if st is not None and (s.id in have_meta or not icons.wants_icon(s)):
             s.params.update(etag=st["etag"], last_modified=st["last_modified"], prev_raw=st["raw_count"])
 
     registry = build_registry()
@@ -69,6 +72,8 @@ def fetch_sources(conn: sqlite3.Connection, loaded: LoadedConfig, force: bool = 
             summary["fetched"] += 1
             _fetch_one(conn, source, registry, ctx, prefilter, cfg, summary)
             last_hit[host] = time.monotonic()
+        if looked := icons.refresh(conn, all_sources, client, utcnow()):
+            summary["icons"] = looked
     return summary
 
 
@@ -78,6 +83,8 @@ def _fetch_one(conn, source, registry, ctx, prefilter, cfg, summary) -> None:
     if result.items:
         new_ids = ingest(conn, source, result.items, prefilter, utcnow())
     record_run(conn, source, result, len(new_ids), cfg, utcnow())
+    if result.feed_meta is not None and icons.wants_icon(source):
+        icons.note_feed(conn, source, result.feed_meta)
     summary["new"] += len(new_ids)
     if result.status.is_failure:
         summary["failed"].append(f"{source.id}: {result.error}")

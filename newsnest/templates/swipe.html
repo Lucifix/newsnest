@@ -22,7 +22,7 @@
     </div>
     <div class="swipe-body">
       <div class="meta">
-        {{ badge(c.lead.source_name, c.logo) }}
+        {{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}
         <span class="src">{{ c.lead.source_name }}</span>
         <span class="sep" aria-hidden="true">·</span>
         <time datetime="{{ r.published or r.fetched_at }}">{{ ago(r.published or r.fetched_at) }}</time>
@@ -46,7 +46,7 @@
       <div class="swipe-foot">
         {% if c.final is not none %}<span class="scorechip{% if c.final >= 7 %} high{% endif %}" title="Score of 10">{{ '%.1f'|format(c.final) }}</span>{% endif %}
         {% if r.reason %}<span class="reasonline">{{ r.reason }}</span>{% endif %}
-        {% if c.others %}<span class="swipe-cov"><span class="stack">{% for name in c.other_outlets[:3] %}{{ badge(name) }}{% endfor %}</span>{{ c.outlets }} outlets</span>{% endif %}
+        {% if c.others %}<span class="swipe-cov"><span class="stack">{% for m in c.other_outlets[:3] %}{{ badge(m.source_name, source=m.row.source_id) }}{% endfor %}</span>{{ c.outlets }} outlets</span>{% endif %}
       </div>
     </div>
     <span class="stamp like" aria-hidden="true">More</span>

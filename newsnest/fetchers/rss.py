@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import io
 import re
+from urllib.parse import urljoin
 
 import feedparser
 
 from newsnest.config import Source
 from newsnest.fetchers.base import FetchContext, FetchFailed, html_to_text, http_get, struct_to_dt
-from newsnest.models import FetchResult, FetchStatus, Item
+from newsnest.models import FeedMeta, FetchResult, FetchStatus, Item
 
 _HN_POINTS = re.compile(r"Points:\s*(\d+)")
 _HN_COMMENTS = re.compile(r"# Comments:\s*(\d+)")
@@ -33,6 +34,7 @@ def parse_feed(source: Source, ctx: FetchContext) -> tuple[feedparser.FeedParser
     parsed = feedparser.parse(io.BytesIO(r.content), response_headers={"content-type": r.headers.get("content-type", "")})
     result = FetchResult(source.id, FetchStatus.OK, http_status=r.status_code, raw_count=len(parsed.entries),
                          etag=r.headers.get("etag"), last_modified=r.headers.get("last-modified"))
+    result.feed_meta = feed_meta(parsed.feed, str(r.url))
     if str(r.url) != source.url:
         result.warnings.append(f"redirected to {r.url}")
     if not parsed.entries:
@@ -45,6 +47,20 @@ def parse_feed(source: Source, ctx: FetchContext) -> tuple[feedparser.FeedParser
         # An encoding override (declared us-ascii, actually utf-8) is harmless: text decodes fine
         result.warnings.append(f"feed is malformed but readable: {parsed.get('bozo_exception')}")
     return parsed, result
+
+
+def feed_meta(feed, feed_url: str) -> FeedMeta:
+    """The feed's website and logo images, best first: Atom <icon> (square by spec), RSS <image>,
+    then Atom <logo> (often a wide banner). Relative addresses are resolved against the feed's URL."""
+    images: list[str] = []
+    for url in (feed.get("icon"), (feed.get("image") or {}).get("href"), feed.get("logo")):
+        if url and isinstance(url, str):
+            url = urljoin(feed_url, url.strip())
+            if url.startswith(("https://", "http://")) and url not in images:
+                images.append(url)
+    link = feed.get("link")
+    site = urljoin(feed_url, link.strip()) if isinstance(link, str) and link.strip() else None
+    return FeedMeta(site if site and site.startswith(("https://", "http://")) else None, images)
 
 
 def entry_to_item(entry, source: Source) -> Item | None:

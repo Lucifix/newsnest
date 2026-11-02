@@ -3,6 +3,8 @@ const VERSION = "__VERSION__";
 const SHELL = `newsnest-shell-${VERSION}`;
 const PAGES = "newsnest-pages";
 const MAX_PAGES = 30;
+const ICONS = "newsnest-icons";
+const MAX_ICONS = 300;
 const PRECACHE = [
   "/offline",
   "/static/app.css?v=__VERSION__",
@@ -36,6 +38,12 @@ async function trimPages() {
   for (const key of keys.slice(0, Math.max(0, keys.length - MAX_PAGES))) await cache.delete(key);
 }
 
+async function trimIcons() {
+  const cache = await caches.open(ICONS);
+  const keys = await cache.keys();
+  for (const key of keys.slice(0, Math.max(0, keys.length - MAX_ICONS))) await cache.delete(key);
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
@@ -50,6 +58,15 @@ self.addEventListener("fetch", (event) => {
       if (response.ok) { const copy = response.clone(); caches.open(SHELL).then((c) => c.put(request, copy)); }
       return response;
     })));
+    return;
+  }
+
+  // Source icons: the address carries the icon's hash, so a cached copy is never stale
+  if (url.pathname.startsWith("/icon/")) {
+    event.respondWith(caches.open(ICONS).then((cache) => cache.match(request).then((hit) => hit || fetch(request).then((response) => {
+      if (response.ok) cache.put(request, response.clone()).then(trimIcons);
+      return response;
+    }))));
     return;
   }
 

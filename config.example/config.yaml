@@ -64,6 +64,8 @@ schedules:
 # daily_cap: max items per day from this feed (optional; overrides categories.<cat>)
 # https_links: true rewrites http:// item links to https:// (optional, default false)
 # allow_http:  plain http:// feed URLs are rejected unless this is true (optional, default false)
+# favicon:   false shows the feed's initials instead of its site's logo (optional, default true;
+#            also in Settings → Feeds, the feed's ⋯ menu)
 feeds:
   # --- Local news ---
   # Add your country's pack in Settings → Feeds, or your own feeds here with category: news.

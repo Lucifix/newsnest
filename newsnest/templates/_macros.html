@@ -30,7 +30,7 @@
 {% macro list_card(c, when, snippet=true, dim_read=true, pill=none) %}
 <article class="card story{% if dim_read and c.read %} read{% endif %}" data-ids="{{ c.ids }}" data-read="{{ 1 if c.read else 0 }}">
   <div class="card-text">
-    <div class="meta">{{ badge(c.lead.source_name, c.logo) }}<span class="src">{{ c.lead.source_name }}</span>
+    <div class="meta">{{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}<span class="src">{{ c.lead.source_name }}</span>
       <span class="sep" aria-hidden="true">·</span><span>{{ when }}</span>{% if pill %}<span class="pill">{{ pill }}</span>{% endif %}</div>
     <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ c.lead.row.title }}</a></h3>
     {% if snippet and c.lead.row.snippet %}<p class="snippet clamp-2">{{ c.lead.row.snippet }}</p>{% endif %}
@@ -39,8 +39,10 @@
 </article>
 {% endmacro %}
 
-{% macro badge(name, logo=none) %}
-{% if logo %}<img class="badge logo" src="{{ logo }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+{# A source's logo: the item's own (GitHub release feeds), else the source's stored icon, else initials #}
+{% macro badge(name, logo=none, source=none) %}
+{% set logo = logo or icon(source) %}
+{% if logo %}<img class="badge logo" src="{{ logo }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
 {% else %}<span class="badge h{{ hue(name) }}" aria-hidden="true">{{ initials(name) }}</span>{% endif %}
 {% endmacro %}
 
@@ -54,7 +56,7 @@
 
 {% macro meta(c, kicker=none) %}
 <div class="meta">
-  {{ badge(c.lead.source_name, c.logo) }}
+  {{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}
   <span class="src">{{ c.lead.source_name }}</span>
   <span class="sep" aria-hidden="true">·</span>
   <time datetime="{{ c.lead.row.published or c.lead.row.fetched_at }}" title="{{ localtime(c.lead.row.published or c.lead.row.fetched_at, '%d.%m. %H:%M') }}">{{ ago(c.lead.row.published or c.lead.row.fetched_at) }}</time>
@@ -133,11 +135,11 @@
 {% if c.others %}
 <details class="coverage">
   <summary>
-    <span class="stack">{% for m in c.others[:4] %}{{ badge(m.source_name) }}{% endfor %}</span>
+    <span class="stack">{% for m in c.others[:4] %}{{ badge(m.source_name, source=m.row.source_id) }}{% endfor %}</span>
     Also covered by {{ c.others|length }} {{ 'outlet' if c.others|length == 1 else 'outlets' }}
   </summary>
   <ul>
-    {% for m in c.others %}<li>{{ badge(m.source_name) }}<a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong> {{ m.row.title }}</a></li>{% endfor %}
+    {% for m in c.others %}<li>{{ badge(m.source_name, source=m.row.source_id) }}<a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong> {{ m.row.title }}</a></li>{% endfor %}
   </ul>
 </details>
 {% endif %}
@@ -241,12 +243,12 @@
 {% if c.others %}
 <details class="coverage">
   <summary>
-    <span class="stack">{% for name in c.other_outlets[:4] %}{{ badge(name) }}{% endfor %}</span>
+    <span class="stack">{% for m in c.other_outlets[:4] %}{{ badge(m.source_name, source=m.row.source_id) }}{% endfor %}</span>
     <span>Full coverage · {{ c.articles }} articles from {{ c.outlets }} outlets</span>
   </summary>
   <ul class="timeline">
     {% for m in c.timeline %}
-    <li>{{ badge(m.source_name) }}
+    <li>{{ badge(m.source_name, source=m.row.source_id) }}
       <a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong> {{ m.row.title }}</a>
       <time class="muted" datetime="{{ m.row.published or m.row.fetched_at }}">{{ ago(m.row.published or m.row.fetched_at) }}</time></li>
     {% endfor %}
@@ -264,7 +266,7 @@
 {% macro feed_meta(it) %}
 {% set c = it.card %}
 <div class="meta">
-  {{ badge(c.lead.source_name, c.logo) }}
+  {{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}
   <span class="src">{{ c.lead.source_name }}</span>
   <span class="sep" aria-hidden="true">·</span>
   <time datetime="{{ c.lead.row.published or c.lead.row.fetched_at }}" title="{{ localtime(c.lead.row.published or c.lead.row.fetched_at, '%d.%m. %H:%M') }}">{{ ago(c.lead.row.published or c.lead.row.fetched_at) }}</time>

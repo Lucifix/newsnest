@@ -206,6 +206,14 @@ MIGRATIONS: list[str] = [
     DELETE FROM meta WHERE key = 'listing_last_run' OR key LIKE 'listing_plan:%';
     DELETE FROM source_state WHERE source_id LIKE 'avto_net-%' OR source_id LIKE 'nepremicnine_net-%';
     """,
+    # source icons, stored here so the browser never fetches them from publishers. site_url and feed_images
+    # are what the feed says about itself; checked_at is the last look (NULL: look again soon)
+    """
+    CREATE TABLE source_icons (
+        source_id TEXT PRIMARY KEY, site_url TEXT, feed_images TEXT, checked_at TEXT,
+        origin TEXT, mime TEXT, width INTEGER, height INTEGER, data BLOB, hash TEXT
+    )
+    """,
 ]
 
 
