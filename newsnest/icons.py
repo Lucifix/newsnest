@@ -133,17 +133,23 @@ def link_icons(html: str, page_url: str) -> list[str]:
     SVG is skipped, relative addresses are resolved against <base href> or the page's own URL."""
     tree = LexborHTMLParser(html)
     base = tree.css_first("base[href]")
-    base_url = urljoin(page_url, base.attributes.get("href") or "") if base else page_url
+    try:
+        base_url = urljoin(page_url, base.attributes.get("href") or "") if base else page_url
+    except ValueError:
+        base_url = page_url
     touch: list[tuple[int, int, str]] = []
     plain: list[tuple[int, int, str]] = []
     for n, link in enumerate(tree.css("link[rel][href]")):
         rel = (link.attributes.get("rel") or "").lower().split()
         href = (link.attributes.get("href") or "").strip()
         kind = (link.attributes.get("type") or "").lower()
-        if not href or href.startswith("data:") or "svg" in kind or urlsplit(href).path.lower().endswith(".svg"):
+        try:
+            if not href or href.startswith("data:") or "svg" in kind or urlsplit(href).path.lower().endswith(".svg"):
+                continue
+            url = urljoin(base_url, href)
+        except ValueError:   # a malformed address ("https://[bad/x.png"): skip it, not the whole page
             continue
         size = _declared_size(link.attributes.get("sizes") or "")
-        url = urljoin(base_url, href)
         if "apple-touch-icon" in rel or "apple-touch-icon-precomposed" in rel:
             touch.append((-(size or 180), n, url))   # undeclared touch icons are 180 px by convention
         elif "icon" in rel:
@@ -166,8 +172,11 @@ def _declared_size(sizes: str) -> int:
 
 def fetchable(url: str) -> bool:
     """Plain web addresses only: no other schemes, and nothing on this machine or the home network."""
-    parts = urlsplit(url)
-    host = (parts.hostname or "").lower()
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+    except ValueError:
+        return False
     if parts.scheme not in ("http", "https") or not host:
         return False
     if host == "localhost" or host.endswith((".localhost", ".local", ".lan", ".internal", ".home.arpa")):
@@ -194,7 +203,7 @@ def _download(client: httpx.Client, url: str, limit: int) -> httpx.Response | No
                     return None
             r._content = bytes(body)  # lets .content / .text work after the stream closed
             return r
-    except httpx.HTTPError as e:
+    except Exception as e:  # network trouble, but also a malformed address in a page's <link> (httpx.InvalidURL)
         log.debug("icon download failed: %s: %s", url, e)
         return None
 
@@ -291,8 +300,10 @@ def refresh(conn: sqlite3.Connection, sources: list[Source], client: httpx.Clien
                                (source.id,)).fetchone()
             icon = discover(client, FeedMeta(row["site_url"], loads(row["feed_images"], [])), source.url)
             store(conn, source.id, icon, now)
-        except Exception:  # an odd site must not stop the tick
+        except Exception:  # an odd site must not stop the tick...
             log.exception("icon lookup crashed for %s", source.id)
+            # ...nor stay first in line every tick, keeping every source behind it from being looked at
+            store(conn, source.id, None, now)
         done += 1
     return done
 
