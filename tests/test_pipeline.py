@@ -239,6 +239,26 @@ def test_entry_image_prefers_media_and_skips_http():
     assert entry_image({"summary": "no image"}) is None
 
 
+def test_html_to_text_decodes_entities_without_tags():
+    from newsnest.fetchers.base import html_to_text
+    assert html_to_text("Apple&#8217;s &#8216;Ultra&#8217; robot") == "Apple’s ‘Ultra’ robot"
+    assert html_to_text("<b>a &lt;script&gt; tag</b>") == "a <script> tag"
+    assert html_to_text("The <dialog> element", plain=True) == "The <dialog> element"
+
+
+def test_entry_titles_come_out_as_text():
+    import feedparser
+
+    from newsnest.fetchers.rss import entry_to_item
+    entries = feedparser.parse("""<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+        <entry><title type="html"><![CDATA[Apple&#8217;s robot]]></title><link href="https://a.si/1"/></entry>
+        <entry><title>Apple&amp;#8217;s robot</title><link href="https://a.si/2"/></entry>
+        <entry><title>The &lt;dialog&gt; element</title><link href="https://a.si/3"/></entry>
+        </feed>""").entries
+    assert [entry_to_item(e, src("verge")).title for e in entries] == [
+        "Apple’s robot", "Apple’s robot", "The <dialog> element"]
+
+
 def test_known_item_gets_image_backfilled(conn, cfg):
     pf = Prefilter(cfg)
     a = item("rtvslo", "Papežu Leonu XIV. se rak ni razširil", "https://rtvslo.si/a")

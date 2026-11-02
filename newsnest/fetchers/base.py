@@ -8,6 +8,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from html import unescape
 from typing import Any, Protocol
 
 import httpx
@@ -102,10 +103,12 @@ def _drop_stale(result: FetchResult, max_age_days: float) -> None:
         result.items = fresh
 
 
-def html_to_text(html: str | None, limit: int = 600) -> str:
+def html_to_text(html: str | None, limit: int = 600, plain: bool = False) -> str:
+    """One line of text with entities decoded, also when there is no tag ("Apple&#8217;s").
+    plain: the text is not markup (a text/plain title), so a "<" in it is kept, not parsed as a tag."""
     if not html:
         return ""
-    text = LexborHTMLParser(html).text(separator=" ") if "<" in html else html
+    text = unescape(html) if plain or "<" not in html else LexborHTMLParser(html).text(separator=" ")
     text = " ".join(text.split())
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
