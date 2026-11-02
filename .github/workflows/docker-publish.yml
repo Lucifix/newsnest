@@ -120,12 +120,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # main -> latest + sha-xxxxxxx; vX.Y.Z tag -> X.Y.Z, X.Y, X.
-      # A release tag never moves latest.
+      # A release tag never moves latest: the default flavor (latest=auto) would add it to semver tags.
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE }}
+          flavor: latest=false
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short,enable={{is_default_branch}}
