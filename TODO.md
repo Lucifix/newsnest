@@ -35,9 +35,6 @@ Learned outlet weights (card menu → "Less from …") keep a noisy new source i
       lock and may get a small ranking boost, so subscribing is rewarded rather than paywalls penalized.
 - [ ] Subscriber lock: optional "hide subscriber articles" setting, off by default. When on, the story's
       free coverage from other outlets stays visible; nothing changes for anyone who leaves it off.
-- [ ] Subscriber lock: verify against real publishers with `tools/check_paywall.py` (not yet run; the dev
-      sandbox blocks news sites). Watch for a site marking every article as not free.
-
 ## Known limitations
 - Story grouping is headline-based; occasional false merges (both headlines stay visible on the card).
 - Most feeds hold ~1 day, so the first-run backfill is "whatever feeds hold" (max_item_age_days: 3).
