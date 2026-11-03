@@ -33,7 +33,7 @@ from newsnest.config_edit import (ConfigEditError, edit_config, ensure_section, 
                                   materialize_sections, remove_where, section_entry, section_list, section_map, tab_room)
 from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
 from newsnest.digest import available_days, build_digest
-from newsnest.discovery import (OpmlFeed, add_candidates, named_sources, parse_opml, promotion_suggestions,
+from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_sources, parse_opml, promotion_suggestions,
                              region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
 from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
@@ -845,7 +845,7 @@ def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
         return {}
     suggestions = promotion_suggestions(conn, cfg)
     ctx = {"nav": {"feeds": len(cfg.feeds), "watches": len(cfg.watches), "earned": len(suggestions),
-                   "trial": conn.execute("SELECT COUNT(*) FROM candidates WHERE status = 'candidate'").fetchone()[0]}}
+                   "trial": conn.execute("SELECT COUNT(*) FROM candidates WHERE status IN ('candidate', 'checking')").fetchone()[0]}}
     if page == "general":
         ctx.update(spent=spent_today(conn, cfg), time_zones=TIME_ZONES, **local_pack_context(cfg))
     elif page == "profile":
@@ -853,9 +853,10 @@ def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
     elif page == "feeds":
         ctx.update(foreign=foreign_local(conn, loaded.sources, cfg.region.tld), lifestyle_missing=missing_from(LIFESTYLE_PACK, cfg.feeds),
                    lifestyle_interest=LIFESTYLE_INTEREST.lower() in read_profile("interests.md").lower(),
-                   section_icons=ICONS, max_tabs=MAX_TABS, **local_pack_context(cfg))
+                   section_icons=ICONS, max_tabs=MAX_TABS, catalog_size=catalog.catalog_size(), **local_pack_context(cfg))
     elif page == "discover":
-        ctx.update(candidates=candidate_rows(conn), suggestions=suggestions, catalog_size=catalog.catalog_size())
+        ctx.update(candidates=candidate_rows(conn, cfg), suggestions=suggestions, catalog_size=catalog.catalog_size(),
+                   catalog_topics=len(catalog.load_catalog()))
     elif page == "catalog":
         sections = cfg.all_sections
         ctx.update(topics=catalog.load_catalog(), states=catalog.feed_states(conn, cfg), sections=sections,
@@ -1170,18 +1171,27 @@ async def settings_action(action: str, request: Request):
 
 # --- discovered sources ---
 
-def candidate_rows(conn) -> list[dict]:
-    """Candidates with story counts and `signals`: opens and likes this week, the number promotion counts."""
-    since = iso(utcnow() - timedelta(days=7))
+def candidate_rows(conn, cfg: Config) -> list[dict]:
+    """Candidates with `signals` (opens and likes this week, the number promotion counts), `good` (stories this
+    week good enough to reach the feed) and, for one with nothing good yet, `days_left` before it retires."""
+    now = utcnow()
+    since = iso(now - timedelta(days=7))
     rows = conn.execute(
-        """SELECT c.*, (SELECT COUNT(*) FROM items i WHERE i.source_id = c.source_id) AS items,
-                  (SELECT COUNT(*) FROM items i WHERE i.source_id = c.source_id AND (i.opened_at IS NOT NULL OR i.rating = 1)) AS liked
-           FROM candidates c ORDER BY CASE c.status WHEN 'candidate' THEN 0 WHEN 'checking' THEN 1 ELSE 2 END, c.title""").fetchall()
+        "SELECT * FROM candidates ORDER BY CASE status WHEN 'candidate' THEN 0 WHEN 'checking' THEN 1 ELSE 2 END, title").fetchall()
     out = []
     for r in rows:
         d = dict(r)
         d["check"] = loads(r["check_result"], {}) or {}
-        d["signals"] = _signals(conn, r["source_id"], since) if r["status"] == "candidate" else 0
+        d["signals"] = d["good"] = 0
+        d["days_left"] = None
+        if r["status"] == "candidate":
+            d["signals"] = _signals(conn, r["source_id"], since)
+            d["good"] = good_stories(conn, cfg, r["source_id"], since)
+            # Retirement looks at the whole trial: only one that never had a good story or a read is on the clock
+            trial = iso(now - timedelta(days=cfg.discovery.retire_after_days))
+            if not d["good"] and not _signals(conn, r["source_id"], trial) and not good_stories(conn, cfg, r["source_id"]):
+                age = now - parse_iso(r["checked_at"] or r["added_at"])
+                d["days_left"] = max(0, cfg.discovery.retire_after_days - age.days)
         out.append(d)
     return out
 
@@ -1257,6 +1267,20 @@ async def discovery_import(request: Request, loaded: LoadedConfig = Depends(get_
         added = add_candidates(conn, cfg, feeds, origin[:120])
     start_check_thread(cfg)
     return RedirectResponse(f"/settings/discover?saved=discovery&added={added}", status_code=303)
+
+
+@app.post("/discovery/{source_id}/section")
+async def discovery_section(source_id: str, category: str = Form(...), conn=Depends(get_conn),
+                            loaded: LoadedConfig = Depends(get_loaded)):
+    """A source on trial moves to another section, and the stories it already brought go with it."""
+    cfg = _require_cfg(loaded)
+    if category not in section_keys(cfg):
+        raise HTTPException(400, "unknown section")
+    if not conn.execute("UPDATE candidates SET category = ? WHERE source_id = ?", (category, source_id)).rowcount:
+        raise HTTPException(404)
+    n = await asyncio.to_thread(_refile)
+    return RedirectResponse(f"/settings/discover?saved=discovery&changed={quote(source_id)}&n={n}#trial-{quote(source_id)}",
+                            status_code=303)
 
 
 @app.post("/discovery/{source_id}/{action}")

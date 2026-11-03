@@ -1111,7 +1111,7 @@ a.srow:active { background: var(--surface-3); }
 /* coloured icon tiles in the menu */
 .stile { flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--h, var(--muted)); }
 .stile svg { width: 19px; height: 19px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.tile-general { --h: #8e8e93; } .tile-feeds { --h: var(--h2); } .tile-discover { --h: var(--h7); }
+.tile-general, .tile-import { --h: #8e8e93; } .tile-feeds { --h: var(--h2); } .tile-discover { --h: var(--h7); }
 .tile-topics { --h: var(--h3); } .tile-more { --h: var(--h1); } .tile-profile { --h: var(--accent); }
 
 /* iOS switch */
@@ -1179,8 +1179,43 @@ input.sinput:invalid { border-color: var(--danger); }
 .sform .button { justify-self: start; }
 .sform p { margin: 0; }
 @media (min-width: 640px) { .sform { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sform > p, .sform > .check, .sform > .button { grid-column: 1 / -1; } }
-/* the feed catalog: topic chips, a list per topic with its destination below, and a bar that follows the scroll */
-.catalog-topics { flex: none; margin-top: 16px; }
+/* Discover: what a trial is, then the sources on trial with their weekly reads as dots */
+.trial-how > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; min-height: 30px; padding-right: 16px; }
+.trial-how > summary::-webkit-details-marker { display: none; }
+.trial-how > summary .chev { margin-left: auto; transition: transform 0.15s; }
+.trial-how[open] > summary .chev { transform: rotate(180deg); }
+.trial-steps { margin: 0; padding: 4px 16px 4px 40px; font-size: 0.92rem; line-height: 1.45; color: var(--text-2); }
+.trial-steps li { padding: 8px 0; }
+.trial-steps li::marker { color: var(--accent-text); font-weight: 700; }
+.trial-steps b { color: var(--text); font-weight: 600; }
+/* the weekly reads as dots; the row menu beside them is a vertical ⋮, so the two never look alike */
+.trial-dots { display: inline-flex; gap: 4px; align-items: center; margin-right: 2px; font-variant-numeric: tabular-nums; }
+.trial-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-3); }
+.trial-dots i.on { background: var(--accent); }
+/* a ⋯ menu row that picks from a list: the native <select> covers the whole row */
+label.pop-select { position: relative; flex-direction: row; gap: 10px; font: 500 0.92rem var(--sans); color: var(--text); }
+.pop-select .pop-value { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-weight: 400; }
+.pop-select .pop-value .chev { width: 14px; height: 14px; }
+.pop-select select { position: absolute; inset: 0; width: 100%; min-height: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; font-size: 16px; }
+.pop-select:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+form.saving .pop-select { opacity: 0.5; }
+.trial-row:target { animation: feed-flash 2.4s ease-out; }
+@media (max-width: 520px) { .trial-row .srow-sub { white-space: normal; } }   /* the dots and ⋯ leave little room */
+.trial-row .nowrap { white-space: nowrap; }
+.catalog-invite { margin-top: 24px; }
+.catalog-invite .button { margin: 0; }
+
+/* the feed catalog: search and topic chips that narrow the list, the section each topic goes to, and a bar that follows the scroll */
+.catalog-tools { display: grid; gap: 10px; margin-top: 16px; scroll-margin-top: 72px; }
+.catalog-search { width: 100%; min-height: 42px; font-size: 16px; }
+/* Every topic in sight: the chips wrap where there's room; on phones they scroll, and the fading edge says there are more */
+.catalog-topics { flex: none; flex-wrap: wrap; overflow: visible; }
+@media (max-width: 760px) {
+  .catalog-topics { flex-wrap: nowrap; overflow-x: auto; padding-right: 32px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+}
+.chip.picked::after { content: ""; width: 7px; height: 7px; margin-left: 2px; border-radius: 50%; background: var(--accent); }
+.catalog-empty { margin: 24px 16px 0; }
 .ctopic { scroll-margin-top: 72px; }
 .ctopic-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 6px; min-height: 30px; }
 .ctopic-head .sgroup-title { margin-bottom: 0; }
@@ -1189,8 +1224,9 @@ input.sinput:invalid { border-color: var(--danger); }
 .cfeed.is-taken { cursor: default; }
 .cfeed.is-taken .srow-title, .cfeed.is-taken .savatar { opacity: 0.55; }
 @media (hover: hover) { .slist label.cfeed.is-taken:hover { background: transparent; } }
-.ctopic-dest label { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; font: inherit; color: inherit; }
-.ctopic-dest select { width: auto; min-height: 34px; padding: 4px 8px; font-size: 16px; }   /* 16px: iOS doesn't zoom in */
+.ctopic-dest { display: flex; align-items: center; gap: 4px; margin: -2px 0 6px 16px; font-size: 0.88rem; color: var(--muted); }
+.ctopic-dest .vselect { min-height: 30px; color: var(--accent-text); font-weight: 600; }
+.ctopic-dest .vselect .chev { stroke: currentColor; }
 .cbar {
   position: sticky; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: flex; align-items: center;
   justify-content: space-between; gap: 12px; margin: 24px 0 0; padding: 8px 8px 8px 18px; border-radius: 999px;

@@ -1,3 +1,4 @@
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from email.utils import formatdate
@@ -192,14 +193,45 @@ def test_retirement(conn, cfg, trial):
 
 
 def test_trial_rows_show_progress_toward_promotion(conn, cfg, env, trial, monkeypatch):
-    """"N of 3" is the weekly count promotion uses, and each row's ⋯ menu carries Keep and Remove."""
+    """The dots are the weekly count promotion uses, said in words too, and each row's ⋮ menu carries Keep, its section
+    and Remove. A source nobody read has no dots."""
     monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
     import newsnest.web as web
     with TestClient(web.app) as client:
         need = cfg.discovery.promote_after
         page = client.get("/settings/discover").text
-        assert f"0 of {need}" in page and f"/discovery/{trial.id}/promote" in page and f"/discovery/{trial.id}/remove" in page
+        assert "trial-dots" not in page and "Local · 1 good this week" in re.sub(r"<[^>]+>", "", page)
+        picker = page.split(f'action="/discovery/{trial.id}/section"')[1].split("</form>")[0]   # ⋯ → Section
+        assert '<option value="news" selected>' in picker and '<option value="world"' in picker
+        assert f"/discovery/{trial.id}/promote" in page and f"/discovery/{trial.id}/remove" in page
+        assert page.index("Browse the catalog") < page.index("Not read yet · 1")   # adding comes before the list
         conn.execute("UPDATE items SET opened_at = ?", (iso(NOW),))  # two stories opened this week
-        assert f"2 of {need}" in client.get("/settings/discover").text
+        page = client.get("/settings/discover").text
+        assert f"Read 2 of {need} this week" in page and "1 more to keep" in page and page.count('<i class="on">') == 2
+        assert "Being read · 1" in page and "Not read yet" not in page
         conn.execute("UPDATE items SET opened_at = ?", (iso(NOW - timedelta(days=9)),))  # too long ago to count
-        assert f"0 of {need}" in client.get("/settings/discover").text
+        assert "trial-dots" not in client.get("/settings/discover").text
+
+
+def test_a_trial_with_nothing_good_shows_when_it_leaves(conn, cfg, env, trial, monkeypatch):
+    monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
+    import newsnest.web as web
+    conn.execute("UPDATE items SET topic = 3, importance = 3, personal = 3")
+    conn.execute("UPDATE candidates SET checked_at = ?", (iso(NOW - timedelta(days=12)),))
+    with TestClient(web.app) as client:
+        page = client.get("/settings/discover").text
+    assert f"Local · Nothing good yet · leaves in {cfg.discovery.retire_after_days - 12} days" in re.sub(r"<[^>]+>", "", page)
+
+
+def test_a_trial_source_moves_to_another_section(conn, cfg, env, trial, monkeypatch):
+    """Picked into the wrong section: move it, and the stories it already brought follow."""
+    monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
+    import newsnest.web as web
+    with TestClient(web.app) as client:
+        r = client.post(f"/discovery/{trial.id}/section", data={"category": "world"}, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"].endswith(f"&changed={trial.id}&n=2#trial-{trial.id}")
+        assert "Moved to World · 2 stories" in client.get(r.headers["location"]).text
+        assert client.post(f"/discovery/{trial.id}/section", data={"category": "nope"}).status_code == 400
+        assert client.post("/discovery/nobody/section", data={"category": "world"}).status_code == 404
+    assert conn.execute("SELECT category FROM candidates").fetchone()[0] == "world"
+    assert {r[0] for r in conn.execute("SELECT category FROM items")} == {"world"}

@@ -1,49 +1,49 @@
 {% extends "_settings_layout.html" %}
-{% from "_settings_ui.html" import group, fold, expand, link_row, avatar, menu, menu_item, section_options with context %}
+{% from "_settings_ui.html" import group, fold, expand, avatar, menu, menu_item, menu_select, section_options with context %}
 {% block stitle %}Discover{% endblock %}
-{% block sintro %}<p class="sub">Feeds on trial show only their best stories ({{ cfg.discovery.min_final }}+, at most {{ cfg.discovery.daily_cap_per_source }} a day each).</p>{% endblock %}
+{% block sintro %}<p class="sub">Try new sources without flooding your feed.</p>{% endblock %}
 {% block page %}
-{% set live = candidates|selectattr('status', 'equalto', 'candidate')|sort(attribute='title')|sort(attribute='signals', reverse=true)|list %}
+{% set need = cfg.discovery.promote_after %}
+{% set live = candidates|selectattr('status', 'equalto', 'candidate')|sort(attribute='title')|sort(attribute='good', reverse=true)|sort(attribute='signals', reverse=true)|list %}
+{% set read = live|selectattr('signals')|rejectattr('signals', 'ge', need)|list %}   {# those at `need` are under Earned a place #}
+{% set quiet = live|rejectattr('signals')|list %}
 {% set checking = candidates|selectattr('status', 'equalto', 'checking')|list %}
 {% set others = candidates|rejectattr('status', 'in', ['candidate', 'checking'])|list %}
-{% set need = cfg.discovery.promote_after %}
-{% set status_text = {'dismissed': 'Removed', 'retired': 'Retired', 'promoted': 'Now a regular source', 'rejected': 'Failed the check'} %}
 {% if request.query_params.get('added') is not none %}<p class="callout ok">{{ request.query_params.get('added') }} feeds added; checking them in the background (refresh in a minute).</p>{% endif %}
 
+{# What a trial is: open on a first visit, one line once something is on trial #}
+<details class="sgroup trial-how"{% if not (live or checking) %} open{% endif %}>
+  <summary class="sgroup-title"><span>How trials work</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+  <ol class="slist trial-steps">
+    <li><b>You pick a source</b> from the catalog or an OPML file.</li>
+    <li><b>Only its best stories reach your feed</b>, at most {{ cfg.discovery.daily_cap_per_source }} a day, tagged Discovered.</li>
+    <li><b>Open or like {{ need }} in a week</b> and it's suggested as a regular source. Nothing good in {{ cfg.discovery.retire_after_days }} days and it leaves on its own.</li>
+  </ol>
+</details>
+
 {% if suggestions %}
-{% call group('Earned a place', footnote='You opened or liked their stories a lot this week.') %}
+{% call group('Earned a place · ' ~ suggestions|length, footnote='You opened or liked their stories a lot this week. Keep makes them regular sources.', icons=true) %}
   {% for sgg in suggestions %}
   <div class="srow">
     {{ avatar(sgg.title, sgg.source_id) }}
-    <span class="srow-main"><span class="srow-title">{{ sgg.title }}</span><span class="srow-sub">{{ sgg.signals }} stories opened or liked this week</span></span>
-    <span class="srow-end"><form method="post" action="/discovery/{{ sgg.source_id }}/promote" class="srow-form"><button class="button small" type="submit">Keep</button></form></span>
+    <span class="srow-main"><span class="srow-title">{{ sgg.title }}</span><span class="srow-sub">You read {{ sgg.signals }} this week</span></span>
+    <span class="srow-end"><form method="post" action="/discovery/{{ sgg.source_id }}/promote" class="srow-form"><button class="button small" type="submit">Keep</button></form>
+      {% call menu(sgg.title) %}
+        {{ menu_item('/discovery/' ~ sgg.source_id ~ '/remove', 'Remove', 'trash', danger=true) }}
+      {% endcall %}</span>
   </div>
   {% endfor %}
 {% endcall %}
 {% endif %}
 
-{% if live or checking %}
-{% call group('On trial · ' ~ live|length, footnote='Open or like ' ~ need ~ ' of a source\'s stories in a week and it is suggested as a regular source. Nothing good in ' ~ cfg.discovery.retire_after_days ~ ' days and it is retired.' ~ ((' Checking ' ~ checking|length ~ ' more feeds…') if checking else '')) %}
-  {% for c in live %}
-  <div class="srow">
-    {{ avatar(c.title, c.source_id) }}
-    <span class="srow-main"><span class="srow-title">{{ c.title }}</span>
-      <span class="srow-sub">{{ section_labels.get(c.category, c.category) }}{% if c.check.per_day %} · ~{{ c.check.per_day }}/day{% endif %} · {{ c["items"] }} {{ 'story' if c["items"] == 1 else 'stories' }}</span></span>
-    <span class="srow-end">
-      <span class="srow-value{% if c.signals %} progress{% endif %}" title="Stories opened or liked this week, of {{ need }} needed">{{ c.signals }} of {{ need }}</span>
-      {% call menu(c.title) %}
-        {{ menu_item('/discovery/' ~ c.source_id ~ '/promote', 'Keep as a regular source', 'check') }}
-        {{ menu_item('/discovery/' ~ c.source_id ~ '/remove', 'Remove', 'trash', danger=true) }}
-      {% endcall %}
-    </span>
-  </div>
-  {% endfor %}
-{% endcall %}
-{% endif %}
-
-{% call group('Add sources') %}
-  {{ link_row('/settings/discover/catalog', 'Browse the feed catalog', value=catalog_size ~ ' feeds') }}
-  {% call expand('Import OPML…', 'From a link or a file') %}
+{# The catalog is the main way in, so it gets a card of its own; OPML is for readers who bring a list #}
+<div class="callout invite catalog-invite">
+  <div><h2>Find sources to try</h2>
+    <p>{{ catalog_size }} checked feeds in {{ catalog_topics }} topics, from world news to gaming.</p></div>
+  <a class="button" href="/settings/discover/catalog">Browse the catalog</a>
+</div>
+{% call group(icons=true) %}
+  {% call expand('Import OPML…', 'Bring a list from another reader, as a link or a file', icon='import', accent=false) %}
   <form method="post" action="/discovery/import" enctype="multipart/form-data" class="sform">
     <label>OPML link <input name="url" type="url" placeholder="https://…/feeds.opml"></label>
     <label>…or a file <input name="file" type="file" accept=".opml,.xml,text/xml"></label>
@@ -53,12 +53,67 @@
   {% endcall %}
 {% endcall %}
 
+{# One source on trial: its section and how it's doing in words, the weekly reads as dots, and a ⋮ menu #}
+{% macro trial_row(c) %}
+{% set need = cfg.discovery.promote_after %}
+{% set moved = request.query_params.get('changed') == c.source_id %}
+<div class="srow trial-row" id="trial-{{ c.source_id }}">
+  {{ avatar(c.title, c.source_id) }}
+  <span class="srow-main"><span class="srow-title">{{ c.title }}</span>
+    {% set where = section_labels.get(c.category, c.category) %}
+    {% if moved %}<span class="srow-sub ok">Moved to {{ where }}{% if request.query_params.get('n') %} · {{ request.query_params.get('n') }} stories{% endif %}</span>
+    {% elif c.status == 'checking' %}<span class="srow-sub">{{ where }} · Checking the feed…</span>
+    {% else %}
+    {% set parts = [where, (c.good ~ ' good this week') if c.good else 'Nothing good ' ~ ('yet' if c.days_left is not none else 'this week')] %}
+    {% if c.signals >= need %}{% set _ = parts.append('ready to keep') %}
+    {% elif c.signals %}{% set _ = parts.append((need - c.signals) ~ ' more to keep') %}
+    {% elif c.days_left is not none %}{% set _ = parts.append('leaves today' if c.days_left == 0 else 'leaves in ' ~ c.days_left ~ (' day' if c.days_left == 1 else ' days')) %}{% endif %}
+    {# Each part wraps whole: a narrow row breaks between "8 good this week" and "1 more to keep", never inside one #}
+    <span class="srow-sub">{% for p in parts %}<span class="nowrap">{{ p }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}
+  </span>
+  {# Only fixed-width parts on the right (the dots, ⋮), so the dots line up from row to row; rows nobody read have
+     nothing to show and leave them out #}
+  <span class="srow-end">
+    {% if c.signals %}
+    <span class="trial-dots" role="img" title="Opened or liked this week: {{ c.signals }} of {{ need }}" aria-label="Read {{ c.signals }} of {{ need }} this week">
+      {%- if need <= 5 %}{% for i in range(need) %}<i{% if i < c.signals %} class="on"{% endif %}></i>{% endfor %}{% else %}{{ c.signals }}/{{ need }}{% endif %}</span>
+    {% endif %}
+    {% call menu(c.title) %}
+      {% if c.status == 'candidate' %}{{ menu_item('/discovery/' ~ c.source_id ~ '/promote', 'Keep as a regular source', 'check') }}{% endif %}
+      {{ menu_select('/discovery/' ~ c.source_id ~ '/section', 'category', 'Section', 'Section of ' ~ c.title, c.category, section_labels) }}
+      {{ menu_item('/discovery/' ~ c.source_id ~ '/remove', 'Remove', 'trash', danger=true) }}
+    {% endcall %}
+  </span>
+</div>
+{% endmacro %}
+
+{# On trial, in two plain groups: the ones you read float up. The dots are explained under their group, moving under the last. #}
+{% set bar_note = 'The dots fill as you open or like their stories this week; at ' ~ need ~ ' a source is suggested as a regular one.' %}
+{% set note = 'In the wrong section? Change it in ⋮, and the stories it brought move with it.' %}
+{% if read %}
+{% call group('Being read · ' ~ read|length, id='trial', icons=true, footnote=bar_note if (quiet or checking) else bar_note ~ ' ' ~ note) %}
+  {% for c in read %}{{ trial_row(c) }}{% endfor %}
+{% endcall %}
+{% endif %}
+{% if quiet or checking %}
+{% call group('Not read yet · ' ~ (quiet|length + checking|length), id=none if read else 'trial', icons=true, footnote=note) %}
+  {% for c in checking %}{{ trial_row(c) }}{% endfor %}
+  {% for c in quiet %}{{ trial_row(c) }}{% endfor %}
+{% endcall %}
+{% endif %}
+
 {% if others %}
-{% call fold('Not on trial', others|length) %}
+{% call fold('Past trials', others|length) %}
   {% for c in others %}
+  {% set reason = c.check.reason if c.check.reason and c.check.reason != 'ok' else '' %}
   <div class="srow">
     <span class="srow-main"><span class="srow-title">{{ c.title }}</span>
-      <span class="srow-sub">{{ status_text.get(c.status, c.status) }}{% if c.check.reason and c.check.reason != 'ok' %}: {{ c.check.reason }}{% endif %}</span></span>
+      <span class="srow-sub">
+        {%- if c.status == 'promoted' %}Kept as a regular source
+        {%- elif c.status == 'dismissed' %}Removed
+        {%- elif c.status == 'retired' %}Retired{% if reason.startswith('no story above') %}: nothing good in {{ cfg.discovery.retire_after_days }} days{% elif reason %}: {{ reason }}{% endif %}
+        {%- elif c.status == 'rejected' %}Couldn't use it{% if reason %}: {{ reason }}{% endif %}
+        {%- else %}{{ c.status }}{% endif %}</span></span>
     {% if c.status in ('dismissed', 'retired') %}
     <span class="srow-end"><form method="post" action="/discovery/{{ c.source_id }}/restore" class="srow-form"><button class="button small secondary" type="submit">Try again</button></form></span>
     {% endif %}

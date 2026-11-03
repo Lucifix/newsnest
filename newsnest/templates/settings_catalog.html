@@ -1,28 +1,42 @@
 {% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import value_select with context %}
 {% block stitle %}Feed catalog{% endblock %}
 {% block back %}<a class="sback" href="/settings/discover"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>Discover</a>{% endblock %}
-{% block sintro %}<p class="sub">Pick feeds to try. They go on trial: only their best stories reach your feed, the ones you read
-  are suggested as regular sources, and the rest retire on their own.</p>{% endblock %}
+{% block sintro %}<p class="sub">Pick feeds to try. Only their best stories reach your feed, and the ones you read are suggested
+  as regular sources.</p>{% endblock %}
 {% block page %}
 {% set state_text = {'yours': 'Already yours', 'trial': 'On trial', 'tried': 'Tried before'} %}
-<nav class="chips catalog-topics" aria-label="Topics">
-  {% for t in topics %}<a class="chip small" href="#topic-{{ t.key }}">{{ t.label }} <span>{{ t.feeds|length }}</span></a>{% endfor %}
-</nav>
+{# Without JS the chips jump to their topic; with it they show one topic at a time, and the search field appears #}
+<div class="catalog-tools">
+  <input type="search" class="catalog-search" placeholder="Search {{ topics|sum(attribute='feeds', start=())|length }} feeds"
+    aria-label="Search the catalog" autocomplete="off" data-catalog-search hidden>
+  <nav class="chips catalog-topics" aria-label="Topics">
+    <a class="chip small" href="#catalog" data-filter="" hidden>All</a>
+    {% for t in topics %}<a class="chip small" href="#topic-{{ t.key }}" data-filter="{{ t.key }}">{{ t.label }} <span>{{ t.feeds|length }}</span></a>{% endfor %}
+  </nav>
+</div>
 
 <form method="post" action="/discovery/catalog" class="catalog" id="catalog" data-icons="/settings/discover/catalog/icons">
   {% for t in topics %}
   {% set home = dest[t.key] %}
   {% set free = t.feeds|rejectattr('key', 'in', states)|list %}
-  <section class="sgroup ctopic" id="topic-{{ t.key }}" data-topic>
+  {% set taken = t.feeds|selectattr('key', 'in', states)|list %}
+  <section class="sgroup ctopic" id="topic-{{ t.key }}" data-topic="{{ t.key }}">
     <div class="ctopic-head">
       <h2 class="sgroup-title">{{ t.label }} · {{ t.feeds|length }}</h2>
       {% if free %}<button type="button" class="button small secondary" data-select-all hidden>Select all</button>{% endif %}
     </div>
+    {% if free %}
+    {% set options = section_labels.copy() %}
+    {% if not home %}{% set _ = options.update({'new': 'New section: ' ~ t.section_label}) %}{% endif %}
+    <p class="ctopic-dest">Goes to {{ value_select('section.' ~ t.key, 'Section for ' ~ t.label, home or 'world', options) }}</p>
+    {% endif %}
+    {# Feeds you already have or tried come last: the top of a topic is all things to pick #}
     <div class="slist has-icons">
-      {% for f in t.feeds %}
+      {% for f in free + taken %}
       {% set state = states.get(f.key) %}
       {% set logo = icon(f.icon_id) %}
-      <label class="srow cfeed{% if state %} is-taken{% endif %}">
+      <label class="srow cfeed{% if state %} is-taken{% endif %}" data-q="{{ (f.name ~ ' ' ~ f.description)|lower }}">
         {% if logo %}<img class="savatar logo" src="{{ logo }}" alt="" loading="lazy" decoding="async">
         {% else %}<span class="savatar" data-icon="{{ f.icon_id }}" aria-hidden="true">{{ initials(f.name) }}</span>{% endif %}
         <span class="srow-main"><span class="srow-title">{{ f.name }}</span><span class="srow-sub">{{ f.description }}</span></span>
@@ -31,23 +45,12 @@
       </label>
       {% endfor %}
     </div>
-    {% if free %}
-    <p class="sgroup-foot ctopic-dest">
-      {% if home %}Goes to {{ section_labels[home] }}{% if home in ('news', 'world') %} (News tab){% endif %}.
-      {% else %}<label>Goes to
-        <select name="section.{{ t.key }}">
-          <option value="world" selected>World</option>
-          {% for s in sections if s.key not in ('news', 'world') %}<option value="{{ s.key }}">{{ s.label }}</option>{% endfor %}
-          <option value="new">New section: {{ t.section_label }}</option>
-        </select></label>
-      {% endif %}
-    </p>
-    {% endif %}
   </section>
   {% endfor %}
+  <p class="muted catalog-empty" data-catalog-empty hidden>No feeds match.</p>
 
   <div class="cbar">
-    <span class="cbar-count" aria-live="polite"><b data-count>0</b> selected</span>
+    <span class="cbar-count" aria-live="polite"><b data-count>0</b> selected<span data-dest-summary></span></span>
     <button class="button" type="submit" data-try>Try them</button>
   </div>
 </form>
