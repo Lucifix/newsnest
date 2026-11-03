@@ -1276,10 +1276,14 @@ async def discovery_section(source_id: str, category: str = Form(...), conn=Depe
     cfg = _require_cfg(loaded)
     if category not in section_keys(cfg):
         raise HTTPException(400, "unknown section")
-    if not conn.execute("UPDATE candidates SET category = ? WHERE source_id = ?", (category, source_id)).rowcount:
+    row = conn.execute("SELECT id, source_id FROM candidates WHERE source_id = ?", (source_id,)).fetchone()
+    if not row:
         raise HTTPException(404)
+    conn.execute("UPDATE candidates SET category = ? WHERE id = ?", (category, row["id"]))
     n = await asyncio.to_thread(_refile)
-    return RedirectResponse(f"/settings/discover?saved=discovery&changed={quote(source_id)}&n={n}#trial-{quote(source_id)}",
+    # The id in the address is the stored one, never what the request sent
+    sid = quote(row["source_id"])
+    return RedirectResponse("/settings/discover?saved=discovery&changed=" + sid + "&n=" + str(n) + "#trial-" + sid,
                             status_code=303)
 
 
