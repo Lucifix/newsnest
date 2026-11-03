@@ -36,9 +36,10 @@ def seed(conn, cfg, personal=7):
     return conn.execute("SELECT * FROM items WHERE url='https://24ur.com/b'").fetchone()
 
 
-def run_one(conn, cfg, row, handler, text=ARTICLE, monkeypatch=None):
+def run_one(conn, cfg, row, handler, text=ARTICLE, monkeypatch=None, paid=False):
     import newsnest.summaries
-    monkeypatch.setattr(newsnest.summaries, "extract_article", lambda ctx, url: (text, None, None))
+    monkeypatch.setattr(newsnest.summaries, "extract_article",
+                        lambda ctx, url: newsnest.summaries.Article(text, None, None, paid))
     ai = AIClient(cfg, conn, fake_client(handler))
     status = newsnest.summaries.summarize_one(conn, cfg, ai, FetchContext(cfg, None), row)
     return status, ai, conn.execute("SELECT * FROM items WHERE id = ?", (row["id"],)).fetchone()
@@ -69,6 +70,68 @@ def test_snippet_only_summary_makes_no_depth_claim(conn, cfg, monkeypatch):
     assert "Only the feed snippet is available" in ai.client.messages.calls[0]["messages"][0]["content"]
 
 
+def ld(*entities):
+    return "".join(f'<script type="application/ld+json">{json.dumps(e)}</script>' for e in entities)
+
+
+# How publishers mark subscriber articles for search engines (Google's paywalled-content markup)
+PAID_PAGES = {
+    "article": ld({"@context": "https://schema.org", "@type": "NewsArticle", "headline": "x",
+                   "isAccessibleForFree": False,
+                   "hasPart": {"@type": "WebPageElement", "isAccessibleForFree": False, "cssSelector": ".paywall"}}),
+    "string value": ld({"@type": "NewsArticle", "isAccessibleForFree": "False"}),
+    "only the part": ld({"@type": "Article", "hasPart": [{"@type": "WebPageElement", "isAccessibleForFree": "false"}]}),
+    "graph": ld({"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "name": "x"},
+                                                             {"@type": "NewsArticle", "isAccessibleForFree": False}]}),
+    "main entity": ld({"@type": "WebPage", "mainEntity": {"@type": "NewsArticle", "isAccessibleForFree": False}}),
+    "list": ld([{"@type": "BreadcrumbList"}, {"@type": "NewsArticle", "isAccessibleForFree": False}]),
+    "microdata": '<article itemscope itemtype="https://schema.org/NewsArticle">'
+                 '<meta itemprop="isAccessibleForFree" content="false"></article>',
+}
+FREE_PAGES = {
+    "marked free": ld({"@type": "NewsArticle", "isAccessibleForFree": True}),
+    "marked free as text": ld({"@type": "NewsArticle", "isAccessibleForFree": "True"}),
+    "no markup": "<html><body><p>Just an article.</p></body></html>",
+    "no flag": ld({"@type": "NewsArticle", "headline": "x"}),
+    # a free article whose sidebar lists a subscriber one: only the page's own article counts
+    "paid article in a list": ld({"@type": "NewsArticle", "isAccessibleForFree": True},
+                                 {"@type": "ItemList", "itemListElement": [
+                                     {"@type": "ListItem", "item": {"@type": "NewsArticle", "isAccessibleForFree": False}}]}),
+    "broken json": '<script type="application/ld+json">{"isAccessibleForFree": false,</script>',
+}
+
+
+@pytest.mark.parametrize("name", PAID_PAGES)
+def test_publisher_paywall_markup_is_recognised(name):
+    from newsnest.summaries import publisher_marks_paid
+    assert publisher_marks_paid(f"<html><head>{PAID_PAGES[name]}</head><body></body></html>")
+
+
+@pytest.mark.parametrize("name", FREE_PAGES)
+def test_free_pages_are_not_marked(name):
+    from newsnest.summaries import publisher_marks_paid
+    assert not publisher_marks_paid(f"<html><head>{FREE_PAGES[name]}</head><body></body></html>")
+
+
+def test_extract_article_reports_paid_even_when_only_a_teaser_is_readable(cfg, monkeypatch):
+    import newsnest.summaries
+
+    class Page:
+        text = f"<html><head>{PAID_PAGES['article']}</head><body><p>Subscribe to read.</p></body></html>"
+        url = "https://news.example/a"
+    monkeypatch.setattr(newsnest.summaries, "http_get", lambda ctx, url: Page())
+    a = newsnest.summaries.extract_article(FetchContext(cfg, None), Page.url)
+    assert a.text is None and a.paid
+
+
+def test_paid_flag_is_stored_with_the_item(conn, cfg, monkeypatch):
+    _, _, row = run_one(conn, cfg, seed(conn, cfg), answer(), monkeypatch=monkeypatch, paid=True)
+    assert json.loads(row["extra"])["paid"] is True
+    _, _, free = run_one(conn, cfg, conn.execute("SELECT * FROM items WHERE url='https://24ur.com/x'").fetchone(),
+                         answer(), monkeypatch=monkeypatch)
+    assert "paid" not in json.loads(free["extra"] or "{}")
+
+
 @pytest.fixture
 def client(env, cfg, monkeypatch):
     monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
@@ -78,7 +141,8 @@ def client(env, cfg, monkeypatch):
     conn.close()
     import newsnest.summaries
     import newsnest.web
-    monkeypatch.setattr(newsnest.summaries, "extract_article", lambda ctx, url: (ARTICLE, None, None))
+    monkeypatch.setattr(newsnest.summaries, "extract_article",
+                        lambda ctx, url: newsnest.summaries.Article(ARTICLE, None, None, "paid" in url))
     monkeypatch.setattr(newsnest.web.AIClient, "create", classmethod(lambda cls, c, k: cls(c, k, fake_client(answer()))))
     with TestClient(newsnest.web.app) as c:
         yield c
@@ -117,3 +181,21 @@ def test_older_prose_summaries_still_render(client):
     page = client.get("/?f=all").text
     assert "Old prose summary of the closure." in page
     assert 'class="tldr"' not in page and page.count("Get key points") == 1
+
+
+def test_subscriber_articles_show_a_lock_and_keep_their_place(client):
+    """The lock is only a label: the story stays where it was and the card still opens the same article."""
+    conn = connect()
+    conn.execute("UPDATE items SET url = 'https://24ur.com/paid' WHERE id = 1")
+    before = client.get("/?f=all").text
+    assert 'aria-label="Subscriber article"' not in before
+    client.post("/api/items/1/summarize", headers={"Accept": "application/json"})
+    client.post("/api/items/2/summarize", headers={"Accept": "application/json"})
+    page = client.get("/?f=all").text
+    assert page.count('aria-label="Subscriber article"') == 1
+    lock = page.index('aria-label="Subscriber article"')
+    assert page.rindex('id="item-', 0, lock) == page.index('id="item-1"')  # on the paid story's card
+    def paid_first(p):
+        return p.index('id="item-1"') < p.index('id="item-2"')
+    assert paid_first(before) == paid_first(page)
+    assert '<a href="/go/1"' in page
