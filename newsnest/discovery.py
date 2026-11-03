@@ -245,6 +245,15 @@ def _signals(conn: sqlite3.Connection, source_id: str, since: str) -> int:
         (source_id, since, since)).fetchone()[0]
 
 
+def good_stories(conn: sqlite3.Connection, cfg: Config, source_id: str, since: str | None = None) -> int:
+    """A source's scored stories at or above discovery.min_final (fetched since `since`, when given): the ones
+    that can reach the feed while it is on trial."""
+    rows = conn.execute("SELECT i.*, st.source_count FROM items i JOIN stories st ON st.id = i.story_id "
+                        "WHERE i.source_id = ? AND i.score_status = 'scored' AND i.fetched_at >= ?",
+                        (source_id, since or "")).fetchall()
+    return sum(1 for x in rows if (final_score(x, x["source_count"], cfg) or 0) >= cfg.discovery.min_final)
+
+
 def promotion_suggestions(conn: sqlite3.Connection, cfg: Config) -> list[dict]:
     """Candidates whose stories I opened or liked often enough this week."""
     since = iso(utcnow() - timedelta(days=7))
@@ -268,10 +277,7 @@ def retire_candidates(conn: sqlite3.Connection, cfg: Config) -> list[str]:
         if (r["consecutive_failures"] or 0) >= 5:
             reason = "kept failing"
         elif now - parse_iso(r["checked_at"] or r["added_at"]) > trial:
-            rows = conn.execute("SELECT i.*, st.source_count FROM items i JOIN stories st ON st.id = i.story_id "
-                                "WHERE i.source_id = ? AND i.score_status = 'scored'", (r["source_id"],)).fetchall()
-            good = [x for x in rows if (final_score(x, x["source_count"], cfg) or 0) >= cfg.discovery.min_final]
-            if not good and not _signals(conn, r["source_id"], iso(now - trial)):
+            if not good_stories(conn, cfg, r["source_id"]) and not _signals(conn, r["source_id"], iso(now - trial)):
                 reason = f"no story above {cfg.discovery.min_final} in {cfg.discovery.retire_after_days} days"
         if reason:
             conn.execute("UPDATE candidates SET status = 'retired', decided_at = ?, check_result = ? WHERE id = ?",

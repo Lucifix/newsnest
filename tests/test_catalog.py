@@ -117,13 +117,17 @@ def test_logos_are_looked_up_once_per_site_and_kept(conn, cfg, monkeypatch):
 def test_the_catalog_page(conn, cfg, web):
     with TestClient(web.app) as client:
         discover = client.get("/settings/discover").text
-        assert "Feeds on trial" in discover and 'href="/settings/discover/catalog"' in discover
-        assert f"{catalog.catalog_size()} feeds" in discover
+        assert "How trials work" in discover and 'href="/settings/discover/catalog"' in discover
+        assert f"{catalog.catalog_size()} checked feeds" in discover
+        assert f"{catalog.catalog_size()} feeds" in client.get("/settings/feeds").text   # Feeds points there too
         page = client.get("/settings/discover/catalog").text
         assert 'action="/discovery/catalog"' in page and 'href="#topic-sport"' in page
-        assert "Already yours" in page   # config.example's BBC World
+        world = page.split('id="topic-world"')[1].split("</section>")[0]
+        assert "Already yours" in world and world.index("CBC World") < world.index("Already yours")   # what you have comes last
         assert 'name="section.sport"' in page and "New section: Sport" in page
-        assert 'name="section.ai"' not in page and "Goes to Tech" in page
+        # A topic whose section the reader has still asks, with that section picked
+        ai = page.split('name="section.ai"')[1].split("</select>")[0]
+        assert '<option value="tech" selected>' in ai and 'value="world"' in ai and "New section" not in ai
         nyt = feed("NYT Science")
         assert f'data-icon="{nyt.icon_id}"' in page   # initials until the logo is found
         conn.execute("INSERT INTO source_icons (source_id, site_url, feed_images, checked_at, mime, data, hash) "
@@ -166,3 +170,12 @@ def test_a_pick_can_go_to_world_or_an_existing_section(conn, cfg, web):
                            follow_redirects=False).headers["location"] == "/settings/discover/catalog"
     cats = dict(conn.execute("SELECT url, category FROM candidates").fetchall())
     assert cats == {feed("BBC Sport").url: "world", feed("Polygon").url: "tech"}
+
+
+def test_a_topic_with_a_home_can_go_elsewhere(conn, cfg, web):
+    """World news picks are not stuck in World: the topic's "Goes to" can name another section."""
+    with TestClient(web.app) as client:
+        client.post("/discovery/catalog", data={"url": [feed("CBC World").url, feed("Interconnects").url],
+                                                "section.world": "tech", "section.ai": "news"})
+    cats = dict(conn.execute("SELECT url, category FROM candidates").fetchall())
+    assert cats == {feed("CBC World").url: "tech", feed("Interconnects").url: "news"}

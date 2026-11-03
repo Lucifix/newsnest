@@ -1,5 +1,5 @@
 {% extends "_settings_layout.html" %}
-{% from "_settings_ui.html" import group, fold, expand, feed_row, section_options with context %}
+{% from "_settings_ui.html" import group, fold, expand, link_row, feed_row, section_options with context %}
 {% block stitle %}Feeds{% endblock %}
 {% block sintro %}<p class="sub">{{ section_labels['news'] }} is for news from where you live{% if cfg and cfg.region.place %} ({{ cfg.region.place }}){% endif %}. International news goes to {{ section_labels['world'] }}; every other section is yours to name and arrange below.</p>{% endblock %}
 {% block page %}
@@ -47,6 +47,7 @@
   {% endfor %}
   {% endif %}
   {% endcall %}
+  {{ link_row('/settings/discover/catalog', 'Try feeds from the catalog', value=catalog_size ~ ' feeds') }}
 {% endcall %}
 
 {# Sections: the tabs and chips of the feed. Local (news) and World are built in: they can be renamed, not removed. #}

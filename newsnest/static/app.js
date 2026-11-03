@@ -762,24 +762,85 @@ document.addEventListener("DOMContentLoaded", () => {
   applyFilters();
 });
 
-// ---------- feed catalog: the selected count, Select all per topic, and logos that arrive while the page is open ----------
+// ---------- feed catalog: the selected count and where the picks go, Select all per topic, topic chips and search
+// that narrow the list, and logos that arrive while the page is open ----------
 const catalogForm = document.getElementById("catalog");
 if (catalogForm) {
   const boxes = (root) => [...root.querySelectorAll('input[name="url"]')];
+  const shownBoxes = (root) => boxes(root).filter((b) => !b.closest("[data-q]").hidden);   // Select all leaves out what search hides
+  const topics = [...catalogForm.querySelectorAll("[data-topic]")];
+  const chips = [...document.querySelectorAll(".catalog-topics [data-filter]")];
+  const search = document.querySelector("[data-catalog-search]");
   const syncCatalog = () => {
     const picked = boxes(catalogForm).filter((b) => b.checked).length;
     catalogForm.querySelector("[data-count]").textContent = String(picked);
     catalogForm.querySelector("[data-try]").disabled = picked === 0;
     catalogForm.querySelectorAll("[data-select-all]").forEach((button) => {
-      button.hidden = false;
-      button.textContent = boxes(button.closest("[data-topic]")).every((b) => b.checked) ? "Clear" : "Select all";
+      const own = shownBoxes(button.closest("[data-topic]"));
+      button.hidden = !own.length;
+      button.textContent = own.every((b) => b.checked) ? "Clear" : "Select all";
     });
+    // "· 2 to World, 1 to Tech": each topic's picks go to the section its "Goes to" names
+    const dest = new Map();
+    topics.forEach((topic) => {
+      const n = boxes(topic).filter((b) => b.checked).length;
+      const select = topic.querySelector('select[name^="section."]');
+      chips.find((c) => c.dataset.filter === topic.dataset.topic)?.classList.toggle("picked", n > 0);
+      if (!n || !select) return;
+      const label = select.selectedOptions[0].textContent.replace(/^New section: /, "");
+      dest.set(label, (dest.get(label) || 0) + n);
+    });
+    catalogForm.querySelector("[data-dest-summary]").textContent =
+      dest.size ? " · " + [...dest].map(([label, n]) => `${n} to ${label}`).join(", ") : "";
   };
-  catalogForm.addEventListener("change", syncCatalog);
+  catalogForm.addEventListener("change", (event) => {
+    // "Goes to" is gray text over an invisible <select>: the text follows the choice (the page doesn't reload)
+    const text = event.target.closest(".vselect")?.querySelector(".vselect-text");
+    if (text) text.textContent = event.target.selectedOptions[0].textContent;
+    syncCatalog();
+  });
+
+  // One topic at a time (or all), narrowed by what is typed; hidden rows keep their ticks
+  const linked = location.hash.startsWith("#topic-") ? location.hash.slice(7) : "";
+  let shown = topics.some((t) => t.dataset.topic === linked) ? linked : topics[0]?.dataset.topic || "";
+  const filterCatalog = () => {
+    const words = (search?.value || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+    let any = false;
+    topics.forEach((topic) => {
+      let visible = 0;
+      topic.querySelectorAll("[data-q]").forEach((row) => {
+        const hit = words.every((w) => row.dataset.q.includes(w));
+        row.hidden = !hit;
+        visible += hit;
+      });
+      topic.hidden = !visible || (!words.length && shown !== "" && topic.dataset.topic !== shown);
+      any ||= !topic.hidden;
+    });
+    chips.forEach((chip) => chip.setAttribute("aria-pressed", String(!words.length && chip.dataset.filter === shown)));
+    // Where the chips scroll sideways (phones), keep the chosen one in view
+    chips.find((c) => c.getAttribute("aria-pressed") === "true")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    catalogForm.querySelector("[data-catalog-empty]").hidden = any;
+    syncCatalog();
+  };
+  chips.forEach((chip) => {
+    chip.hidden = false;
+    chip.addEventListener("click", (event) => {
+      event.preventDefault();
+      shown = chip.dataset.filter;
+      if (search) search.value = "";
+      filterCatalog();
+      document.querySelector(".catalog-tools").scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  });
+  if (search) {
+    search.hidden = false;
+    search.addEventListener("input", filterCatalog);
+  }
+  filterCatalog();
   catalogForm.addEventListener("click", (event) => {
     const button = event.target.closest("[data-select-all]");
     if (!button) return;
-    const own = boxes(button.closest("[data-topic]"));
+    const own = shownBoxes(button.closest("[data-topic]"));
     const on = !own.every((b) => b.checked);
     own.forEach((b) => { b.checked = on; });
     syncCatalog();
