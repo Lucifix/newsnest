@@ -991,7 +991,7 @@ function refreshPage() {
 
 // Pull to refresh on the feed: pull down from the very top and let go past the mark. The browser's own
 // pull-to-reload is off on this page (app.css), since a reload keeps the order. Touch only; buttons
-// (Refresh in the menu and, in the installed app, the top bar) do the same for everyone else.
+// (Refresh in the ⋯ menu) does the same for everyone else.
 if (feedPage && "ontouchstart" in window) {
   const ARM = 64;   // how far the indicator travels before letting go refreshes
   const MAX = 96;

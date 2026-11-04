@@ -831,14 +831,7 @@ a.chip { text-decoration: none; }
 }
 
 /* ---------- installed app (PWA) ---------- */
-.refresh {
-  display: none; flex: none; width: 38px; height: 38px; place-items: center; border-radius: 50%;
-  border: 0; background: transparent; color: var(--text-2); cursor: pointer;
-}
-.refresh svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.refresh:active { background: var(--surface-2); }
 @media (display-mode: standalone) {
-  .refresh { display: grid; }
   .topbar { padding-top: env(safe-area-inset-top); }
   .appmenu { top: calc(54px + env(safe-area-inset-top)); }
   html { scroll-padding-top: calc(110px + env(safe-area-inset-top)); }

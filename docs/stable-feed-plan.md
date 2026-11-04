@@ -60,8 +60,9 @@ Signals (impressions, reads, opens, weights) are recorded exactly as before; the
      Only at the top, only a vertical pull (a sideways swipe on the chips is not one), never with search,
      a sheet or the menu open. The browser's pull-to-reload is switched off on the feed page only
      (`overscroll-behavior-y: none`), so the two never both fire.
-   - **Refresh** in the ⋯ menu and, in the installed app, the top bar button: on the feed a new session,
-     on every other page a reload as before.
+   - **Refresh** in the ⋯ menu: on the feed a new session, on every other page a reload as before. The
+     installed app's separate top bar Refresh button is gone: with pull to refresh it was one control too
+     many, and the menu item covers every page.
    - **Tap the tab you are on**, as in most feed apps; from a part or chip inside the tab the first tap
      goes back to its All.
 3. **"N new stories" pill** (later): stories fetched after the session started that would make the feed;
