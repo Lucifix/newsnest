@@ -25,6 +25,11 @@ class Member:
     def id(self) -> int:
         return self.row["id"]
 
+    @property
+    def paid(self) -> bool:
+        """The publisher marks the article as for subscribers (found when its page was loaded for key points)."""
+        return (loads(self.row["extra"], {}) or {}).get("paid") is True
+
 
 @dataclass
 class Card:

@@ -309,6 +309,10 @@ details.group:not([open]) > summary .sec::after { transform: rotate(-90deg); }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); min-width: 0; }
 .meta .src { font-weight: 700; color: var(--text-2); }
 .meta .sep { opacity: 0.6; }
+.paid { display: inline-flex; align-self: center; color: var(--muted); }
+.meta .paid { margin-left: -3px; }
+.coverage li .paid { margin: 0 4px 0 2px; vertical-align: -1px; }
+.paid svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .kicker { color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem; }
 .summary, .snippet { margin: 4px 0 0; color: var(--text-2); font-size: 0.95rem; }
 .clamp-2, .clamp-3, .clamp-4 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }

@@ -30,7 +30,7 @@
 {% macro list_card(c, when, snippet=true, dim_read=true, pill=none) %}
 <article class="card story{% if dim_read and c.read %} read{% endif %}" data-ids="{{ c.ids }}" data-read="{{ 1 if c.read else 0 }}">
   <div class="card-text">
-    <div class="meta">{{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}<span class="src">{{ c.lead.source_name }}</span>
+    <div class="meta">{{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}<span class="src">{{ c.lead.source_name }}</span>{{ paid_mark(c.lead) }}
       <span class="sep" aria-hidden="true">·</span><span>{{ when }}</span>{% if pill %}<span class="pill">{{ pill }}</span>{% endif %}</div>
     <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ c.lead.row.title }}</a></h3>
     {% if snippet and c.lead.row.snippet %}<p class="snippet clamp-2">{{ c.lead.row.snippet }}</p>{% endif %}
@@ -46,6 +46,12 @@
 {% else %}<span class="badge h{{ hue(name) }}" aria-hidden="true">{{ initials(name) }}</span>{% endif %}
 {% endmacro %}
 
+{# A small lock after the outlet's name: the publisher marks the article as for subscribers. Only a label:
+   it changes nothing about where the story ranks or which link the card opens. #}
+{% macro paid_mark(m) %}
+{% if m.paid %}<span class="paid" role="img" aria-label="Subscriber article" title="Subscriber article: the publisher marks it as for paying readers"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></span>{% endif %}
+{% endmacro %}
+
 {% macro ring(final) %}
 {% if final is not none %}
 <span class="ring{% if final >= 7 %} high{% endif %}" style="--p: {{ [100, (final * 10)|round|int]|min }}" title="Score {{ '%.1f'|format(final) }} of 10">
@@ -57,7 +63,7 @@
 {% macro meta(c, kicker=none) %}
 <div class="meta">
   {{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}
-  <span class="src">{{ c.lead.source_name }}</span>
+  <span class="src">{{ c.lead.source_name }}</span>{{ paid_mark(c.lead) }}
   <span class="sep" aria-hidden="true">·</span>
   <time datetime="{{ c.lead.row.published or c.lead.row.fetched_at }}" title="{{ localtime(c.lead.row.published or c.lead.row.fetched_at, '%d.%m. %H:%M') }}">{{ ago(c.lead.row.published or c.lead.row.fetched_at) }}</time>
   {% if kicker %}<span class="kicker">{{ kicker }}</span>{% endif %}
@@ -139,7 +145,7 @@
     Also covered by {{ c.others|length }} {{ 'outlet' if c.others|length == 1 else 'outlets' }}
   </summary>
   <ul>
-    {% for m in c.others %}<li>{{ badge(m.source_name, source=m.row.source_id) }}<a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong> {{ m.row.title }}</a></li>{% endfor %}
+    {% for m in c.others %}<li>{{ badge(m.source_name, source=m.row.source_id) }}<a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong>{{ paid_mark(m) }} {{ m.row.title }}</a></li>{% endfor %}
   </ul>
 </details>
 {% endif %}
@@ -249,7 +255,7 @@
   <ul class="timeline">
     {% for m in c.timeline %}
     <li>{{ badge(m.source_name, source=m.row.source_id) }}
-      <a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong> {{ m.row.title }}</a>
+      <a href="/go/{{ m.id }}" target="_blank" rel="noopener"><strong>{{ m.source_name }}</strong>{{ paid_mark(m) }} {{ m.row.title }}</a>
       <time class="muted" datetime="{{ m.row.published or m.row.fetched_at }}">{{ ago(m.row.published or m.row.fetched_at) }}</time></li>
     {% endfor %}
   </ul>
@@ -267,7 +273,7 @@
 {% set c = it.card %}
 <div class="meta">
   {{ badge(c.lead.source_name, c.logo, c.lead.row.source_id) }}
-  <span class="src">{{ c.lead.source_name }}</span>
+  <span class="src">{{ c.lead.source_name }}</span>{{ paid_mark(c.lead) }}
   <span class="sep" aria-hidden="true">·</span>
   <time datetime="{{ c.lead.row.published or c.lead.row.fetched_at }}" title="{{ localtime(c.lead.row.published or c.lead.row.fetched_at, '%d.%m. %H:%M') }}">{{ ago(c.lead.row.published or c.lead.row.fetched_at) }}</time>
   {% if it.top %}<span class="kicker">Top story</span>{% endif %}

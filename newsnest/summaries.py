@@ -4,14 +4,20 @@ on demand from the card's "Key points" button for any other story.
 
 Article text comes from trafilatura. If the fetch or extraction fails, or the page is paywalled
 (too little text), the summary is written from the RSS snippet and marked "from snippet only".
+
+The same page load also tells whether the publisher marks the article as for subscribers (schema.org
+isAccessibleForFree: false, which publishers add for search engines). The card then shows a small lock.
+Only pages the summaries already load are checked; no page is ever loaded just for this.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import time
 from datetime import timedelta
+from typing import Any, Iterator, NamedTuple
 
 from newsnest.ai import AIClient, AIError, BudgetExceeded, parse_json
 from newsnest.config import Config
@@ -76,21 +82,65 @@ def candidates(conn: sqlite3.Connection, cfg: Config, limit: int) -> list[sqlite
     return [r for _, r in ranked[:limit]]
 
 
-def extract_article(ctx: FetchContext, url: str) -> tuple[str | None, str | None, str | None]:
-    """Returns (text, error, preview image url)."""
+class Article(NamedTuple):
+    text: str | None
+    error: str | None
+    image: str | None   # preview image url
+    paid: bool = False  # the publisher marks it as for subscribers
+
+
+def extract_article(ctx: FetchContext, url: str) -> Article:
     import trafilatura  # heavy import, only needed here
 
     try:
         r = http_get(ctx, url)
     except FetchFailed as e:
-        return None, str(e), None
+        return Article(None, str(e), None)
     meta = trafilatura.extract_metadata(r.text)
     image = meta.image if meta and meta.image and meta.image.startswith("https://") else None
+    paid = publisher_marks_paid(r.text)
     text = trafilatura.extract(r.text, url=str(r.url), include_comments=False, include_tables=False,
                                favor_precision=True)
     if not text or len(text) < MIN_ARTICLE_CHARS:
-        return None, "too little text (paywall or teaser)", image
-    return text[:MAX_ARTICLE_CHARS], None, image
+        return Article(None, "too little text (paywall or teaser)", image, paid)
+    return Article(text[:MAX_ARTICLE_CHARS], None, image, paid)
+
+
+def publisher_marks_paid(html: str) -> bool:
+    """True when the page's own structured data says the article is not free to read: schema.org
+    isAccessibleForFree false on the article, or on a part of it (hasPart, for a paywalled section).
+    Only the page's main entities count, not the articles it lists in a sidebar or ItemList."""
+    from selectolax.lexbor import LexborHTMLParser
+
+    tree = LexborHTMLParser(html)
+    for node in tree.css('script[type="application/ld+json"]'):
+        try:
+            data = json.loads(node.text(deep=True) or "")
+        except ValueError:
+            continue
+        for entity in _main_entities(data):
+            parts = entity.get("hasPart")
+            parts = parts if isinstance(parts, list) else [parts]
+            if _is_false(entity.get("isAccessibleForFree")) or any(
+                    isinstance(p, dict) and _is_false(p.get("isAccessibleForFree")) for p in parts):
+                return True
+    # Microdata: <meta itemprop="isAccessibleForFree" content="false">
+    return any(_is_false(n.attributes.get("content")) for n in tree.css('[itemprop="isAccessibleForFree"]'))
+
+
+def _main_entities(data: Any) -> Iterator[dict]:
+    if isinstance(data, list):
+        for d in data:
+            yield from _main_entities(d)
+    elif isinstance(data, dict):
+        yield data
+        yield from _main_entities(data.get("@graph"))
+        if isinstance(data.get("mainEntity"), dict):
+            yield data["mainEntity"]
+
+
+def _is_false(value: Any) -> bool:
+    return value is False or (isinstance(value, str) and value.strip().lower() == "false")
 
 
 def system_blocks(cfg: Config) -> list[dict]:
@@ -119,10 +169,15 @@ def summarize_one(conn: sqlite3.Connection, cfg: Config, ai: AIClient, ctx: Fetc
                   purpose: str = "summary") -> str:
     """Fetches the article and writes the key points. Returns the new summary_status:
     'done', 'no_text' (nothing to summarize) or 'error'. BudgetExceeded propagates."""
-    text, _err, image = extract_article(ctx, r["url"])
+    text, _err, image, paid = extract_article(ctx, r["url"])
     extra = loads(r["extra"], {}) or {}
+    found = {}
     if image and not extra.get("image"):  # feeds like TechCrunch and HN carry no image
-        conn.execute("UPDATE items SET extra = ? WHERE id = ?", (dumps({**extra, "image": image}), r["id"]))
+        found["image"] = image
+    if paid:
+        found["paid"] = True
+    if found:
+        conn.execute("UPDATE items SET extra = ? WHERE id = ?", (dumps({**extra, **found}), r["id"]))
     source = "article"
     if text is None:
         if not r["snippet"]:

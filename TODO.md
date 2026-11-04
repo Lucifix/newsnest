@@ -31,7 +31,10 @@ Learned outlet weights (card menu → "Less from …") keep a noisy new source i
 - [ ] Feed catalog: offer it during first-run setup, after the local pack.
 - [ ] Search: word forms in inflected languages (Ljubljana should find Ljubljani). Today whole words
       match, plus the last word as a prefix while typing. Likely fix: the FTS5 trigram tokenizer.
-
+- [ ] Subscriber lock: "sources I pay for" setting (per feed, in Settings → Feeds). Those sources lose the
+      lock and may get a small ranking boost, so subscribing is rewarded rather than paywalls penalized.
+- [ ] Subscriber lock: optional "hide subscriber articles" setting, off by default. When on, the story's
+      free coverage from other outlets stays visible; nothing changes for anyone who leaves it off.
 ## Known limitations
 - Story grouping is headline-based; occasional false merges (both headlines stay visible on the card).
 - Most feeds hold ~1 day, so the first-run backfill is "whatever feeds hold" (max_item_age_days: 3).
