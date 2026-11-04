@@ -52,11 +52,18 @@ Signals (impressions, reads, opens, weights) are recorded exactly as before; the
    Back and `/feed/more` read the session; Mark all read reads it and then ends it. The in-memory
    snapshot is retired. Kill switch: `feed.stable_sessions: false` builds a new session on every page
    load, which is the old behaviour.
-2. **Refresh: tap the tab you are on.** As in most feed apps (X, Instagram, Reddit, YouTube, Google
-   News), tapping the active tab at its All starts a new session (`/?f=<tab>&refresh=1`); from a chip
-   inside the tab the first tap goes back to All. No new button. Needed because reloading (and the
-   browser's pull to refresh, which reloads) now keeps the order on purpose: without it, an installed
-   app shows no new stories until the reader has been away for the idle time.
+2. **Refresh.** Needed because a reload, and the browser's own pull to refresh (a reload), now keep the
+   order on purpose: without it, an installed app shows no new stories until the reader has been away
+   for the idle time. Every way in asks for a new session (`/?refresh=1`, which redirects back to the
+   same tab or chip):
+   - **Pull to refresh** on the feed (touch): pull down from the very top past the mark and let go.
+     Only at the top, only a vertical pull (a sideways swipe on the chips is not one), never with search,
+     a sheet or the menu open. The browser's pull-to-reload is switched off on the feed page only
+     (`overscroll-behavior-y: none`), so the two never both fire.
+   - **Refresh** in the ⋯ menu and, in the installed app, the top bar button: on the feed a new session,
+     on every other page a reload as before.
+   - **Tap the tab you are on**, as in most feed apps; from a part or chip inside the tab the first tap
+     goes back to its All.
 3. **"N new stories" pill** (later): stories fetched after the session started that would make the feed;
    a top story is named, so breaking news is not hidden until the next session.
 
