@@ -858,6 +858,42 @@ a.chip { text-decoration: none; }
 /* All / Local / World pick the part of the feed; a little air before the categories begin */
 .cats a.scope + a:not(.scope) { margin-left: 8px; }
 
+/* ---------- switching tabs: the old stories dim at once, placeholders hold the place while it loads ---------- */
+.feedwrap.swapping .stream > :not(.skel-feed) { opacity: 0.45; transition: opacity 0.15s ease; }
+.feedwrap.swapping .readall { opacity: 0.45; pointer-events: none; }  /* would mark the old tab read */
+.skel-feed { display: grid; gap: 14px; animation: skel-in 0.2s ease both; }
+@keyframes skel-in { from { opacity: 0; } }
+.skel-card {
+  display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 0 14px; align-items: start;
+  background: var(--surface); border: 1px solid var(--edge); border-radius: var(--radius); padding: 14px;
+}
+@media (min-width: 600px) { .skel-card { grid-template-columns: minmax(0, 1fr) 140px; } }
+.skel-card.big { display: block; padding: 0; border-radius: 18px; overflow: hidden; }
+.skel-card.big .skel-text { padding: 14px 16px 18px; }
+.skel { display: block; border-radius: 6px; background: var(--surface-3); }
+.skel-meta { width: 34%; height: 10px; margin: 4px 0 12px; }
+.skel-title { height: 16px; margin-bottom: 8px; }
+.skel-title.short { width: 72%; }
+.skel-line { width: 88%; height: 10px; margin-top: 12px; }
+.skel-line + .skel-line { width: 60%; margin-top: 8px; }
+.skel-thumb { aspect-ratio: 1; border-radius: 10px; }
+.skel-media { aspect-ratio: 16 / 9; border-radius: 0; }
+.skel-chips .skel { flex: none; width: 84px; height: 36px; border-radius: 999px; }
+.skel-chips .skel:first-child { width: 56px; }
+.skel-chips .skel:nth-child(3) { width: 104px; }
+/* A soft sheen sweeps across every placeholder together, so it reads as one loading page */
+.skel {
+  background: linear-gradient(100deg, var(--surface-3) 40%, var(--surface-2) 50%, var(--surface-3) 60%) fixed;
+  background-size: 200vw 100%;
+  animation: skel-sheen 1.3s linear infinite;
+}
+@keyframes skel-sheen { from { background-position: 100vw 0; } to { background-position: -100vw 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; background: var(--surface-3); }
+  .skel-feed { animation: none; }
+  .feedwrap.swapping .stream > :not(.skel-feed) { transition: none; }
+}
+
 /* ---------- vivid layer: grotesque headlines, mono labels, neon fills ---------- */
 .brand { font-family: var(--display); letter-spacing: -0.02em; }
 .masthead h1 { letter-spacing: -0.035em; }

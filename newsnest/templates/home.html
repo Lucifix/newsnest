@@ -7,7 +7,8 @@
 {% set live_sources = status.sources|rejectattr('health.level', 'equalto', 'disabled')|list %}
 {% set ok_sources = live_sources|rejectattr('health.level', 'equalto', 'failing')|list %}
 {% set hour = now_local.hour %}
-<div class="feedwrap">
+{# data-href: this view's own address, for Back and in-place tab switches (app.js showFeed) #}
+<div class="feedwrap" data-href="/?f={{ feed.active|urlencode }}">
 {{ banner_box(banner) }}
 <header class="masthead">
   <p class="dateline">{{ now_local.strftime('%A, %d %B') }}</p>
