@@ -214,6 +214,14 @@ MIGRATIONS: list[str] = [
         origin TEXT, mime TEXT, width INTEGER, height INTEGER, data BLOB, hash TEXT
     )
     """,
+    # feed sessions: the home feed's ranking, computed once and reused until the reader is away for a while,
+    # so opening a story or switching tabs never reshuffles it (newsnest.feedsession). One per device (cookie)
+    """
+    CREATE TABLE feed_sessions (
+        id TEXT PRIMARY KEY, created_at TEXT NOT NULL, last_used_at TEXT NOT NULL,
+        config_fp TEXT NOT NULL, format INTEGER NOT NULL, payload TEXT NOT NULL
+    )
+    """,
 ]
 
 

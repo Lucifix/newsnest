@@ -321,6 +321,7 @@
 {% macro mark_all(feed, token) %}
 <form class="readall" method="post" action="/api/read">
   <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="f" value="{{ feed.active }}">
   <button class="linkbutton" type="submit" name="value" value="1">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 12.5 4 4L15 8.5M10 15l1.5 1.5L21 7"/></svg>Mark all read
   </button>

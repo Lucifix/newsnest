@@ -10,15 +10,15 @@ rank = final score x freshness x boosts x learned weights
 Read stories leave the feed (they are listed under "Read"), unless the story was updated
 afterwards: new outlets joined it after it was read (two for a top story, otherwise
 three, at least one of them in the last few hours). It is then back as unread, marked Updated.
+
+All of this applies when a ranking is made. The home feed keeps one ranking per feed session
+(newsnest.feedsession), so a story read or skipped now leaves or sinks in the next session.
 """
 
 from __future__ import annotations
 
-import secrets
 import sqlite3
-import threading
-import time
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from itertools import zip_longest
@@ -280,21 +280,42 @@ def _weave(stream: list[FeedItem], extras: list[FeedItem], every: int) -> list[F
     return out
 
 
+@dataclass
+class Ranking:
+    """The ranked feed for every tab at once, before a tab is picked: what a feed session stores."""
+    items: list[FeedItem]     # above the threshold, ranked, capped per source
+    extras: list[FeedItem]    # below it but given a slot: new sources and exploring
+    affinity: Counter         # category engagement, for the order of the category chips
+    profile: bool
+    calibration: bool
+    read_count: int
+    dropped: int
+    cutoff: str               # start of the feed window, so the rows can be loaded again
+
+
+def window_rows(conn: sqlite3.Connection, cutoff: str) -> list[sqlite3.Row]:
+    """Every member of every story that has an item inside the window (fetched at or after cutoff)."""
+    return conn.execute(
+        """SELECT i.*, s.source_count FROM items i JOIN stories s ON s.id = i.story_id
+           WHERE i.story_id IN (SELECT story_id FROM items WHERE fetched_at >= ?)
+              OR i.event IN (SELECT event FROM items WHERE fetched_at >= ? AND event IS NOT NULL)
+           ORDER BY i.id""", (cutoff, cutoff)).fetchall()
+
+
 def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], active: str = "all",
                now: datetime | None = None) -> Feed:
+    """Rank and pick a tab in one go: a fresh ranking, as of now."""
+    return view_feed(rank_feed(conn, cfg, sources, now), cfg, active)
+
+
+def rank_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now: datetime | None = None) -> Ranking:
     now = now or utcnow()
     f = cfg.feed
     names = {s.id: s.name for s in sources}
     caps = {s.id: s.daily_cap for s in sources}
     discovered_ids = {s.id for s in sources if s.params.get("discovered")}
     cutoff = iso(now - timedelta(hours=f.window_hours))
-    # Every member of every story that has an item inside the window
-    rows = conn.execute(
-        """SELECT i.*, s.source_count FROM items i JOIN stories s ON s.id = i.story_id
-           WHERE i.story_id IN (SELECT story_id FROM items WHERE fetched_at >= ?)
-              OR i.event IN (SELECT event FROM items WHERE fetched_at >= ? AND event IS NOT NULL)
-           ORDER BY i.id""", (cutoff, cutoff)).fetchall()
-    cards = make_cards(rows, cfg, names)
+    cards = make_cards(window_rows(conn, cutoff), cfg, names)
     weights = load_weights(conn)
     profile = profile_exists()
     calibration = cfg.scoring.calibration_mode
@@ -396,7 +417,17 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
     rest = [it for it in pool if not it.extra]
     dropped += cap_into(rest) if calibration else len(rest)
 
-    affinity = _affinity(conn)
+    return Ranking(items=capped, extras=extras, affinity=_affinity(conn), profile=profile, calibration=calibration,
+                   read_count=read_count, dropped=dropped, cutoff=cutoff)
+
+
+def view_feed(ranking: Ranking, cfg: Config, active: str = "all") -> Feed:
+    """One tab of a ranking: its stream, the dock's tabs and the chips under it. No database access."""
+    capped, extras, affinity = ranking.items, ranking.extras, ranking.affinity
+    sections = section_keys(cfg)
+    f = cfg.feed
+    for it in capped + extras:  # set again below for this tab's stream
+        it.first = it.big = False
     blocks_of: dict[str, Counter] = defaultdict(Counter)
     for it in capped:
         blocks_of[it.category][it.block] += 1
@@ -475,9 +506,10 @@ def build_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], act
         if it.card.image and not it.updated:
             it.big = True
 
-    return Feed(items=stream, chips=chips, subchips=subchips, active=active, parent=parent, tab=tab, profile=profile,
-                calibration=calibration, unseen=sum(1 for it in capped if it.card.unseen),
-                unread=len(capped), read_count=read_count, dropped=dropped)
+    return Feed(items=stream, chips=chips, subchips=subchips, active=active, parent=parent, tab=tab,
+                profile=ranking.profile, calibration=ranking.calibration,
+                unseen=sum(1 for it in capped if it.card.unseen), unread=sum(1 for it in capped if not it.card.read),
+                read_count=ranking.read_count + sum(1 for it in capped if it.card.read), dropped=ranking.dropped)
 
 
 def read_stories(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now: datetime | None = None) -> list[tuple[Card, datetime]]:
@@ -555,29 +587,3 @@ def search_stories(conn: sqlite3.Connection, cfg: Config, sources: list[Source],
 
 def story_hidden(card: Card) -> bool:
     return card.muted or any(m.row["hidden_at"] for m in [card.lead, *card.others])
-
-
-# --- snapshots: the ranked list is frozen per page load, so "load more" never repeats or skips stories ---
-_SNAPSHOT_TTL = 1800
-_SNAPSHOT_MAX = 16
-_snapshots: "OrderedDict[str, tuple[float, Feed]]" = OrderedDict()
-_snapshot_lock = threading.Lock()
-
-
-def remember(feed: Feed) -> str:
-    token = secrets.token_urlsafe(9)
-    now = time.monotonic()
-    with _snapshot_lock:
-        _snapshots[token] = (now, feed)
-        while len(_snapshots) > _SNAPSHOT_MAX:
-            _snapshots.popitem(last=False)
-    return token
-
-
-def recall(token: str) -> Feed | None:
-    with _snapshot_lock:
-        entry = _snapshots.get(token)
-        if not entry or time.monotonic() - entry[0] > _SNAPSHOT_TTL:
-            _snapshots.pop(token, None)
-            return None
-        return entry[1]

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 from html import escape as html_escape
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 import hashlib
 import logging
 import os
@@ -36,8 +36,9 @@ from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_sources, parse_opml, promotion_suggestions,
                              region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
+from newsnest import feedsession
 from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
-                        read_stories, recall, remember, saved_stories, search_stories, story_hidden, weight_strength)
+                        read_stories, saved_stories, search_stories, story_hidden, view_feed, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
 from newsnest.missed import handle_missed
 from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
@@ -355,32 +356,49 @@ FILTER_COOKIE = "newsnest_filter"
 PAGE_SIZE = 20
 
 
+def _set_feed_cookie(response, sid: str) -> None:
+    response.set_cookie(feedsession.COOKIE, sid, max_age=7 * 86400, samesite="lax", httponly=True)
+
+
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, conn=Depends(get_conn),
+def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, refresh: int = 0, conn=Depends(get_conn),
          loaded: LoadedConfig = Depends(get_loaded)):
     """The Discover-style feed. Only the first page is rendered; the rest loads while scrolling.
-    The chosen filter chip is remembered in a cookie."""
+    The chosen filter chip is remembered in a cookie. The order comes from the device's feed session
+    (newsnest.feedsession), so it holds still across reloads, tab switches and Back; refresh=1 starts
+    a new one and comes back here without it."""
     cfg = _require_cfg(loaded)
+    sources = named_sources(conn, cfg, loaded.sources)
+    if refresh:
+        sid, _ = feedsession.start(conn, cfg, sources)
+        response = RedirectResponse(("/?" + urlencode({"f": f})) if f else "/", status_code=303)
+        _set_feed_cookie(response, sid)
+        return response
     active = f or request.cookies.get(FILTER_COOKIE) or "all"
-    feed = build_feed(conn, cfg, named_sources(conn, cfg, loaded.sources), active)
-    token = remember(feed)
+    # stable_sessions off: every page load ranks again (the session then only serves its own "load more")
+    sid, ranking = feedsession.open_session(conn, cfg, sources, request.cookies.get(feedsession.COOKIE),
+                                            fresh=not cfg.feed.stable_sessions)
+    feed = view_feed(ranking, cfg, active)
+    token = sid
     shown = max(PAGE_SIZE, min(n, 300))
     suggestion = (promotion_suggestions(conn, cfg) or [None])[0] if feed.active == "all" else None
     response = render(request, "home.html", conn, loaded, feed=feed, token=token, suggestion=suggestion,
                       page=feed.items[:shown], next_offset=shown if shown < len(feed.items) else None)
     response.set_cookie(FILTER_COOKIE, feed.active, max_age=365 * 86400, samesite="lax")
+    _set_feed_cookie(response, sid)
     return response
 
 
 @app.get("/feed/more", response_class=HTMLResponse)
 def feed_more(request: Request, token: str, offset: int, f: str | None = None, conn=Depends(get_conn),
               loaded: LoadedConfig = Depends(get_loaded)):
-    """The next page of the frozen ranking, as an HTML fragment for the infinite scroll."""
+    """The next page of the session's ranking, as an HTML fragment for the infinite scroll. The token is
+    the session the page was rendered from."""
     cfg = _require_cfg(loaded)
-    feed = recall(token)
-    if feed is None:  # snapshot expired (tab left open for long): rebuild; the page skips duplicates
-        feed = build_feed(conn, cfg, named_sources(conn, cfg, loaded.sources), f or request.cookies.get(FILTER_COOKIE) or "all")
-        token = remember(feed)
+    sources = named_sources(conn, cfg, loaded.sources)
+    # A session that ended meanwhile (away for long, Refresh elsewhere) starts again; the page skips duplicates
+    token, ranking = feedsession.open_session(conn, cfg, sources, token)
+    feed = view_feed(ranking, cfg, f or request.cookies.get(FILTER_COOKIE) or "all")
     offset = max(0, offset)
     end = offset + PAGE_SIZE
     return templates.TemplateResponse(request, "_feed_page.html", {
@@ -464,11 +482,13 @@ def _mark_story_read(conn, item_ids: list[int]) -> None:
 
 
 @app.get("/go/{item_id}")
-def go(item_id: int, conn=Depends(get_conn)):
+def go(request: Request, item_id: int, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     row = conn.execute("SELECT url, source_id, ai_category, opened_at FROM items WHERE id = ?", (item_id,)).fetchone()
     if not row:
         raise HTTPException(404)
     _mark_story_read(conn, [item_id])
+    if loaded.config:  # opening a story is reading: the feed session stays
+        feedsession.touch(conn, loaded.config, request.cookies.get(feedsession.COOKIE))
     if row["opened_at"] is None:  # first open only; auto-read on scroll never comes through here
         conn.execute("UPDATE items SET opened_at = ? WHERE id = ?", (iso(utcnow()), item_id))
         nudge(conn, row["source_id"], row["ai_category"], OPEN_NUDGE)
@@ -533,15 +553,18 @@ def _back(request: Request, payload: dict):
 
 
 @app.post("/api/read")
-def set_read(request: Request, ids: str = Form(""), value: int = Form(1), token: str = Form(""),
-             conn=Depends(get_conn)):
+def set_read(request: Request, ids: str = Form(""), value: int = Form(1), token: str = Form(""), f: str = Form("all"),
+             conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     """Mark stories read (value=1) or unread (value=0); ids are item ids of the stories.
-    With a feed token instead of ids: every story of that feed snapshot (Mark all read)."""
+    With a feed token instead of ids: every story of that feed session's tab f (Mark all read). The session
+    then ends, so the next page load ranks again and the feed is empty."""
     if token:
-        feed = recall(token)
-        if feed is None:
+        cfg = _require_cfg(loaded)
+        ranking = feedsession.resume(conn, cfg, named_sources(conn, cfg, loaded.sources), token)
+        if ranking is None:
             raise HTTPException(409, "The page is out of date; reload and try again")
-        ids = ",".join(it.card.ids for it in feed.items)
+        ids = ",".join(it.card.ids for it in view_feed(ranking, cfg, f).items)
+        feedsession.end(conn, token)
     id_list = _ids(ids)
     if id_list and value:
         _mark_story_read(conn, id_list)
@@ -573,9 +596,11 @@ SEEN_THROTTLE = timedelta(minutes=45)
 
 
 @app.post("/api/seen")
-def set_seen(ids: str = Form(...), conn=Depends(get_conn)):
-    """Impressions from the home feed. Counted at most once per story per 45 min, so reloading the
-    page never pushes stories out; a story skipped often enough sinks and then drops out."""
+def set_seen(request: Request, ids: str = Form(...), conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
+    """Impressions from the home feed. Counted at most once per story per 45 min; a story skipped often
+    enough sinks and then drops out, from the next feed session on (the current one holds still)."""
+    if loaded.config:  # cards on screen: the reader is still at it
+        feedsession.touch(conn, loaded.config, request.cookies.get(feedsession.COOKIE))
     id_list = _ids(ids)
     if id_list:
         now = utcnow()
