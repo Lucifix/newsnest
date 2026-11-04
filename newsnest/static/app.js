@@ -518,40 +518,126 @@ function rememberNewsChip() {
   const href = document.querySelector('.cats [aria-current="true"]')?.getAttribute("href");
   try { if (href) sessionStorage.setItem(NEWS_CHIP, href); } catch { /* storage blocked: no memory */ }
 }
-document.addEventListener("click", (event) => {
-  const tab = event.target.closest('a[data-tab="headlines"]');
-  if (!tab || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  // Tapping News while already on it goes back to All, like any tab
-  if (document.body.dataset.tab === "headlines") return;
-  let saved = null;
-  try { saved = sessionStorage.getItem(NEWS_CHIP); } catch { /* ignore */ }
-  if (saved && saved !== tab.getAttribute("href")) { event.preventDefault(); location.href = saved; }
-});
+// ---------- the feed swaps in place: dock tabs, category chips, Back ----------
+// The tapped tab or chip lights at once and the old stories dim; if the server takes a moment (ranking a
+// new feed session can), placeholder cards hold the place until the stories arrive. A quick answer swaps
+// straight in, without a flash of placeholders. Anything unexpected falls back to loading the page.
+const SKELETON_DELAY = 120;  // ms
+const SKELETON_CARD = '<div class="skel-card"><div class="skel-text"><i class="skel skel-meta"></i>' +
+  '<i class="skel skel-title"></i><i class="skel skel-title short"></i><i class="skel skel-line"></i></div><i class="skel skel-thumb"></i></div>';
+const SKELETON = '<div class="skel-feed" aria-hidden="true"><div class="skel-card big"><i class="skel skel-media"></i>' +
+  '<div class="skel-text"><i class="skel skel-meta"></i><i class="skel skel-title"></i><i class="skel skel-title short"></i>' +
+  `<i class="skel skel-line"></i><i class="skel skel-line"></i></div></div>${SKELETON_CARD.repeat(3)}</div>`;
+const SKELETON_CHIPS = `<div class="cats skel-chips" aria-hidden="true">${'<i class="skel"></i>'.repeat(5)}</div>`;
 
-let feedRequest = 0;
-async function showFeed(href, push) {
+const swapsInPlace = () => !!document.body.dataset.tab && !!document.querySelector(".feedwrap #stream");
+const plainClick = (event) => !(event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
+
+function showSkeleton(wrap, tab) {
+  const stream = wrap.querySelector("#stream");
+  if (!stream || stream.querySelector(".skel-feed")) return;
+  stream.innerHTML = SKELETON;
+  if (!tab) return;
+  // Another tab: its chips and notes are not known yet either
+  wrap.querySelectorAll(".callout").forEach((c) => c.remove());
+  const cats = wrap.querySelector(".cats");
+  if (cats) cats.outerHTML = SKELETON_CHIPS;
+  else stream.insertAdjacentHTML("beforebegin", SKELETON_CHIPS);
+}
+
+// Light a dock tab (top bar and phone dock) before its stories arrive
+function lightTab(key) {
+  document.querySelectorAll(".sections a[data-tab], .tabbar a[data-tab]").forEach((a) => {
+    if (a.dataset.tab === key) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+}
+
+// The dock as the new page has it: which tab is lit, which one refreshes when tapped again, its icon
+function syncDock(doc) {
+  document.body.dataset.tab = doc.body.dataset.tab || "";
+  for (const selector of [".topbar .sections", ".tabbar"]) {
+    const here = document.querySelector(selector);
+    const there = doc.querySelector(selector);
+    if (!here || !there) continue;
+    const keys = (nav) => [...nav.querySelectorAll("a[data-tab]")].map((a) => a.dataset.tab).join(" ");
+    if (keys(here) !== keys(there)) {  // a section became a tab or stopped being one
+      here.replaceWith(document.importNode(there, true));
+      continue;
+    }
+    here.querySelectorAll("a[data-tab]").forEach((a) => {
+      const b = there.querySelector(`a[data-tab="${CSS.escape(a.dataset.tab)}"]`);
+      a.setAttribute("href", b.getAttribute("href"));
+      if (b.hasAttribute("aria-current")) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+  }
+  const icon = doc.querySelector(".tabcurrent");
+  if (icon) document.querySelector(".tabcurrent")?.replaceChildren(...[...icon.childNodes].map((n) => document.importNode(n, true)));
+}
+
+let feedLoad = null;
+// push: a new history entry (a tap); otherwise the current one is updated (Back, or a refresh)
+async function showFeed(href, { push = false, tab = false } = {}) {
   const wrap = document.querySelector(".feedwrap");
-  const scrollLeft = wrap.querySelector(".cats")?.scrollLeft ?? 0;
-  const mine = ++feedRequest;
+  const scrollLeft = tab ? 0 : wrap.querySelector(".cats")?.scrollLeft ?? 0;
+  feedLoad?.abort();  // a later tap wins
+  const load = feedLoad = new AbortController();
+  wrap.classList.add("swapping");
+  wrap.querySelector("#stream")?.setAttribute("aria-busy", "true");
+  const skeleton = setTimeout(() => showSkeleton(wrap, tab), SKELETON_DELAY);
   try {
-    const response = await fetch(href, { headers: { Accept: "text/html" } });
-    if (!response.ok || response.redirected) throw new Error(response.statusText);
+    const response = await fetch(href, { headers: { Accept: "text/html" }, signal: load.signal });
+    // Refresh (?refresh=1) redirects back to the feed; anything else (the login page) loads for real
+    const landed = new URL(response.url);
+    if (!response.ok || landed.origin !== location.origin || landed.pathname !== "/") throw new Error(response.statusText);
     const doc = new DOMParser().parseFromString(await response.text(), "text/html");
     const fresh = doc.querySelector(".feedwrap");
     if (!fresh) throw new Error("no feed");
-    if (mine !== feedRequest) return;  // a later tap won
+    if (load !== feedLoad) return;
+    clearTimeout(skeleton);
     wrap.replaceChildren(...fresh.childNodes);
+    wrap.dataset.href = fresh.dataset.href;
     document.title = doc.title;
-    if (push) history.pushState({ feed: true }, "", href);
+    syncDock(doc);
+    const state = { feed: true, href: fresh.dataset.href };
+    const address = landed.pathname + landed.search;
+    if (push) history.pushState(state, "", address);
+    else history.replaceState(state, "", address);
     setupCats(scrollLeft);
     applyBanner();
     rememberNewsChip();
     trackStories(wrap.querySelectorAll("[data-track-seen] .story"));
     watchLoadMore();
-  } catch {
-    location.href = href;
+  } catch (error) {
+    if (error.name !== "AbortError" && load === feedLoad) location.href = href;
+  } finally {
+    clearTimeout(skeleton);
+    if (load === feedLoad) {
+      feedLoad = null;
+      wrap.classList.remove("swapping");
+    }
   }
 }
+
+// A dock tab: lit at once, back to the top, its stories follow. Tapping the tab you are on refreshes
+// (its link carries refresh=1), with the same placeholders instead of a blank reload.
+document.addEventListener("click", (event) => {
+  const tab = event.target.closest(".sections a[data-tab], .tabbar a[data-tab]");
+  if (!tab || !plainClick(event) || !swapsInPlace()) return;
+  event.preventDefault();
+  let href = tab.href;
+  // News reopens the chip I was on inside it (tapping News while on it goes back to its All)
+  if (tab.dataset.tab === "headlines" && document.body.dataset.tab !== "headlines") {
+    let saved = null;
+    try { saved = sessionStorage.getItem(NEWS_CHIP); } catch { /* storage blocked */ }
+    if (saved) href = new URL(saved, location.href).href;
+  }
+  const refresh = new URL(href).searchParams.has("refresh");
+  lightTab(tab.dataset.tab);
+  scrollTo({ top: 0, behavior: "instant" });
+  showFeed(href, { push: !refresh, tab: true });
+});
 
 document.addEventListener("click", (event) => {
   const more = event.target.closest(".cats-more");
@@ -566,16 +652,20 @@ document.addEventListener("click", (event) => {
   // Light the chip at once; the stories follow
   link.parentElement.querySelectorAll("a").forEach((a) => a.removeAttribute("aria-current"));
   link.setAttribute("aria-current", "true");
-  showFeed(link.href, true);
+  showFeed(link.href, { push: true });
 });
-addEventListener("popstate", (event) => { if (event.state?.feed) showFeed(event.state.href || location.href, false); });
+addEventListener("popstate", (event) => {
+  if (!event.state?.feed || !swapsInPlace()) return;
+  // Closing search goes Back to the view already on screen: nothing to load
+  if (event.state.href === document.querySelector(".feedwrap").dataset.href) return;
+  showFeed(event.state.href || location.href, { tab: true });
+});
 document.addEventListener("DOMContentLoaded", () => {
   rememberNewsChip();
-  const nav = document.querySelector(".cats");
-  if (!nav) return;
-  // So Back to the first category swaps too. A bare / follows the filter cookie, which later taps
-  // change, so remember the selected chip's own address.
-  history.replaceState({ feed: true, href: nav.querySelector('[aria-current="true"]')?.href }, "");
+  // So Back to the first view swaps too. A bare / follows the filter cookie, which later taps
+  // change, so remember the view's own address.
+  const wrap = document.querySelector(".feedwrap[data-href]");
+  if (wrap && !history.state?.search) history.replaceState({ feed: true, href: wrap.dataset.href }, "");
   setupCats();
 });
 // Backup for browsers where the observer does not fire: check on scroll, at most once per frame
