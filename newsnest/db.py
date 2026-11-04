@@ -222,6 +222,12 @@ MIGRATIONS: list[str] = [
         config_fp TEXT NOT NULL, format INTEGER NOT NULL, payload TEXT NOT NULL
     )
     """,
+    # ranking a new feed session: without these, the reader's engagement and the sources on trial were looked
+    # up by reading every story ever stored, so it got slower each day (newsnest.feed._affinity, _new_sources)
+    """
+    CREATE INDEX IF NOT EXISTS items_opened ON items(opened_at) WHERE opened_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS items_source_fetched ON items(source_id, fetched_at)
+    """,
 ]
 
 

@@ -330,3 +330,29 @@ def test_weight_strength_buckets():
     assert weight_strength(1.1) == ("more", 1) and weight_strength(1.25) == ("more", 2)  # one "More about"
     assert weight_strength(0.75) == ("less", 2)  # one "Less from"
     assert weight_strength(WEIGHT_MAX) == ("more", 3) and weight_strength(WEIGHT_MIN) == ("less", 3)
+
+
+def test_ranking_lookups_do_not_read_every_stored_story(db, cfg, monkeypatch):
+    """A new feed session is ranked on tab switches too: its lookups must use indexes, not scan all of history."""
+    import newsnest.feed as feed_mod
+    plans = []
+    real = db.execute
+
+    class Spy:
+        def execute(self, sql, params=()):
+            if "GROUP BY" in sql:
+                plans.append([r[3] for r in real("EXPLAIN QUERY PLAN " + sql, params)])
+            return real(sql, params)
+
+    spy = Spy()
+    feed_mod._affinity(spy)
+    feed_mod._turned_down(spy)
+    feed_mod._new_sources(spy, 14, set(), NOW)
+    assert len(plans) == 3
+    for plan in plans:
+        assert not any(step.startswith("SCAN") for step in plan), plan
+    # Same answers as before: a source with only recent stories is new, one with an old story is not
+    add(db, cfg, "a", "Old story", "https://a.si/old", NOW - timedelta(days=30))
+    add(db, cfg, "a", "New story", "https://a.si/new")
+    add(db, cfg, "b", "New story too", "https://b.si/new")
+    assert feed_mod._new_sources(db, 14, set(), NOW) == {"b"}
