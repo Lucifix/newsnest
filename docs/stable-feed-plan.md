@@ -1,7 +1,6 @@
 # Stable feed sessions
 
-Status: phase 1 built (`newsnest/feedsession.py`, tests in `tests/test_feedsession.py`). Phase 2
-(Refresh button) ships with it; `/?refresh=1` already works.
+Status: phases 1 and 2 built (`newsnest/feedsession.py`, tests in `tests/test_feedsession.py`); phase 3 later.
 
 ## Problem
 
@@ -30,7 +29,7 @@ current state of each story overlaid. This is how Discover-style feeds and RSS r
 **A session starts** when:
 - the device has no session cookie (first visit, cleared cookies), or the session is unknown;
 - more than `feed.session_idle_minutes` (default 45) passed since the device last used it;
-- the reader asks for it: Refresh (`/?refresh=1`) or Mark all read;
+- the reader asks for it: tapping the tab they are on (`/?refresh=1`) or Mark all read;
 - the config or source list changed (config fingerprint);
 - the stored format is from another release (format version).
 
@@ -53,7 +52,11 @@ Signals (impressions, reads, opens, weights) are recorded exactly as before; the
    Back and `/feed/more` read the session; Mark all read reads it and then ends it. The in-memory
    snapshot is retired. Kill switch: `feed.stable_sessions: false` builds a new session on every page
    load, which is the old behaviour.
-2. **Refresh control** in the masthead (`/?refresh=1`). Ships together with phase 1.
+2. **Refresh: tap the tab you are on.** As in most feed apps (X, Instagram, Reddit, YouTube, Google
+   News), tapping the active tab at its All starts a new session (`/?f=<tab>&refresh=1`); from a chip
+   inside the tab the first tap goes back to All. No new button. Needed because reloading (and the
+   browser's pull to refresh, which reloads) now keeps the order on purpose: without it, an installed
+   app shows no new stories until the reader has been away for the idle time.
 3. **"N new stories" pill** (later): stories fetched after the session started that would make the feed;
    a top story is named, so breaking news is not hidden until the next session.
 
@@ -67,9 +70,9 @@ Signals (impressions, reads, opens, weights) are recorded exactly as before; the
 | Rollback to an older image | The old code ignores the table and the cookie; `migrate()` accepts a newer database. Do not set `stable_sessions` / `session_idle_minutes` in config.yaml before rolling back (older releases reject unknown keys) |
 | Database growth | Sessions unused for 24 h are deleted, at most 20 kept |
 | A write per feed request (`last_used_at`) | SQLite WAL, one worker; `/api/seen` already writes |
-| Someone prefers immediate removal | Kill switch, Refresh |
+| Someone prefers immediate removal | Kill switch, tap the tab |
 
-Trade-off: new stories wait for the next session or Refresh (phase 3 handles breaking news). Reading a
+Trade-off: new stories wait for the next session or a tap on the tab (phase 3 handles breaking news). Reading a
 single article for longer than the idle time brings back a fresh ranking.
 
 ## Verification

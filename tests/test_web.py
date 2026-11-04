@@ -195,7 +195,8 @@ def test_add_rename_reorder_and_remove_a_section(client, env):
     assert 'data-tab="sports"' not in client.get("/").text
     client.post("/settings/feed_add", data={"name": "Sport24", "url": "https://sport.example/rss", "category": "sports"})
     page = client.get("/?f=sports").text
-    assert '<a href="/?f=sports" data-tab="sports" aria-current="page">' in page and "<span>Sports</span>" in page
+    # the tab you are on refreshes when tapped again (newsnest.feedsession)
+    assert '<a href="/?f=sports&amp;refresh=1" data-tab="sports" aria-current="page">' in page and "<span>Sports</span>" in page
 
     # renamed, made a chip, moved up
     client.post("/settings/section_edit", data={"key": "sports", "label": "Sport  talk", "icon": "film"})
@@ -501,13 +502,15 @@ def test_for_you_tab_leaves_a_remembered_section(client):
     client.get("/?f=tech")  # remembered in the filter cookie, so a bare / would reopen Tech
     page = client.get("/?f=tech").text
     assert 'href="/?f=all"' in page
-    assert '<a href="/?f=tech" data-tab="tech" aria-current="page">' in page
+    assert '<a href="/?f=tech&amp;refresh=1" data-tab="tech" aria-current="page">' in page
     page = client.get("/?f=all").text
-    assert '<a href="/?f=all" data-tab="all" aria-current="page">' in page
+    assert '<a href="/?f=all&amp;refresh=1" data-tab="all" aria-current="page">' in page
     # News is one tab for Local and World: a Local or World filter lights it, and an old link still works
     for f in ("headlines", "news", "world", "cat:news:Slovenia"):
         page = client.get(f"/?f={f}").text
-        assert '<a href="/?f=headlines" data-tab="headlines" aria-current="page">' in page, f
+        # at News's All a tap refreshes; from Local, World or a category it goes back to All first
+        again = "&amp;refresh=1" if f == "headlines" else ""
+        assert f'<a href="/?f=headlines{again}" data-tab="headlines" aria-current="page">' in page, f
     assert 'href="/?f=world"' not in client.get("/?f=all").text  # World is a chip inside News, not a tab
 
 

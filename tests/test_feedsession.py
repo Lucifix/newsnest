@@ -212,3 +212,18 @@ def test_the_migration_adds_the_table_to_an_existing_database(env):
     assert migrate(conn) == len(MIGRATIONS)
     assert conn.execute("SELECT COUNT(*) FROM feed_sessions").fetchone()[0] == 0
     conn.close()
+
+
+def test_tapping_the_tab_you_are_on_refreshes(db, cfg, client):
+    stories(db, cfg)
+    page = client.get("/?f=all").text
+    assert page.count('href="/?f=all&amp;refresh=1" data-tab="all"') == 2  # top bar and dock
+    assert 'href="/?f=headlines" data-tab="headlines"' in page
+    # Inside a part or chip of a tab the first tap goes back to its All, without a refresh
+    assert 'href="/?f=headlines&amp;refresh=1" data-tab="headlines"' in client.get("/?f=headlines").text
+    assert 'href="/?f=headlines" data-tab="headlines"' in client.get("/?f=news").text
+    first = order(client.get("/?f=all").text)
+    client.get(f"/go/{first[0]}", follow_redirects=False)
+    assert first[0] not in order(client.get("/?f=all&refresh=1").text)
+    # Other pages have no refresh link
+    assert "refresh=1" not in client.get("/saved").text

@@ -27,6 +27,10 @@
 {# explicit ?f=all: a bare / reopens the section remembered in the filter cookie. The tabs come from the
    sections in config.yaml: one shows once it has a feed to read. #}
 {% set sections = dock(section) %}
+{# Tapping the tab you are on, at its All, is Refresh (a new feed session: fresh ranking, new stories), as in
+   most feed apps; from a chip inside it, the first tap goes back to All #}
+{% set refresh_tab = feed.active if feed is defined and path == '/' else none %}
+{% macro tab_href(key) %}/?f={{ key }}{% if key == refresh_tab %}&amp;refresh=1{% endif %}{% endmacro %}
 <header class="topbar">
   <a class="brand" href="/" aria-label="NewsNest, today's digest">
     {{ logo_mark() }}
@@ -34,7 +38,7 @@
   </a>
   <nav class="sections" aria-label="Sections">
     {% for tab in sections %}
-    <a href="/?f={{ tab.key }}" data-tab="{{ tab.key }}" {% if tab.key == section %}aria-current="page"{% endif %}>{{ tab.label }}</a>
+    <a href="{{ tab_href(tab.key) }}" data-tab="{{ tab.key }}" {% if tab.key == section %}aria-current="page"{% endif %}>{{ tab.label }}</a>
     {% endfor %}
   </nav>
   {# Desktop search: the field grows out of the magnifier #}
@@ -98,7 +102,7 @@
 <div class="dock">
 <nav class="tabbar" aria-label="Sections" style="--tabs: {{ sections|length }}">
   {% for tab in sections %}
-  <a href="/?f={{ tab.key }}" data-tab="{{ tab.key }}" {% if tab.key == section %}aria-current="page"{% endif %}>
+  <a href="{{ tab_href(tab.key) }}" data-tab="{{ tab.key }}" {% if tab.key == section %}aria-current="page"{% endif %}>
     {{ section_icon(tab.icon) }}
     <span>{{ tab.label }}</span></a>
   {% endfor %}
