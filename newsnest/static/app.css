@@ -862,6 +862,9 @@ a.chip { text-decoration: none; }
 .feedwrap.swapping .stream > :not(.skel-feed) { opacity: 0.45; transition: opacity 0.15s ease; }
 .feedwrap.swapping .readall { opacity: 0.45; pointer-events: none; }  /* would mark the old tab read */
 .skel-feed { display: grid; gap: 14px; animation: skel-in 0.2s ease both; }
+/* The new stories fade up from the dimmed level, so the swap reads as one movement (the masthead stays put) */
+.feedwrap.swapped > .cats, .feedwrap.swapped > .callout, .feedwrap.swapped > .stream { animation: feed-in 0.18s ease-out both; }
+@keyframes feed-in { from { opacity: 0.45; } }
 @keyframes skel-in { from { opacity: 0; } }
 .skel-card {
   display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 0 14px; align-items: start;
@@ -890,7 +893,7 @@ a.chip { text-decoration: none; }
 @keyframes skel-sheen { from { background-position: 100vw 0; } to { background-position: -100vw 0; } }
 @media (prefers-reduced-motion: reduce) {
   .skel { animation: none; background: var(--surface-3); }
-  .skel-feed { animation: none; }
+  .skel-feed, .feedwrap.swapped > .cats, .feedwrap.swapped > .callout, .feedwrap.swapped > .stream { animation: none; }
   .feedwrap.swapping .stream > :not(.skel-feed) { transition: none; }
 }
 

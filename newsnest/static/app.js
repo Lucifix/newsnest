@@ -520,9 +520,13 @@ function rememberNewsChip() {
 }
 // ---------- the feed swaps in place: dock tabs, category chips, Back ----------
 // The tapped tab or chip lights at once and the old stories dim; if the server takes a moment (ranking a
-// new feed session can), placeholder cards hold the place until the stories arrive. A quick answer swaps
-// straight in, without a flash of placeholders. Anything unexpected falls back to loading the page.
-const SKELETON_DELAY = 120;  // ms
+// new feed session can), placeholder cards hold the place until the stories arrive. Two timers keep the
+// placeholders from flickering: an answer within SKELETON_DELAY swaps straight in and never shows them,
+// and once shown they stay at least SKELETON_MIN, so they never flash by. Anything unexpected falls back
+// to loading the page.
+const SKELETON_DELAY = 250;  // ms
+const SKELETON_MIN = 400;    // ms
+let skeletonShownAt = null;  // when the placeholders on screen appeared (a later tap keeps them up)
 const SKELETON_CARD = '<div class="skel-card"><div class="skel-text"><i class="skel skel-meta"></i>' +
   '<i class="skel skel-title"></i><i class="skel skel-title short"></i><i class="skel skel-line"></i></div><i class="skel skel-thumb"></i></div>';
 const SKELETON = '<div class="skel-feed" aria-hidden="true"><div class="skel-card big"><i class="skel skel-media"></i>' +
@@ -535,9 +539,12 @@ const plainClick = (event) => !(event.button > 0 || event.metaKey || event.ctrlK
 
 function showSkeleton(wrap, tab) {
   const stream = wrap.querySelector("#stream");
-  if (!stream || stream.querySelector(".skel-feed")) return;
-  stream.innerHTML = SKELETON;
-  if (!tab) return;
+  if (!stream) return;
+  if (!stream.querySelector(".skel-feed")) {
+    stream.innerHTML = SKELETON;
+    skeletonShownAt = performance.now();
+  }
+  if (!tab || wrap.querySelector(".skel-chips")) return;
   // Another tab: its chips and notes are not known yet either
   wrap.querySelectorAll(".callout").forEach((c) => c.remove());
   const cats = wrap.querySelector(".cats");
@@ -583,6 +590,7 @@ async function showFeed(href, { push = false, tab = false } = {}) {
   const scrollLeft = tab ? 0 : wrap.querySelector(".cats")?.scrollLeft ?? 0;
   feedLoad?.abort();  // a later tap wins
   const load = feedLoad = new AbortController();
+  wrap.classList.remove("swapped");
   wrap.classList.add("swapping");
   wrap.querySelector("#stream")?.setAttribute("aria-busy", "true");
   const skeleton = setTimeout(() => showSkeleton(wrap, tab), SKELETON_DELAY);
@@ -595,8 +603,15 @@ async function showFeed(href, { push = false, tab = false } = {}) {
     const fresh = doc.querySelector(".feedwrap");
     if (!fresh) throw new Error("no feed");
     if (load !== feedLoad) return;
-    clearTimeout(skeleton);
+    clearTimeout(skeleton);  // arrived in time: the placeholders never show
+    if (skeletonShownAt !== null) {  // already showing: keep them up long enough not to flash
+      const wait = SKELETON_MIN - (performance.now() - skeletonShownAt);
+      if (wait > 0) await new Promise((resolve) => { setTimeout(resolve, wait); });
+      if (load !== feedLoad) return;  // tapped elsewhere meanwhile
+    }
+    skeletonShownAt = null;
     wrap.replaceChildren(...fresh.childNodes);
+    wrap.classList.add("swapped");  // the new stories fade in
     wrap.dataset.href = fresh.dataset.href;
     document.title = doc.title;
     syncDock(doc);
