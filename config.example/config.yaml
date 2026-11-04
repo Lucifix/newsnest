@@ -249,6 +249,11 @@ feed:
   new_source_stories: 2
   # Mark a story read once it has been on screen and you scroll past it (Settings → General).
   auto_read_on_scroll: false
+  # The order holds still while you read, switch tabs or come back from an article; a fresh ranking comes
+  # after this many minutes away, or on Refresh / Mark all read. stable_sessions: false ranks again on
+  # every page load (the old behaviour).
+  # session_idle_minutes: 45
+  # stable_sessions: true
 
 discovery:
   # Discovered sources: feeds on trial from OPML imports or the feed catalog (Settings → Discover).

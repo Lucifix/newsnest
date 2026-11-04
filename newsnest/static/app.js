@@ -976,6 +976,90 @@ if (searchLayer) {
   document.addEventListener("keydown", (event) => { if (event.key === "Escape" && searching()) closeSearch(); });
 }
 
+// ---------- refresh: on the feed, a fresh ranking (a new feed session); anywhere else, a reload ----------
+// The feed keeps its order through reloads on purpose (newsnest.feedsession), so a plain reload would
+// bring nothing new. Refresh asks the server for a new session for the chip I'm on (it redirects back).
+const feedPage = !!document.getElementById("stream");
+function refreshPage() {
+  if (!feedPage) { location.reload(); return; }
+  const url = new URL(location.href);
+  url.hash = "";
+  url.searchParams.delete("n");
+  url.searchParams.set("refresh", "1");
+  location.replace(url.href);  // no extra history entry: Back still leaves the feed
+}
+
+// Pull to refresh on the feed: pull down from the very top and let go past the mark. The browser's own
+// pull-to-reload is off on this page (app.css), since a reload keeps the order. Touch only; buttons
+// (Refresh in the ⋯ menu) does the same for everyone else.
+if (feedPage && "ontouchstart" in window) {
+  const ARM = 64;   // how far the indicator travels before letting go refreshes
+  const MAX = 96;
+  document.documentElement.classList.add("pull-refresh");
+  const ptr = document.createElement("div");
+  ptr.className = "ptr";
+  ptr.setAttribute("aria-hidden", "true");
+  ptr.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>';
+  document.body.append(ptr);
+  let start = null;    // {x, y} of the touch, while a pull may be under way
+  let vertical = null; // decided on the first few pixels: a pull down, or something else (chips, scrolling)
+  let travel = 0;
+  let busy = false;
+
+  const atTop = () => (document.scrollingElement || document.documentElement).scrollTop <= 0;
+  const overlayOpen = () => {
+    if (searching() || document.querySelector(".sheet:not([hidden])")) return true;
+    try { return !!document.querySelector(":popover-open"); } catch { return false; }
+  };
+  const show = (distance) => {
+    travel = distance;
+    ptr.style.setProperty("--pull", `${distance}px`);
+    ptr.style.setProperty("--turn", `${Math.min(1, distance / ARM) * 300}deg`);
+    ptr.classList.toggle("armed", distance >= ARM);
+    ptr.classList.add("pulling");
+  };
+  const reset = () => {
+    start = vertical = null;
+    travel = 0;
+    ptr.classList.remove("pulling", "armed");
+    ptr.style.removeProperty("--pull");
+  };
+
+  addEventListener("touchstart", (event) => {
+    if (busy || event.touches.length !== 1 || !atTop() || overlayOpen()
+        || event.target.closest("input, textarea, select, [contenteditable]")) { start = null; return; }
+    start = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    vertical = null;
+  }, { passive: true });
+
+  addEventListener("touchmove", (event) => {
+    if (!start || event.touches.length !== 1) return;
+    const dx = event.touches[0].clientX - start.x;
+    const dy = event.touches[0].clientY - start.y;
+    if (vertical === null) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      vertical = dy > 0 && dy > Math.abs(dx) * 1.5;
+      if (!vertical) { reset(); return; }
+    }
+    if (!atTop() || dy <= 0) { reset(); return; }
+    show(Math.min(MAX, dy * 0.5));  // resistance: the indicator moves half as far as the finger
+  }, { passive: true });
+
+  addEventListener("touchend", () => {
+    if (!start) return;
+    if (travel < ARM) { reset(); return; }  // not far enough: it slides back
+    start = null;
+    busy = true;
+    ptr.classList.remove("pulling", "armed");
+    ptr.classList.add("refreshing");        // stays at the mark and spins until the new page arrives
+    ptr.style.setProperty("--pull", `${ARM}px`);
+    refreshPage();
+  });
+  addEventListener("touchcancel", reset);
+  // Back to a page restored from the browser's cache: no spinner left behind
+  addEventListener("pageshow", () => { busy = false; ptr.classList.remove("refreshing"); reset(); });
+}
+
 // ---------- PWA: service worker, install, refresh ----------
 if ("serviceWorker" in navigator && window.isSecureContext) {
   addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => { /* not installable here; the site still works */ }));
@@ -1018,7 +1102,7 @@ document.addEventListener("DOMContentLoaded", () => {
     installEvent = null;
     renderInstallPanel();
   });
-  document.querySelectorAll("[data-refresh]").forEach((b) => b.addEventListener("click", () => location.reload()));
+  document.querySelectorAll("[data-refresh]").forEach((b) => b.addEventListener("click", refreshPage));
 });
 
 

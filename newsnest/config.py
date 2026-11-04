@@ -197,6 +197,11 @@ class HomeFeedCfg(_Strict):
     new_source_stories: int = 2
     # Mark stories read once they have been on screen and are scrolled past (not counted as "opened")
     auto_read_on_scroll: bool = False
+    # The feed's order is computed once per session and kept while you read, switch tabs or come back
+    # from an article; a new session (fresh ranking) starts after this many minutes away, on Refresh
+    # or Mark all read. stable_sessions: false ranks again on every page load (the old behaviour)
+    stable_sessions: bool = True
+    session_idle_minutes: float = Field(default=45, gt=0)
 
 
 class DiscoveryCfg(_Strict):
