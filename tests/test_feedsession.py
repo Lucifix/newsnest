@@ -172,6 +172,22 @@ def test_a_changed_config_damaged_or_old_format_session_is_ranked_again(db, cfg)
     assert feedsession.resume(db, cfg, SOURCES, sid) is None
     assert feedsession.resume(db, cfg, SOURCES, None) is None
     assert feedsession.resume(db, cfg, SOURCES, "unknown") is None
+    assert feedsession.resume(db, cfg, SOURCES, "x" * 16 + "\r\nSet-Cookie: a=b") is None
+
+
+def test_the_cookie_only_ever_carries_a_stored_session_id(db, cfg, client):
+    stories(db, cfg)
+    client.cookies.set(feedsession.COOKIE, "forged;path=/")
+    r = client.get("/")
+    sid = r.cookies.get(feedsession.COOKIE)
+    assert sid != "forged;path=/" and db.execute("SELECT 1 FROM feed_sessions WHERE id = ?", (sid,)).fetchone()
+    def flags(response):
+        header = next(h for h in response.headers.get_list("set-cookie") if h.startswith(feedsession.COOKIE + "="))
+        return {part.strip().split("=")[0].lower() for part in header.split(";")[1:]}
+    assert "httponly" in flags(r) and "secure" not in flags(r)
+    r = client.get("/", headers={"x-forwarded-proto": "https"})
+    assert r.cookies.get(feedsession.COOKIE) == sid  # the same session, now marked secure
+    assert "secure" in flags(r)
 
 
 def test_touch_keeps_a_session_alive_but_never_revives_one(db, cfg):

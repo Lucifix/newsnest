@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import secrets
 import sqlite3
 from collections import Counter
@@ -33,6 +34,8 @@ FORMAT = 1
 # Sessions nobody used for this long are deleted, and only the newest few are kept
 KEEP = timedelta(hours=24)
 KEEP_MAX = 20
+# What start() hands out (secrets.token_urlsafe(12)); anything else is not looked up
+_SID = re.compile(r"[A-Za-z0-9_-]{16}")
 
 
 def config_fingerprint(cfg: Config, sources: list[Source]) -> str:
@@ -97,7 +100,15 @@ def resume(conn: sqlite3.Connection, cfg: Config, sources: list[Source], sid: st
            now: datetime | None = None) -> Ranking | None:
     """The session's ranking, or None when there is no usable session (unknown, idle too long, another
     config or format, damaged). Using it keeps it alive."""
-    if not sid:
+    found = _resume(conn, cfg, sources, sid, now)
+    return found[1] if found else None
+
+
+def _resume(conn: sqlite3.Connection, cfg: Config, sources: list[Source], sid: str | None,
+            now: datetime | None = None) -> tuple[str, Ranking] | None:
+    """The stored session id and its ranking. The id comes from the database, not from what the browser
+    sent, so it is safe to put in a cookie or a page."""
+    if not sid or not _SID.fullmatch(sid):
         return None
     now = now or utcnow()
     row = conn.execute("SELECT * FROM feed_sessions WHERE id = ?", (sid,)).fetchone()
@@ -108,8 +119,8 @@ def resume(conn: sqlite3.Connection, cfg: Config, sources: list[Source], sid: st
         ranking = _restore(conn, cfg, sources, row["payload"], parse_iso(row["created_at"]))
     except (KeyError, TypeError, ValueError, StopIteration):
         return None  # a damaged payload: rank again rather than fail the page
-    conn.execute("UPDATE feed_sessions SET last_used_at = ? WHERE id = ?", (iso(now), sid))
-    return ranking
+    conn.execute("UPDATE feed_sessions SET last_used_at = ? WHERE id = ?", (iso(now), row["id"]))
+    return row["id"], ranking
 
 
 def start(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now: datetime | None = None) -> tuple[str, Ranking]:
@@ -129,10 +140,8 @@ def start(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now: dat
 def open_session(conn: sqlite3.Connection, cfg: Config, sources: list[Source], sid: str | None,
                  fresh: bool = False, now: datetime | None = None) -> tuple[str, Ranking]:
     """The device's session, or a new one when it has none usable or fresh is asked for."""
-    ranking = None if fresh else resume(conn, cfg, sources, sid, now)
-    if ranking is not None:
-        return sid, ranking
-    return start(conn, cfg, sources, now)
+    found = None if fresh else _resume(conn, cfg, sources, sid, now)
+    return found or start(conn, cfg, sources, now)
 
 
 def touch(conn: sqlite3.Connection, cfg: Config, sid: str | None, now: datetime | None = None) -> None:

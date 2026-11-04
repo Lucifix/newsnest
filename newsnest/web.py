@@ -217,9 +217,8 @@ async def login(request: Request):
         return HTMLResponse(LOGIN_PAGE.format(error='<p class="err">Wrong password.</p>',
                                               next=html_escape(target, quote=True)), status_code=401)
     response = RedirectResponse(target, status_code=303)
-    secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     response.set_cookie(SESSION_COOKIE, _session_token(password), max_age=365 * 86400, httponly=True,
-                        samesite="lax", secure=secure)
+                        samesite="lax", secure=_https(request))
     return response
 
 
@@ -356,8 +355,14 @@ FILTER_COOKIE = "newsnest_filter"
 PAGE_SIZE = 20
 
 
-def _set_feed_cookie(response, sid: str) -> None:
-    response.set_cookie(feedsession.COOKIE, sid, max_age=7 * 86400, samesite="lax", httponly=True)
+def _https(request: Request) -> bool:
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+
+
+def _set_feed_cookie(request: Request, response, sid: str) -> None:
+    """sid is always a stored session's id from the database (newsnest.feedsession), never the cookie as sent."""
+    response.set_cookie(feedsession.COOKIE, sid, max_age=7 * 86400, samesite="lax", httponly=True,
+                        secure=_https(request))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -372,7 +377,7 @@ def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, refresh: in
     if refresh:
         sid, _ = feedsession.start(conn, cfg, sources)
         response = RedirectResponse(("/?" + urlencode({"f": f})) if f else "/", status_code=303)
-        _set_feed_cookie(response, sid)
+        _set_feed_cookie(request, response, sid)
         return response
     active = f or request.cookies.get(FILTER_COOKIE) or "all"
     # stable_sessions off: every page load ranks again (the session then only serves its own "load more")
@@ -385,7 +390,7 @@ def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, refresh: in
     response = render(request, "home.html", conn, loaded, feed=feed, token=token, suggestion=suggestion,
                       page=feed.items[:shown], next_offset=shown if shown < len(feed.items) else None)
     response.set_cookie(FILTER_COOKIE, feed.active, max_age=365 * 86400, samesite="lax")
-    _set_feed_cookie(response, sid)
+    _set_feed_cookie(request, response, sid)
     return response
 
 
