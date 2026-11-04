@@ -224,7 +224,8 @@ def test_the_migration_adds_the_table_to_an_existing_database(env):
     conn = connect()
     migrate(conn)
     conn.execute("DROP TABLE feed_sessions")
-    conn.execute("UPDATE schema_version SET version = ?", (len(MIGRATIONS) - 1,))
+    before = next(i for i, sql in enumerate(MIGRATIONS) if "CREATE TABLE feed_sessions" in sql)
+    conn.execute("UPDATE schema_version SET version = ?", (before,))
     assert migrate(conn) == len(MIGRATIONS)
     assert conn.execute("SELECT COUNT(*) FROM feed_sessions").fetchone()[0] == 0
     conn.close()

@@ -222,15 +222,21 @@ def _new_sources(conn: sqlite3.Connection, days: int, skip: set[str], now: datet
     """Sources still on trial: first story in the last `days` days and hardly any of them seen yet.
     Not discovered ones (they have their own trial)."""
     since = iso(now - timedelta(days=days))
-    rows = conn.execute("SELECT source_id FROM items GROUP BY source_id "
-                        "HAVING MIN(fetched_at) >= ? AND SUM(seen_count > 0) < ?", (since, TRIAL_IMPRESSIONS))
+    # Only the last `days` days are read (items_fetched; "+" keeps SQLite from walking all of
+    # items_source_fetched for the GROUP BY); a source with anything older is not new (items_source_fetched)
+    rows = conn.execute("SELECT source_id FROM items i WHERE fetched_at >= :since GROUP BY +source_id "
+                        "HAVING SUM(seen_count > 0) < :n AND NOT EXISTS (SELECT 1 FROM items o "
+                        "WHERE o.source_id = i.source_id AND o.fetched_at < :since)",
+                        {"since": since, "n": TRIAL_IMPRESSIONS})
     return {r["source_id"] for r in rows} - skip
 
 
 def _turned_down(conn: sqlite3.Connection) -> set[str]:
     """Categories with more 👎 than 👍 in the last 30 days: exploring does not push them."""
     since = iso(utcnow() - timedelta(days=30))
-    rows = conn.execute("SELECT ai_category FROM items WHERE ai_category IS NOT NULL AND rated_at >= ? "
+    # rating IS NOT NULL changes nothing (an unrated row counts for neither side) but lets items_rated be used
+    rows = conn.execute("SELECT ai_category FROM items WHERE ai_category IS NOT NULL AND rating IS NOT NULL "
+                        "AND rated_at >= ? "
                         "GROUP BY ai_category HAVING SUM(rating < 0) > SUM(rating > 0)", (since,))
     return {r["ai_category"] for r in rows}
 
