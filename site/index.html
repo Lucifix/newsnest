@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NewsNest: a news feed that learns what you care about</title>
-<meta name="description" content="NewsNest is a self-hosted, open-source news reader with no ads. It brings together the RSS feeds you choose, folds the same story from different outlets into one card, and uses AI (Anthropic's Claude) to rank and summarise it by your interests.">
+<meta name="description" content="NewsNest is a self-hosted, open-source news reader with no ads. It brings together the RSS feeds you choose, folds the same story from different outlets into one card, and uses AI (Anthropic's Claude, or a model of your choice, even a local one) to rank and summarise it by your interests.">
 <meta name="theme-color" content="#f2f2ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a0a0c" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32">
@@ -64,7 +64,7 @@
       <p class="eyebrow"><span class="dot"></span>Self-hosted · Open source · No ads</p>
       <h1>Your news. Your rules. <mark>No noise.</mark></h1>
       <p class="lede">NewsNest brings together the RSS feeds you choose, folds the same story from different
-        outlets into one card, and uses AI (Anthropic's Claude) to rank and summarise it by your interests. No ads, no
+        outlets into one card, and uses AI (Anthropic's Claude, or a local model) to rank and summarise it by your interests. No ads, no
         tracking, and it runs on your own machine.</p>
       <div class="cta">
         <a class="btn primary" href="#start">Get started
@@ -141,9 +141,9 @@
 
   <div class="ticker" aria-hidden="true">
     <div class="ticker-track">
-      <span>RSS</span><span>Atom</span><span>GitHub releases</span><span>OPML import</span><span>Claude</span><span>SQLite</span><span>Docker Compose</span><span>Installable PWA</span><span>Light &amp; dark</span><span>Full-text search</span><span>MIT licensed</span>
-      <span>RSS</span><span>Atom</span><span>GitHub releases</span><span>OPML import</span><span>Claude</span><span>SQLite</span><span>Docker Compose</span><span>Installable PWA</span><span>Light &amp; dark</span><span>Full-text search</span><span>MIT licensed</span>
-    </div>
+      <span>RSS</span><span>Atom</span><span>GitHub releases</span><span>OPML import</span><span>Claude</span><span>Ollama</span><span>SQLite</span><span>Docker Compose</span><span>Installable PWA</span><span>Light &amp; dark</span><span>Full-text search</span><span>MIT licensed</span>
+      <span>RSS</span><span>Atom</span><span>GitHub releases</span><span>OPML import</span><span>Claude</span><span>Ollama</span><span>SQLite</span><span>Docker Compose</span><span>Installable PWA</span><span>Light &amp; dark</span><span>Full-text search</span><span>MIT licensed</span>
+</div>
   </div>
 
   <!-- The five things NewsNest stands for; the feature groups below follow the same order -->
@@ -402,7 +402,7 @@
     <ol class="pipe">
       <li class="reveal"><span class="step mono">01</span><h3>Fetch</h3><p>RSS, Atom and GitHub releases, de-duplicated by URL.</p></li>
       <li class="reveal"><span class="step mono">02</span><h3>Group</h3><p>The same story across outlets becomes one.</p></li>
-      <li class="reveal"><span class="step mono">03</span><h3>Score</h3><p>Claude rates topic · importance · fit.</p></li>
+      <li class="reveal"><span class="step mono">03</span><h3>Score</h3><p>The AI rates topic · importance · fit.</p></li>
       <li class="reveal"><span class="step mono">04</span><h3>Rank</h3><p>Score × freshness × what you like.</p></li>
       <li class="reveal end"><span class="step mono">05</span><h3>Your feed</h3><p>Likes, opens and ratings flow back into the ranking.</p></li>
     </ol>
@@ -430,14 +430,15 @@
         </ul>
       </div>
       <div class="priv goes reveal">
-        <p class="priv-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Goes to the Anthropic API, with your key</p>
+        <p class="priv-head"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Goes to the Anthropic API, with your key (or the AI you chose)</p>
         <ul>
           <li>Headlines and snippets, with your interests file and your country and city, for scoring</li>
           <li>Article text, for key points</li>
           <li>Headlines you've rated, for drafting your interests and the weekly suggestions</li>
           <li>Links you paste into <em>Missed this</em></li>
         </ul>
-        <p class="fine">No key? Then nothing goes to Anthropic at all, and the feed shows newest first.</p>
+        <p class="fine">With a local model in Ollama, none of this leaves your network. No AI at all? Then nothing
+          goes out, and the feed shows newest first.</p>
       </div>
     </div>
   </section>
@@ -591,7 +592,8 @@
       <p class="eyebrow">Quick start</p>
       <h2 id="start-h">Up and running in five lines.</h2>
       <p class="sub">You need <a href="https://docs.docker.com/get-docker/">Docker</a> with Compose and, for the
-        AI features, an <a href="https://console.anthropic.com/">Anthropic API key</a>.</p>
+        AI features, an <a href="https://console.anthropic.com/">Anthropic API key</a> (or any OpenAI-compatible API,
+        including a local Ollama).</p>
     </div>
     <div class="start-grid">
       <div class="term reveal">

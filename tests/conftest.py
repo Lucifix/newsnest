@@ -17,6 +17,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("NEWSNEST_CONFIG_DIR", str(cfg_dir))
     monkeypatch.setenv("NEWSNEST_DATA_DIR", str(data_dir))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     return SimpleNamespace(config=cfg_dir, data=data_dir)
 
 
@@ -57,6 +58,28 @@ class FakeMessages:
 
 def fake_client(handler):
     return SimpleNamespace(messages=FakeMessages(handler))
+
+
+class FakeCompletions:
+    """Stands in for an OpenAI client's chat.completions; `handler(kwargs)` returns (text, finish_reason) or
+    (text, finish_reason, refusal). usage=None mimics a server that reports none."""
+
+    def __init__(self, handler, usage=True):
+        self.handler = handler
+        self.usage = usage
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        text, finish, *rest = self.handler(kwargs)
+        message = SimpleNamespace(content=text, refusal=rest[0] if rest else None)
+        usage = SimpleNamespace(prompt_tokens=3000, completion_tokens=500,
+                                prompt_tokens_details=SimpleNamespace(cached_tokens=2000)) if self.usage else None
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=finish)], usage=usage)
+
+
+def fake_openai_client(handler, usage=True):
+    return SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions(handler, usage)))
 
 
 def echo_scores(kwargs, topic=7, importance=5, personal=6):

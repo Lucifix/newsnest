@@ -57,7 +57,7 @@ LABEL_SCHEMA = {
 
 
 def normalize_label(label: str | None) -> str | None:
-    slug = slugify(label or "", LABEL_MAX)
+    slug = slugify(label if isinstance(label, str) else "", LABEL_MAX)
     return None if slug in ("", "x", "none", "null", "n-a") else slug
 
 
@@ -100,7 +100,9 @@ def run_labeling(conn: sqlite3.Connection, cfg: Config, ai: AIClient, max_batche
                     {"type": "text", "text": f"<active_events>\n{active_events_text(conn)}\n</active_events>"},
                     {"type": "text", "text": f"<items>\n{lines}\n</items>"}]}],
                 max_tokens=8000, effort=cfg.scoring.effort, schema=LABEL_SCHEMA)
-            answers = {e.get("id"): normalize_label(e.get("event")) for e in parse_json(result.text).get("items", [])}
+            entries = parse_json(result.text).get("items")
+            answers = {e.get("id"): normalize_label(e.get("event"))
+                       for e in (entries if isinstance(entries, list) else []) if isinstance(e, dict)}
         except (Refused, Truncated):
             answers = {}
         except BudgetExceeded:

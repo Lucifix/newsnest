@@ -9,7 +9,7 @@
 # Set it with "where you live" in Settings → General.
 timezone: UTC
 
-# Where you live. Claude ranks stories for someone living there, and Settings → Feeds offers the Local
+# Where you live. The AI ranks stories for someone living there, and Settings → Feeds offers the Local
 # news pack for your country (Slovenia, Germany, United States, United Kingdom so far).
 # country: empty = no local focus; city is optional.
 # tld:     feeds on this web domain always count as Local, e.g. ".de" (optional).
@@ -172,7 +172,7 @@ prefilter:
 scoring:
   # false = show everything unscored, newest first.
   enabled: true
-  # Claude model for the first pass and summaries.
+  # Model for the first pass and summaries (see the ai section below for other providers).
   model: claude-haiku-5-5
   # How much the model thinks: low | medium | high. Higher costs more.
   effort: low
@@ -198,7 +198,7 @@ scoring:
   summary_language: English
   # Calibration mode: show every item with scores and reasons, hide nothing.
   calibration_mode: true
-  # Fixed list of digest sections; Claude puts every item in exactly one ("Other" is always added).
+  # Fixed list of digest sections; the AI puts every item in exactly one ("Other" is always added).
   # "Local" is your city or area and "National" your country (set in Settings → General).
   categories:
     - Local
@@ -226,6 +226,8 @@ scoring:
     - Travel & outdoors
     - Other
   # Model for the rare, quality-sensitive jobs: "Draft my profile" and the weekly interests.md proposal.
+  # Use a strong one: small local models write a noticeably worse profile (ai.profile can send these
+  # jobs to another provider).
   profile_model: claude-opus-5-5
   # Days between automatic interests.md proposals (needs 10+ new ratings or misses). 0 = off.
   proposal_every_days: 7
@@ -278,8 +280,38 @@ digest:
   min_final: 5.0
 
 budget:
-  # Hard daily cap on Claude API spend in USD. When reached, AI calls stop and items show unscored.
+  # Hard daily cap on AI spend in USD. When reached, AI calls stop and items show unscored.
   daily_usd: 0.50
+
+# -----------------------------------------------------------------------------
+# AI provider
+# -----------------------------------------------------------------------------
+# Default: Claude through the Anthropic API, with ANTHROPIC_API_KEY. Leave this section out to keep it.
+# provider: openai talks to any OpenAI-compatible API: OpenAI, OpenRouter, Ollama, LM Studio, vLLM...
+# Set scoring.model and scoring.profile_model to model names that provider serves.
+#
+# ai:
+#   provider: openai
+#   # Empty = https://api.openai.com/v1. Ollama in the same stack: http://ollama:11434/v1
+#   # Ollama on this machine: http://host.docker.internal:11434/v1 (start Ollama with OLLAMA_HOST=0.0.0.0)
+#   # OpenRouter: https://openrouter.ai/api/v1
+#   base_url: http://ollama:11434/v1
+#   # Env var with the key. Empty = OPENAI_API_KEY (ANTHROPIC_API_KEY for provider: anthropic).
+#   # Local servers need no key. OpenRouter: api_key_env: OPENROUTER_API_KEY
+#   api_key_env: ""
+#   # Seconds per call. Local models on a CPU can need 600.
+#   timeout_seconds: 120
+#   # true sends scoring.effort as reasoning_effort; only reasoning models (o-series, gpt-5...) accept it.
+#   send_effort: false
+#   # schema = strict JSON schema (default). json = plain JSON mode, for servers that reject schemas.
+#   json_mode: schema
+#   # USD per million tokens [input, output]. Claude models are priced built in; any other model without
+#   # a price counts at Claude Opus rates, so the budget runs out early. "*" matches every model.
+#   prices:
+#     "*": [0, 0]
+#   # Optional: run the profile jobs (profile_model) somewhere else, e.g. local scoring + Claude for the profile:
+#   # profile:
+#   #   provider: anthropic
 
 heartbeat:
   # Alert if a news/tech feed returns 0 items for this many hours.

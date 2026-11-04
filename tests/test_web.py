@@ -67,6 +67,28 @@ def test_every_page_renders(client):
     assert client.get("/settings/nope").status_code == 404
 
 
+def test_status_and_settings_show_the_ai_provider(client, env):
+    general = client.get("/settings/general").text
+    assert "Anthropic" in general and "claude-haiku-5-5" in general and "claude-opus-5-5" in general
+    assert "ANTHROPIC_API_KEY is set" in client.get("/status").text
+    path = env.config / "config.yaml"
+    path.write_text(path.read_text().replace("model: claude-haiku-5-5", "model: qwen3:14b")
+                    + "\nai:\n  provider: openai\n  base_url: http://ollama:11434/v1\n"
+                      "  profile:\n    provider: anthropic\n")
+    general = client.get("/settings/general").text
+    assert "ollama:11434" in general and "qwen3:14b" in general and "Anthropic" in general
+    status = client.get("/status").text
+    assert "ollama:11434 · qwen3:14b" in status and "the AI server at ollama:11434 is reachable" in status
+    # after the first call the setup hint gives way to the missing-price warning, until a price is set
+    from newsnest.db import connect, set_meta
+    conn = connect()
+    set_meta(conn, "ai_status", '{"ok": true, "at": "2026-01-01T00:00:00+00:00"}')
+    conn.close()
+    assert "No price set for qwen3:14b" in client.get("/status").text
+    path.write_text(path.read_text() + "  prices:\n    '*': [0, 0]\n")
+    assert "No price set" not in client.get("/status").text
+
+
 def test_settings_menu_and_general_autosave(client, env):
     root = client.get("/settings").text
     assert 'class="settings is-root"' in root and 'href="/settings/feeds"' in root and "Profile &amp; tuning" in root

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from newsnest.ai import local_day, spent_today
+from newsnest.ai import ai_setup, local_day, setup_hint, spent_today
 from newsnest.config import LoadedConfig
 from newsnest.db import get_meta, loads, parse_iso, utcnow
 from newsnest.digest import day_bounds
@@ -81,7 +81,8 @@ def collect_status(conn: sqlite3.Connection, loaded: LoadedConfig, now: datetime
         budget_hit = get_meta(conn, "ai_budget_hit") == today
         pending = conn.execute("SELECT COUNT(*) FROM items WHERE score_status = 'pending'").fetchone()[0]
         ai_view = {"status": ai, "usage": dict(usage), "spent": spent_today(conn, cfg), "cap": cfg.budget.daily_usd,
-                   "budget_hit": budget_hit, "last_call": dict(last_call) if last_call else None, "pending": pending}
+                   "budget_hit": budget_hit, "last_call": dict(last_call) if last_call else None, "pending": pending,
+                   "setup": ai_setup(cfg), "hint": setup_hint(cfg)}
         if budget_hit:
             banner.append(f"Daily AI budget (${cfg.budget.daily_usd:.2f}) reached: new items are shown unscored until tomorrow")
         at = parse_iso(ai.get("at")) if ai else None
