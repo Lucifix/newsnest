@@ -1161,15 +1161,20 @@ function refreshPage() {
 
 // Pull to refresh on the feed: pull down from the very top and let go past the mark. The browser's own
 // pull-to-reload is off on this page (app.css), since a reload keeps the order. Touch only; buttons
-// (Refresh in the ⋯ menu) does the same for everyone else.
+// (Refresh in the ⋯ menu) does the same for everyone else. Once a pull has started, the touch belongs
+// to it until the finger lifts: moving back up only takes the indicator back in, it never scrolls the feed.
 if (feedPage && "ontouchstart" in window) {
   const ARM = 64;   // how far the indicator travels before letting go refreshes
-  const MAX = 96;
+  const MAX = 110;
   document.documentElement.classList.add("pull-refresh");
   const ptr = document.createElement("div");
   ptr.className = "ptr";
   ptr.setAttribute("aria-hidden", "true");
-  ptr.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>';
+  // a ring that fills as you pull, an arrow that flips when letting go will refresh
+  ptr.innerHTML = '<svg viewBox="0 0 24 24">'
+    + '<circle class="ptr-track" cx="12" cy="12" r="9"/>'
+    + '<circle class="ptr-ring" cx="12" cy="12" r="9" pathLength="100"/>'
+    + '<path class="ptr-arrow" d="M12 8.5v7M9 12.5l3 3 3-3"/></svg>';
   document.body.append(ptr);
   let start = null;    // {x, y} of the touch, while a pull may be under way
   let vertical = null; // decided on the first few pixels: a pull down, or something else (chips, scrolling)
@@ -1182,17 +1187,21 @@ if (feedPage && "ontouchstart" in window) {
     try { return !!document.querySelector(":popover-open"); } catch { return false; }
   };
   const show = (distance) => {
+    const wasArmed = travel >= ARM;
     travel = distance;
+    const progress = Math.min(1, distance / ARM);
     ptr.style.setProperty("--pull", `${distance}px`);
-    ptr.style.setProperty("--turn", `${Math.min(1, distance / ARM) * 300}deg`);
+    ptr.style.setProperty("--p", progress.toFixed(3));
     ptr.classList.toggle("armed", distance >= ARM);
     ptr.classList.add("pulling");
+    if (!wasArmed && distance >= ARM) navigator.vibrate?.(8);  // a tick where letting go starts to count
   };
   const reset = () => {
     start = vertical = null;
     travel = 0;
     ptr.classList.remove("pulling", "armed");
     ptr.style.removeProperty("--pull");
+    ptr.style.removeProperty("--p");
   };
 
   addEventListener("touchstart", (event) => {
@@ -1202,18 +1211,31 @@ if (feedPage && "ontouchstart" in window) {
     vertical = null;
   }, { passive: true });
 
+  // Not passive: once the pull owns the touch, the browser must not scroll with it
   addEventListener("touchmove", (event) => {
     if (!start || event.touches.length !== 1) return;
     const dx = event.touches[0].clientX - start.x;
     const dy = event.touches[0].clientY - start.y;
     if (vertical === null) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      // The first moves decide it; a downward one at the top has nothing to scroll anyway, so hold it
+      // back from the browser now (once it starts a scroll, later moves can't be stopped)
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
+        if (dy > 0 && dy >= Math.abs(dx) && event.cancelable) event.preventDefault();
+        return;
+      }
       vertical = dy > 0 && dy > Math.abs(dx) * 1.5;
-      if (!vertical) { reset(); return; }
+      if (!vertical) { start = vertical = null; return; }  // chips, a scroll: leave it to the browser
     }
-    if (!atTop() || dy <= 0) { reset(); return; }
-    show(Math.min(MAX, dy * 0.5));  // resistance: the indicator moves half as far as the finger
-  }, { passive: true });
+    if (event.cancelable) event.preventDefault();
+    show(Math.max(0, Math.min(MAX, rubber(dy))));
+  }, { passive: false });
+
+  // resistance that grows as you pull: easy at first, heavier past the mark
+  function rubber(dy) {
+    if (dy <= 0) return 0;
+    const linear = dy * 0.55;
+    return linear <= ARM ? linear : ARM + (MAX - ARM) * (1 - Math.exp(-(linear - ARM) / (MAX - ARM)));
+  }
 
   addEventListener("touchend", () => {
     if (!start) return;
@@ -1221,8 +1243,9 @@ if (feedPage && "ontouchstart" in window) {
     start = null;
     busy = true;
     ptr.classList.remove("pulling", "armed");
-    ptr.classList.add("refreshing");        // stays at the mark and spins until the new page arrives
+    ptr.classList.add("refreshing");        // settles at the mark and spins until the new page arrives
     ptr.style.setProperty("--pull", `${ARM}px`);
+    ptr.style.setProperty("--p", "1");
     refreshPage();
   });
   addEventListener("touchcancel", reset);
