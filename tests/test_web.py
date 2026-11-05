@@ -698,6 +698,6 @@ def test_source_icons_are_served_and_shown_unless_turned_off(client, env):
 
 def test_the_feed_names_its_own_view_for_in_place_tab_switches(client):
     """app.js swaps tabs in place and records each view's address for Back; a bare / says which view it is."""
-    assert 'class="feedwrap" data-href="/?f=tech"' in client.get("/?f=tech").text
-    assert 'class="feedwrap" data-href="/?f=tech"' in client.get("/").text   # the filter cookie reopens Tech
+    assert 'class="feedwrap home" data-href="/?f=tech"' in client.get("/?f=tech").text
+    assert 'class="feedwrap home" data-href="/?f=tech"' in client.get("/").text   # the filter cookie reopens Tech
     assert 'data-href="/?f=cat%3Aheadlines%3AWorld"' in client.get("/?f=cat:headlines:World").text

@@ -531,7 +531,7 @@ const SKELETON_CARD = '<div class="skel-card"><div class="skel-text"><i class="s
   '<i class="skel skel-title"></i><i class="skel skel-title short"></i><i class="skel skel-line"></i></div><i class="skel skel-thumb"></i></div>';
 const SKELETON = '<div class="skel-feed" aria-hidden="true"><div class="skel-card big"><i class="skel skel-media"></i>' +
   '<div class="skel-text"><i class="skel skel-meta"></i><i class="skel skel-title"></i><i class="skel skel-title short"></i>' +
-  `<i class="skel skel-line"></i><i class="skel skel-line"></i></div></div>${SKELETON_CARD.repeat(3)}</div>`;
+  `<i class="skel skel-line"></i><i class="skel skel-line"></i></div></div>${SKELETON_CARD.repeat(4)}</div>`;  // four: two full rows of the desktop grid
 const SKELETON_CHIPS = `<div class="cats skel-chips" aria-hidden="true">${'<i class="skel"></i>'.repeat(5)}</div>`;
 
 const swapsInPlace = () => !!document.body.dataset.tab && !!document.querySelector(".feedwrap #stream");

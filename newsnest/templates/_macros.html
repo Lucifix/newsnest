@@ -288,8 +288,10 @@
 
 {% macro feed_card(it, calibration) %}
 {% set c = it.card %}{% set r = c.lead.row %}
+{# lead: on desktop the first story heads the page, with the next few stacked beside it #}
+{% set place = ' lead' if it.first else '' %}
 {% if it.big %}
-<article {{ card_attrs(c, 'fcard big h' ~ hue(c.lead.source_name)) }}>
+<article {{ card_attrs(c, 'fcard big h' ~ hue(c.lead.source_name) ~ place) }}>
   <a class="big-media" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
     <img src="{{ c.image }}" alt="" decoding="async" referrerpolicy="no-referrer" loading="{{ 'eager' if it.first else 'lazy' }}">
     <span class="hero-mono">{{ initials(c.lead.source_name) }}</span>
@@ -302,7 +304,7 @@
   </div>
 </article>
 {% else %}
-<article {{ card_attrs(c, 'card fcard' ~ (' has-img' if c.image else '')) }}>
+<article {{ card_attrs(c, 'card fcard' ~ (' has-img' if c.image else '') ~ place) }}>
   <div class="card-text">
     {{ feed_meta(it) }}
     <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h3>

@@ -8,7 +8,8 @@
 {% set ok_sources = live_sources|rejectattr('health.level', 'equalto', 'failing')|list %}
 {% set hour = now_local.hour %}
 {# data-href: this view's own address, for Back and in-place tab switches (app.js showFeed) #}
-<div class="feedwrap" data-href="/?f={{ feed.active|urlencode }}">
+{# home: the desktop front page (lead story, two-column grid, categories in a rail) is scoped to it #}
+<div class="feedwrap home" data-href="/?f={{ feed.active|urlencode }}">
 {{ banner_box(banner) }}
 <header class="masthead">
   <p class="dateline">{{ now_local.strftime('%A, %d %B') }}</p>
@@ -26,9 +27,11 @@
 
 {% if feed.subchips %}
 {# One row: the parts of this tab (All, or All / Local / World on News), then its categories. The four
-   you read most show; the rest (except the selected one) fold behind More. #}
+   you read most show; the rest (except the selected one) fold behind More. On wide screens the row becomes a
+   rail beside the stories, with every category listed and its title showing. #}
 {% set extra = feed.subchips|selectattr('fold')|list|length %}
 <nav class="cats" aria-label="Categories">
+  <p class="cats-title">Categories</p>
   {% for chip in feed.subchips %}
   {% set classes = (['scope'] if chip.scope else ['c' ~ cat_hue(chip.label)]) + (['extra'] if chip.fold else []) %}
   <a class="{{ classes|join(' ') }}" href="/?f={{ chip.key|urlencode }}" {% if chip.key == feed.active %}aria-current="true"{% endif %}>

@@ -108,9 +108,11 @@ html { -webkit-text-size-adjust: 100%; scroll-padding-top: 110px; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--sans); }
 a { color: var(--link); }
 code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
-main { max-width: 1080px; margin: 0 auto; padding: 0 16px 56px; }
+/* --page: the width of a page's content; the top bar lines its brand and buttons up with it */
+:root { --page: 1080px; }
+main { max-width: var(--page); margin: 0 auto; padding: 0 16px 56px; }
 footer {
-  max-width: 1080px; margin: 0 auto; padding: 16px; text-align: center; color: var(--muted);
+  max-width: var(--page); margin: 0 auto; padding: 16px; text-align: center; color: var(--muted);
   font: 500 0.7rem var(--mono); text-transform: uppercase; letter-spacing: 0.03em;
 }
 footer .bad { color: var(--danger); font-weight: 700; }
@@ -143,7 +145,8 @@ footer .bad { color: var(--danger); font-weight: 700; }
 
 /* ---------- top bar ---------- */
 .topbar {
-  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 16px;
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 6px;
+  padding: 0 max(8px, (100% - var(--page)) / 2 + 8px) 0 max(16px, (100% - var(--page)) / 2 + 16px);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 .brand { display: flex; align-items: center; gap: 8px; margin-right: auto; text-decoration: none; color: var(--text); font: 700 1.15rem var(--display); padding: 10px 0; }
@@ -746,7 +749,9 @@ a.chip { text-decoration: none; }
 
 /* ---------- performance: long feeds on phones ---------- */
 /* Off-screen cards are not laid out or painted until they come near the viewport */
-.stream > .story { content-visibility: auto; contain-intrinsic-size: auto 260px; }
+.stream > .story, .textpair > .story { content-visibility: auto; contain-intrinsic-size: auto 260px; }
+/* Two stories without a photo; a grid cell on the desktop front page, invisible to the layout elsewhere */
+.textpair { display: contents; }
 .stream > .fcard.big { contain-intrinsic-size: auto 520px; }
 /* Shadows and zoom effects only where there is a mouse; flat cards scroll smoother on phones */
 .card, .fcard.big { box-shadow: none; }
@@ -1387,3 +1392,117 @@ input.chipinput:focus { outline: none; }
 .limit-row .srow-title .pill, .srow .srow-title .pill { vertical-align: 2px; margin-left: 4px; }
 .chart-narrow { display: none !important; }
 @media (max-width: 600px) { .chart-wide { display: none !important; } .chart-narrow { display: block !important; } }
+
+/* ---------- desktop front page: a lead package, then a river of stories, categories in a rail ---------- */
+/* Phones and small tablets keep the card column. From 960px the home feed reads like a front page: the first
+   story large on the left with the next three stacked beside it as headlines, then one list in rank order
+   (text left, photo right) divided by hairlines instead of boxed cards. The buttons come up on hover or focus.
+   From 1240px the category row becomes a rail on the right. Only the home feed (.feedwrap.home). */
+.cats-title { display: none; }
+@media (min-width: 960px) {
+  body.feedpage:not(.swipepage) { --page: 1032px; }
+  .feedwrap.home { max-width: none; }
+  /* Rows 1–3 hold the three headlines beside the lead; row 4 (1fr) takes whatever height the lead has
+     beyond them, so they stay together at the top instead of spreading out */
+  .feedwrap.home .stream {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); grid-template-rows: auto auto auto 1fr;
+    column-gap: 36px; row-gap: 0; align-content: start; margin-top: 22px;
+  }
+  .feedwrap.home .stream > * { grid-column: 1 / -1; }
+
+  /* No boxes: stories sit on the page, separated by hairlines */
+  .feedwrap.home .stream .story { background: transparent; border: 0; border-radius: 0; box-shadow: none; overflow: visible; padding: 0; }
+  .feedwrap.home .stream .story:hover { box-shadow: none; }
+  .feedwrap.home .stream .story.unseen::before { display: none; }  /* the NEW label says it */
+  .feedwrap.home .big-media { border-radius: 6px; }
+  .feedwrap.home .fcard.big .big-body { padding: 0; }
+  .feedwrap.home .story h3 a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+  /* The river: one story per row, text on the left at a readable measure, the photo on the right */
+  .feedwrap.home .stream > .story { padding: 22px 0; border-top: 1px solid var(--border); contain-intrinsic-size: auto 190px; }
+  .feedwrap.home .stream > .fcard.big, .feedwrap.home .stream > .card.fcard.has-img {
+    display: grid; grid-template-columns: minmax(0, 1fr) 232px; column-gap: 32px; align-items: start;
+  }
+  .feedwrap.home .stream > .fcard.big > .big-media { grid-column: 2; grid-row: 1; aspect-ratio: 3 / 2; }
+  .feedwrap.home .stream > .fcard.big > .big-body { grid-column: 1; grid-row: 1; min-width: 0; }
+  .feedwrap.home .stream > .card.fcard.has-img > .thumb-img { aspect-ratio: 3 / 2; border-radius: 6px; }
+  .feedwrap.home .stream > .card.fcard:not(.has-img) > .card-text { max-width: 760px; }
+  .feedwrap.home .stream .story h3 { margin: 8px 0 6px; font-size: 1.32rem; line-height: 1.2; letter-spacing: -0.02em; }
+  .feedwrap.home .stream .story .summary, .feedwrap.home .stream .story .snippet { font-size: 0.98rem; line-height: 1.5; }
+  .feedwrap.home .hero-mono { font-size: 2.6rem; }
+
+  /* The lead package: the first story spans the first rows on the left, the next three stack on the right */
+  .feedwrap.home .stream > .lead:first-child { grid-column: 1; grid-row: 1 / span 4; padding: 0 0 30px; border-top: 0; display: block; contain-intrinsic-size: auto 640px; }
+  .feedwrap.home .stream > .lead:first-child > .big-media { aspect-ratio: 16 / 9; margin-bottom: 18px; }
+  .feedwrap.home .stream > .lead:first-child h3 { margin: 10px 0 10px; font-size: clamp(2rem, 2.9vw, 2.6rem); line-height: 1.06; letter-spacing: -0.03em; }
+  .feedwrap.home .stream > .lead:first-child .summary, .feedwrap.home .stream > .lead:first-child .snippet { font-size: 1.08rem; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) {
+    grid-column: 2; display: block; padding: 18px 0; contain-intrinsic-size: auto 170px;
+  }
+  .feedwrap.home .stream > .lead:first-child + .story { padding-top: 0; border-top: 0; }
+  /* Beside the lead the headlines carry it; their photos would only make the column taller */
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) > :is(.big-media, .thumb-img) { display: none; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) h3 { font-size: 1.16rem; line-height: 1.22; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) :is(.summary, .snippet) {
+    font-size: 0.92rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+  }
+  /* The river starts below the package, across the full width */
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(5) { border-top: 2px solid var(--text); }
+
+  /* Quiet footer: the score chip stays; the reason line and the empty divider go */
+  .feedwrap.home .stream .slimfoot { margin-top: 2px; padding-top: 0; border-top: 0; }
+  .feedwrap.home .stream .whybox > summary { min-height: 30px; }
+  .feedwrap.home .stream > .story { padding-bottom: 16px; }
+  .feedwrap.home .stream .slimfoot > .acts.slim { top: 0; }
+  .feedwrap.home .stream .reasonline { display: none; }
+  .feedwrap.home .stream .sumbtn { min-height: 28px; margin-top: 6px; padding: 2px 0; border: 0; border-radius: 0; color: var(--muted); }
+  .feedwrap.home .stream .sumbtn:hover { background: transparent; color: var(--accent-text); }
+  /* The buttons come up on hover or keyboard focus; one that is on (liked, saved, read, menu open) stays */
+  @media (hover: hover) {
+    .feedwrap.home .stream .acts.slim .act:not([aria-pressed="true"], [aria-expanded="true"]) { opacity: 0; transition: opacity 0.15s; }
+    .feedwrap.home .stream .story:is(:hover, :focus-within) .acts.slim .act { opacity: 1; }
+  }
+
+  /* Placeholders while a tab loads take the same shape: the package, then the river */
+  .feedwrap.home .skel-feed { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 18px 36px; }
+  .feedwrap.home .skel-card { background: transparent; border: 0; padding: 0; }
+  .feedwrap.home .skel-card.big { grid-row: span 3; }
+  .feedwrap.home .skel-card.big .skel-text { padding: 18px 0 0; }
+  .feedwrap.home .skel-card.big .skel-media { border-radius: 6px; }
+  .feedwrap.home .skel-card:not(.big) { grid-template-columns: minmax(0, 1fr); }
+  .feedwrap.home .skel-card:not(.big) .skel-thumb { display: none; }
+  .feedwrap.home .skel-card:nth-child(n+5) { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) 232px; }
+  .feedwrap.home .skel-card:nth-child(n+5) .skel-thumb { display: block; aspect-ratio: 3 / 2; }
+}
+@media (min-width: 1240px) {
+  body.feedpage:not(.swipepage) { --page: 1352px; }
+  /* The rail spans every row of the page grid; the masthead, notes and stream stack in the first column */
+  .feedwrap.home { display: grid; grid-template-columns: minmax(0, 1fr) 260px; column-gap: 32px; row-gap: 0; align-items: start; }
+  .feedwrap.home > * { grid-column: 1; }
+  .feedwrap.home > .cats {
+    grid-column: 2; grid-row: 1 / span 8; position: sticky; top: calc(49px + 16px);
+    flex-direction: column; flex-wrap: nowrap; gap: 2px; margin: 36px 0 0; padding: 2px 0 2px 20px;
+    max-height: calc(100dvh - 49px - 32px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+    -webkit-mask-image: none; mask-image: none; border-left: 1px solid var(--border);
+  }
+  .feedwrap.home > .cats .cats-title {
+    display: block; margin: 0 10px 6px; font: 700 0.66rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+  }
+  .feedwrap.home > .cats a {
+    position: relative; min-height: 38px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; box-shadow: none;
+  }
+  .feedwrap.home > .cats a span { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .feedwrap.home > .cats a:hover { background: var(--surface-2); }
+  .feedwrap.home > .cats a[aria-current="true"] { background: var(--surface-2); color: var(--text); }
+  .feedwrap.home > .cats a[aria-current="true"] span { color: var(--muted); }
+  /* All / Local / World first, a rule, then the categories */
+  .feedwrap.home > .cats a.scope + a:not(.scope) { margin: 13px 0 0; }
+  .feedwrap.home > .cats a.scope + a:not(.scope)::before {
+    content: ""; position: absolute; left: 10px; right: 10px; top: -8px; border-top: 1px solid var(--border);
+  }
+  /* Every category shows in the rail: nothing folds behind More */
+  .feedwrap.home > .cats.folded .extra { display: flex; }
+  .feedwrap.home > .cats .cats-more { display: none; }
+  .feedwrap.home > .skel-chips .skel { width: auto; height: 30px; margin: 4px 6px; border-radius: 6px; }
+  .feedwrap.home > .skel-chips .skel:first-child, .feedwrap.home > .skel-chips .skel:nth-child(3) { width: auto; }
+}
