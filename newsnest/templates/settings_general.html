@@ -13,7 +13,7 @@
   {% include "_region_lists.html" %}
 
   {% call group('Reading') %}
-    {{ toggle_row('auto_read_on_scroll', 'Mark read when I scroll past', checked=cfg.feed.auto_read_on_scroll) }}
+    {{ toggle_row('auto_read_on_scroll', 'Mark read when I scroll past', 'In the feed list. The desktop front page only marks what you open.', cfg.feed.auto_read_on_scroll) }}
     {{ toggle_row('calibration_mode', 'Calibration mode', 'Show every story with its score', cfg.scoring.calibration_mode) }}
   {% endcall %}
 
