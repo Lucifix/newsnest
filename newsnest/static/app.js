@@ -286,6 +286,8 @@ function flushSeen() {
 }
 // Auto-read (Settings → General): a story that was really on screen and is then scrolled past
 // (it leaves through the top) is marked read. Not counted as "opened".
+// Not beside the desktop front page (laneEnds): that page is an overview you look around in, not a list
+// you read through, so there a story is read when you open it, tick it or mark all read. Seen still counts.
 const autoRead = document.body.dataset.autoRead === "1";
 const viewedOnce = new WeakSet();
 const readQueue = new Set();
@@ -304,7 +306,7 @@ if ("IntersectionObserver" in window) {
     for (const entry of entries) {
       const story = entry.target;
       const scrolledPast = !entry.isIntersecting && entry.boundingClientRect.bottom <= (entry.rootBounds?.top ?? 0);
-      if (scrolledPast && viewedOnce.has(story) && story.dataset.read !== "1") {
+      if (scrolledPast && viewedOnce.has(story) && story.dataset.read !== "1" && !laneEnds()) {
         story.dataset.ids.split(",").forEach((id) => readQueue.add(id));
         setStoryRead(story, true);
         passObserver.unobserve(story);

@@ -249,7 +249,8 @@ feed:
   # A source you add gets its best few stories in for this many days, marked "New source", whatever they score.
   new_source_days: 14
   new_source_stories: 2
-  # Mark a story read once it has been on screen and you scroll past it (Settings → General).
+  # Mark a story read once it has been on screen and you scroll past it (Settings → General). In the feed
+  # list only: on the wide-screen front page a story is read when you open it or mark it.
   auto_read_on_scroll: false
   # The order holds still while you read, switch tabs or come back from an article; a fresh ranking comes
   # after this many minutes away, or on Refresh / Mark all read. stable_sessions: false ranks again on

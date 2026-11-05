@@ -100,6 +100,7 @@ def test_settings_menu_and_general_autosave(client, env):
     assert r.headers["location"] == "/settings/general?saved=general"
     page = client.get(r.headers["location"]).text
     assert 'data-toast="Saved"' in page and 'role="switch" name="auto_read_on_scroll" checked' in page
+    assert "The desktop front page only marks what you open." in page   # where the switch does not apply
     text = (env.config / "config.yaml").read_text(encoding="utf-8")
     assert "min_final: 4.5" in text and "daily_usd: 0.75" in text
     # a bad value comes back as an error on the same page
