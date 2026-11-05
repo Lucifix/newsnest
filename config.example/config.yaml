@@ -297,7 +297,8 @@ budget:
 #   # OpenRouter: https://openrouter.ai/api/v1
 #   base_url: http://ollama:11434/v1
 #   # Env var with the key. Empty = OPENAI_API_KEY (ANTHROPIC_API_KEY for provider: anthropic).
-#   # Local servers need no key. OpenRouter: api_key_env: OPENROUTER_API_KEY
+#   # With a base_url the key is optional (local servers need none), unless api_key_env names one.
+#   # OpenRouter: api_key_env: OPENROUTER_API_KEY
 #   api_key_env: ""
 #   # Seconds per call. Local models on a CPU can need 600.
 #   timeout_seconds: 120

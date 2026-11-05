@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from newsnest.ai import (AIClient, AIError, AIUnavailable, Refused, Truncated, Usage, check_required, cost_usd,
-                         parse_json, spent_today)
+                         parse_json, setup_hint, spent_today)
 from newsnest.config import AICfg, ProviderCfg, load_config
 from newsnest.profile import write_profile
 from newsnest.profile_ai import SCHEMA, draft_profile
@@ -121,6 +121,22 @@ def test_keys(cfg, conn, monkeypatch):
     cfg.ai = AICfg(api_key_env="MY_CLAUDE_KEY")
     with pytest.raises(AIUnavailable, match="MY_CLAUDE_KEY"):
         AIClient.create(cfg, conn)
+    # a hosted API behind base_url with a named key: missing means missing, not a dummy key and a 401
+    openai_cfg(cfg, base_url="https://openrouter.ai/api/v1", api_key_env="OPENROUTER_API_KEY")
+    with pytest.raises(AIUnavailable, match="OPENROUTER_API_KEY is not set"):
+        AIClient.create(cfg, conn)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    assert AIClient.create(cfg, conn).backend().client.api_key == "sk-or-test"
+
+
+def test_setup_hint_names_the_key_or_the_local_server(cfg):
+    assert "ANTHROPIC_API_KEY is set" in setup_hint(cfg)
+    openai_cfg(cfg)
+    assert "OPENAI_API_KEY is set" in setup_hint(cfg)
+    openai_cfg(cfg, base_url="https://openrouter.ai/api/v1", api_key_env="OPENROUTER_API_KEY")
+    assert "OPENROUTER_API_KEY is set" in setup_hint(cfg)
+    openai_cfg(cfg, base_url=OLLAMA)
+    assert "the AI server at ollama:11434 is reachable" in setup_hint(cfg)
 
 
 def test_profile_jobs_use_the_profile_provider(conn, cfg):
@@ -166,6 +182,8 @@ def test_loose_answers_do_not_crash_summaries_or_labels():
 
 def test_parse_json_tolerates_think_blocks_fences_and_prose():
     assert parse_json('<think>hmm {"no": 1}</think>\n```json\n{"a": 1}\n```') == {"a": 1}
+    # only the closing tag (the template opened it), with braces in the thinking
+    assert parse_json('maybe {"no": 1} or {\n</think>\n{"a": 1}') == {"a": 1}
     assert parse_json('Here you go: {"a": {"b": 2}} Hope this helps') == {"a": {"b": 2}}
     with pytest.raises(AIError):
         parse_json("no json here")

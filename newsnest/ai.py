@@ -120,10 +120,7 @@ def ai_setup(cfg: Config) -> list[dict]:
 def setup_hint(cfg: Config) -> str:
     """What has to be in place before the first AI call."""
     p = cfg.ai
-    if p.provider == "openai" and p.base_url:
-        need = f"the AI server at {p.label} is reachable"
-    else:
-        need = f"{p.key_env} is set"
+    need = f"{p.key_env} is set" if p.needs_key else f"the AI server at {p.label} is reachable"
     return f"Scoring starts once a profile exists and {need}."
 
 
@@ -188,7 +185,7 @@ class OpenAIBackend:
     @classmethod
     def connect(cls, p: ProviderCfg) -> "OpenAIBackend":
         key = os.environ.get(p.key_env, "")
-        if not key and not p.base_url:
+        if not key and p.needs_key:
             raise _missing_key(p)
         # Local servers (Ollama, LM Studio) need no key, but the SDK insists on one
         return cls(openai.OpenAI(api_key=key or "not-needed", base_url=p.base_url or None, max_retries=2,
@@ -334,7 +331,9 @@ def parse_json(text: str, schema: dict | None = None) -> dict:
     """The answer as a JSON object; a parse failure is an AIError. Structured output guarantees JSON with
     Claude, but other models may wrap it in <think> blocks, code fences or prose, so those are stripped.
     With `schema`, required keys and basic types are checked as well."""
-    cleaned = _THINK.sub("", text).strip()
+    cleaned = _THINK.sub("", text)
+    # Some chat templates put the opening <think> in the prompt, so the answer only has the closing tag
+    cleaned = cleaned.rsplit("</think>", 1)[-1].strip()
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError as e:

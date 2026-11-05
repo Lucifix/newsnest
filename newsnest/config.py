@@ -232,7 +232,8 @@ class ProviderCfg(_Strict):
     provider: Literal["anthropic", "openai"] = "anthropic"
     # openai only. Empty = https://api.openai.com/v1
     base_url: str = ""
-    # Name of the environment variable that holds the key. Empty = ANTHROPIC_API_KEY or OPENAI_API_KEY
+    # Name of the environment variable that holds the key. Empty = ANTHROPIC_API_KEY or OPENAI_API_KEY.
+    # With a base_url the key is optional (local servers need none), unless api_key_env names one
     api_key_env: str = ""
     # Local models on a CPU can take minutes for a scoring batch
     timeout_seconds: float = Field(default=120, gt=0)
@@ -263,6 +264,11 @@ class ProviderCfg(_Strict):
     @property
     def key_env(self) -> str:
         return self.api_key_env or ("ANTHROPIC_API_KEY" if self.provider == "anthropic" else "OPENAI_API_KEY")
+
+    @property
+    def needs_key(self) -> bool:
+        """Hosted APIs need a key; a local server (base_url, no api_key_env) does not."""
+        return self.provider == "anthropic" or not self.base_url or bool(self.api_key_env)
 
     @property
     def label(self) -> str:

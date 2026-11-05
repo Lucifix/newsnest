@@ -214,6 +214,9 @@ scoring:
 | OpenRouter | `https://openrouter.ai/api/v1` | `api_key_env: OPENROUTER_API_KEY` (add it to the compose environment) |
 | Ollama / LM Studio | `http://<host>:11434/v1` / `http://<host>:1234/v1` | none |
 
+With a `base_url` the key is optional, since local servers need none, unless `api_key_env` names one: then a
+missing variable shows as "… is not set" on the status page instead of a 401 from the API.
+
 Things to know before switching:
 
 - **Quality.** Scoring, grouping by event and the profile draft were tuned on Claude. Small local models
