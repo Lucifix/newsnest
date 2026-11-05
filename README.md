@@ -33,11 +33,17 @@ what matters to you.
     <td align="center"><sub>Swipe to sort</sub></td>
     <td align="center"><sub>Dark mode, automatically</sub></td>
   </tr>
+  <tr>
+    <td align="center" colspan="3"><img src="https://raw.githubusercontent.com/Lucifix/newsnest/main/docs/images/desktop.png" alt="The home page on a desktop: a front page with the top story and its score, Top stories below it, and the ranked feed beside it"></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="3"><sub>A front page on bigger screens</sub></td>
+  </tr>
 </table>
 
 <sub>Outlets and headlines are made up. Photos from <a href="https://unsplash.com">Unsplash</a> by
-<a href="https://unsplash.com/@afgprogrammer">Mohammad Rahmani</a>, <a href="https://unsplash.com/@gabiontheroad">Gabriella Clare Marino</a>
-and <a href="https://unsplash.com/@amoltyagi2">Amol Tyagi</a>.</sub>
+<a href="https://unsplash.com/@jbl12761">James Lee</a>, <a href="https://unsplash.com/@amoltyagi2">Amol Tyagi</a>,
+<a href="https://unsplash.com/@gabiontheroad">Gabriella Clare Marino</a> and <a href="https://unsplash.com/@afgprogrammer">Mohammad Rahmani</a>.</sub>
 
 </div>
 
@@ -66,6 +72,9 @@ local model in Ollama.
 - 🔎 **No black box.** Calibration mode shows every story with its scores and reasons, and
   *Missed this* lets you paste a link the feed should have shown you.
 - 🃏 **Swipe to sort.** A one-thumb deck to rate a backlog in minutes.
+- 🖥️ **A front page on bigger screens.** On a laptop or desktop the home page becomes a front page: your
+  top story large with its score, then Top stories and a block for each category, with your ranked feed
+  beside it. *More stories* opens the rest of the feed as one column.
 - 💸 **A hard spending cap.** AI calls stop for the day when your budget is reached (default $0.50).
   Without an API key everything still works, and stories are shown newest first.
 - 📱 **Installable and private.** A mobile-first web app with light and dark themes that installs to
