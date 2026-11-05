@@ -1436,18 +1436,26 @@ input.chipinput:focus { outline: none; }
   .feedwrap.home .stream > .lead:first-child > .big-media { aspect-ratio: 16 / 9; margin-bottom: 18px; }
   .feedwrap.home .stream > .lead:first-child h3 { margin: 10px 0 10px; font-size: clamp(2rem, 2.9vw, 2.6rem); line-height: 1.06; letter-spacing: -0.03em; }
   .feedwrap.home .stream > .lead:first-child .summary, .feedwrap.home .stream > .lead:first-child .snippet { font-size: 1.08rem; }
-  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) {
-    grid-column: 2; display: block; padding: 18px 0; contain-intrinsic-size: auto 170px;
+  /* Counted "of .story": the bar a hidden story leaves behind (app.js hideStory) is not one of the four */
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4 of .story) {
+    grid-column: 2; display: block; padding: 18px 0; border-top: 0; border-bottom: 1px solid var(--border);
+    contain-intrinsic-size: auto 170px;
   }
-  .feedwrap.home .stream > .lead:first-child + .story { padding-top: 0; border-top: 0; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(2 of .story) { padding-top: 0; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(4 of .story) { border-bottom: 0; }
   /* Beside the lead the headlines carry it; their photos would only make the column taller */
-  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) > :is(.big-media, .thumb-img) { display: none; }
-  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) h3 { font-size: 1.16rem; line-height: 1.22; }
-  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4) :is(.summary, .snippet) {
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4 of .story) > :is(.big-media, .thumb-img) { display: none; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4 of .story) h3 { font-size: 1.16rem; line-height: 1.22; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4 of .story) :is(.summary, .snippet) {
     font-size: 0.92rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
   }
   /* The river starts below the package, across the full width */
-  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(5) { border-top: 2px solid var(--text); }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(5 of .story) { border-top: 2px solid var(--text); }
+  /* A hidden story stays hidden whatever display the layout gives it, and its Undo bar takes its place */
+  .feedwrap.home .stream > [hidden] { display: none !important; }
+  .feedwrap.home .stream > .lead:first-child[hidden] + .hiddenbar { grid-column: 1; grid-row: 1 / span 4; align-self: start; }
+  .feedwrap.home .stream > .lead:first-child ~ .story:nth-child(-n+4 of .story)[hidden] + .hiddenbar { grid-column: 2; margin-bottom: 14px; }
+  .feedwrap.home .stream > .hiddenbar { margin-top: 14px; }
 
   /* Quiet footer: the score chip stays; the reason line and the empty divider go */
   .feedwrap.home .stream .slimfoot { margin-top: 2px; padding-top: 0; border-top: 0; }
