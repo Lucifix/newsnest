@@ -10,13 +10,13 @@ NewsNest gathers your RSS feeds into one calm stream, folds the same story from 
 into a single card, and uses Claude (or a model of your choice, even a local one) to rank and summarise
 what matters to you.
 
-![Status: early (v0.1)](https://img.shields.io/badge/status-early%20(v0.1)-orange)
+[![Latest release](https://img.shields.io/github/v/release/Lucifix/newsnest)](https://github.com/Lucifix/newsnest/releases/latest)
+![License: MIT](https://img.shields.io/github/license/Lucifix/newsnest)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
 [![Docker pulls](https://img.shields.io/docker/pulls/lucifix/newsnest?logo=docker&logoColor=white)](https://hub.docker.com/r/lucifix/newsnest)
 ![amd64 and arm64 images](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-0b1220)
 [![Build status](https://img.shields.io/github/actions/workflow/status/Lucifix/newsnest/docker-publish.yml?branch=main&label=build)](https://github.com/Lucifix/newsnest/actions/workflows/docker-publish.yml)
-![Self-hosted](https://img.shields.io/badge/self--hosted-yes-2ea44f)
-![Powered by Claude](https://img.shields.io/badge/AI-Claude-D97757)
+![AI: Claude, OpenAI, Ollama](https://img.shields.io/badge/AI-Claude%20%7C%20OpenAI%20%7C%20Ollama-D97757)
 
 [Website](https://lucifix.github.io/newsnest/) · [Features](#features) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Configuration](#configuration) · [Development](#development)
 
