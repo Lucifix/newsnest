@@ -156,7 +156,9 @@ def key_points(row) -> list[str] | None:
     return loads(row["summary_points"]) if row["summary_points"] is not None else None
 
 
-def clean_points(points: list) -> list[str]:
+def clean_points(points) -> list[str]:
+    if not isinstance(points, list):  # a model without strict structured output may send one string
+        points = [points] if isinstance(points, str) else []
     out = []
     for p in points:
         p = str(p).strip().lstrip("-•*· ").strip()

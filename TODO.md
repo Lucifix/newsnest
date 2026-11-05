@@ -12,6 +12,11 @@
 - [ ] Remote access (VPN or NPM + auth). Never expose without auth.
 - [ ] Optional: GitHub Actions build → GHCR, stack only pulls.
 
+## AI providers
+- [ ] OpenRouter reports the real cost per call (`usage: {include: true}` → `usage.cost`): use it instead of
+      `ai.prices` when present.
+- [ ] Try the scoring prompt on a few local models (qwen3 8B/14B, llama 3.x) and note which are good enough.
+
 ## More sources (later; none verified yet, check for an https RSS feed first)
 Learned outlet weights (card menu → "Less from …") keep a noisy new source in check.
 - Slovenian news: Ljubljana Info (ljubljanainfo.com), Necenzurirano, Forbes Slovenija, Bloomberg Adria

@@ -1,4 +1,5 @@
-"""Claude jobs that write the profile: the onboarding draft and the weekly interests.md proposal.
+"""AI jobs that write the profile: the onboarding draft and the weekly interests.md proposal.
+They run on scoring.profile_model, through ai.profile when that is set (tier="profile").
 
 Both are stored in `proposals` and only reach interests.md when I approve (or edit and save) them.
 """
@@ -93,8 +94,8 @@ def draft_profile(conn: sqlite3.Connection, cfg: Config, ai: AIClient) -> int:
     result = ai.call(purpose="profile_draft", model=cfg.scoring.profile_model,
                      system=[{"type": "text", "text": draft_system(cfg)}],
                      messages=[{"role": "user", "content": "<ratings>\n" + "\n".join(lines) + "\n</ratings>"}],
-                     max_tokens=16000, effort="medium", schema=SCHEMA)
-    data = parse_json(result.text)
+                     max_tokens=16000, effort="medium", schema=SCHEMA, tier="profile")
+    data = parse_json(result.text, SCHEMA)
     return conn.execute(
         "INSERT INTO proposals (created_at, kind, status, current_text, proposed_text, rationale) VALUES (?, 'draft', 'pending', ?, ?, ?)",
         (iso(utcnow()), read_profile("interests.md"), data["interests_md"].strip() + "\n", data["rationale"])).lastrowid
@@ -148,8 +149,8 @@ def weekly_proposal(conn: sqlite3.Connection, cfg: Config, ai: AIClient) -> int 
                                 f"<current_profile>\n{current}\n</current_profile>\n\n<ratings>\n" + "\n".join(lines)
                                 + "\n</ratings>\n\n<missed>\n" + ("\n".join(miss_lines) or "(none)") + "\n</missed>"
                                 + "\n\n<feed_feedback>\n" + ("\n".join(fb_lines) or "(none)") + "\n</feed_feedback>"}],
-                     max_tokens=16000, effort="medium", schema=PROPOSAL_SCHEMA)
-    data = parse_json(result.text)
+                     max_tokens=16000, effort="medium", schema=PROPOSAL_SCHEMA, tier="profile")
+    data = parse_json(result.text, PROPOSAL_SCHEMA)
     # Only changes that fit the file as it is now; the rest (a bullet the model misquoted) can't be applied anyway
     proposed, items, _ = apply_changes(file_text, data["changes"])
     basis = {"ratings": len(rated), "missed": len(misses), "choices": sum(r["n"] for r in fb), "since": last}

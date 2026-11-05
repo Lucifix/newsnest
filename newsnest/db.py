@@ -228,6 +228,11 @@ MIGRATIONS: list[str] = [
     CREATE INDEX IF NOT EXISTS items_opened ON items(opened_at) WHERE opened_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS items_source_fetched ON items(source_id, fetched_at)
     """,
+    # which AI provider served each call ("Anthropic", "OpenAI", or a custom server's host); older rows were all Claude
+    """
+    ALTER TABLE ai_calls ADD COLUMN provider TEXT;
+    UPDATE ai_calls SET provider = 'Anthropic'
+    """,
 ]
 
 

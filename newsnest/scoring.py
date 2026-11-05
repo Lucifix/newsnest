@@ -1,4 +1,4 @@
-"""First-pass news scoring with Claude: title + snippet in batches, JSON per item.
+"""First-pass news scoring with the AI: title + snippet in batches, JSON per item.
 
 Prompt layout, stable parts first so they are cached: instructions + scale + categories, then the
 interest profile and seed examples (cache breakpoint), then recent ratings (second breakpoint, changes
@@ -165,15 +165,23 @@ def score_items(ai: AIClient, cfg: Config, conn: sqlite3.Connection, items: list
 
     wanted = {it.id for it in items}
     out: dict[int, dict] = {}
-    for entry in parse_json(result.text).get("items", []):
+    entries = parse_json(result.text).get("items", [])
+    for entry in entries if isinstance(entries, list) else []:
+        # Models without strict structured output sometimes drop a key: such items count as missing from the
+        # answer and are retried
+        if not isinstance(entry, dict) or not _REQUIRED.issubset(entry):
+            continue
         if entry.get("id") in wanted:
             out[entry["id"]] = {
                 "topic": _clamp(entry["topic"]), "importance": _clamp(entry["importance"]),
-                "personal": _clamp(entry["personal"]), "reason": str(entry["reason"])[:300],
+                "personal": _clamp(entry["personal"]), "reason": str(entry.get("reason") or "")[:300],
                 "category": entry["category"] if entry["category"] in cfg.scoring.categories else "Other",
                 "event": normalize_label(entry.get("event")),
             }
     return out
+
+
+_REQUIRED = {"id", "topic", "importance", "personal", "category"}
 
 
 def _clamp(v) -> int:

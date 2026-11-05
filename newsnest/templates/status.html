@@ -48,7 +48,10 @@
 
 {% set ai = status.ai %}
 {% if ai %}
-{% call group('AI today', footnote='Scoring starts once a profile exists and ANTHROPIC_API_KEY is set.' if not ai.status else none) %}
+{% set unpriced = ai.setup|rejectattr('priced')|map(attribute='model')|unique|list %}
+{% set ai_foot = ai.hint if not ai.status else ('No price set for ' ~ unpriced|join(', ') ~ ': its cost counts at Claude Opus rates against the budget. Add it under ai.prices in config.yaml ([0, 0] for a local model).' if unpriced else none) %}
+{% call group('AI today', footnote=ai_foot) %}
+  {% for t in ai.setup %}{{ kv(t.label ~ ' model', t.provider ~ ' · ' ~ t.model) }}{% endfor %}
   {{ kv('Spent', '$%.4f of $%.2f'|format(ai.spent, ai.cap)) }}
   <div class="srow srow-meter"><div class="meter" role="img" aria-label="{{ (100 * ai.spent / ai.cap)|round|int if ai.cap else 0 }}% of the daily budget used">
     <span style="width: {{ [100, (100 * ai.spent / ai.cap) if ai.cap else 100]|min }}%"></span></div></div>
@@ -75,7 +78,7 @@
 {% call fold('Recent AI calls', ai_calls|length) %}
   {% for c in ai_calls %}
   <div class="srow"><span class="srow-main"><span class="srow-title">{{ c.purpose }}</span>
-    <span class="srow-sub wrap">{{ localtime(c.at, '%d.%m. %H:%M') }} · {{ c.model }} · {{ '{:,}'.format(c.input_tokens or 0) }} in / {{ '{:,}'.format(c.output_tokens or 0) }} out{% if c.cache_read_tokens %} · {{ '{:,}'.format(c.cache_read_tokens) }} cached{% endif %}</span>
+    <span class="srow-sub wrap">{{ localtime(c.at, '%d.%m. %H:%M') }} · {% if c.provider and c.provider != 'Anthropic' %}{{ c.provider }}: {% endif %}{{ c.model }} · {{ '{:,}'.format(c.input_tokens or 0) }} in / {{ '{:,}'.format(c.output_tokens or 0) }} out{% if c.cache_read_tokens %} · {{ '{:,}'.format(c.cache_read_tokens) }} cached{% endif %}</span>
     {% if not c.ok %}<span class="srow-sub wrap failing">{{ c.error or c.stop_reason }}</span>{% endif %}</span>
     <span class="srow-end"><span class="srow-value">${{ '%.4f'|format(c.cost_usd) }}</span></span></div>
   {% endfor %}

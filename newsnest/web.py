@@ -25,7 +25,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
 from newsnest import REPO_URL, WEBSITE_URL, __version__, catalog, icons
-from newsnest.ai import AIClient, AIError, BudgetExceeded, spent_today
+from newsnest.ai import AIClient, AIError, BudgetExceeded, ai_setup, spent_today
 from newsnest.bootstrap import config_dir, env
 from newsnest.calibration import calibration_data, subscore_labels
 from newsnest.config import ICONS, MAX_TABS, NEWS, WORLD, Config, LoadedConfig, load_config, slugify
@@ -877,7 +877,7 @@ def settings_context(page: str, conn, loaded: LoadedConfig) -> dict:
     ctx = {"nav": {"feeds": len(cfg.feeds), "watches": len(cfg.watches), "earned": len(suggestions),
                    "trial": conn.execute("SELECT COUNT(*) FROM candidates WHERE status IN ('candidate', 'checking')").fetchone()[0]}}
     if page == "general":
-        ctx.update(spent=spent_today(conn, cfg), time_zones=TIME_ZONES, **local_pack_context(cfg))
+        ctx.update(spent=spent_today(conn, cfg), ai_setup=ai_setup(cfg), time_zones=TIME_ZONES, **local_pack_context(cfg))
     elif page == "profile":
         ctx.update(time_zones=TIME_ZONES, **local_pack_context(cfg))
     elif page == "feeds":

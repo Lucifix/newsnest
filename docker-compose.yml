@@ -15,10 +15,16 @@ services:
     environment:
       - TZ=${TZ:-UTC}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Only for ai.provider: openai in config.yaml (OpenAI, OpenRouter...); local servers like Ollama need none
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       # Login password for the web UI. Without it the app refuses all access.
       - NEWSNEST_PASSWORD=${NEWSNEST_PASSWORD:-${RADAR_PASSWORD:-}}
     ports:
       - "${NEWSNEST_PORT:-${RADAR_PORT:-3095}}:8080"
+    # Lets the container reach an AI server on this machine (Ollama, LM Studio) as host.docker.internal,
+    # on Linux too
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # config.yaml + profile files; seeded from config.example/ on first start if empty
       - ${NEWSNEST_CONFIG_PATH:-${RADAR_CONFIG_PATH:-/opt/newsnest/config}}:/config
@@ -34,7 +40,7 @@ services:
 #   sudo chown -R 1000:1000 /opt/newsnest
 #
 # Stack environment variables in Portainer: NEWSNEST_PASSWORD (required: no password, no access),
-# ANTHROPIC_API_KEY, optionally TZ, PUID, PGID.
+# ANTHROPIC_API_KEY (or OPENAI_API_KEY with ai.provider: openai), optionally TZ, PUID, PGID.
 # The RADAR_* names used before the rename (RADAR_PASSWORD, RADAR_PORT, RADAR_CONFIG_PATH, RADAR_DATA_PATH)
 # are still read when the NEWSNEST_* one is not set.
 #

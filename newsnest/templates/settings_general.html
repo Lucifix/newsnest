@@ -4,7 +4,7 @@
 {% block page %}
 {# Every control saves as soon as it changes; without JS the Save button below does it #}
 <form method="post" action="/settings/general" data-autosave>
-  {% call group('Where you live', footnote='Claude ranks stories for someone living there, and Local news packs follow your country. The web domain is optional: feeds on it always count as Local.') %}
+  {% call group('Where you live', footnote='The AI ranks stories for someone living there, and Local news packs follow your country. The web domain is optional: feeds on it always count as Local.') %}
     {{ input_row('country', 'Country', cfg.region.country, required=false, placeholder='Germany', list='country-list', width='9em') }}
     {{ input_row('city', 'City', cfg.region.city, required=false, placeholder='Berlin', width='9em') }}
     {{ input_row('timezone', 'Time zone', cfg.timezone, list='tz-list', width='11em') }}
@@ -22,7 +22,11 @@
     {{ input_row('summary_language', 'Summary language', cfg.scoring.summary_language, width='8.5em') }}
   {% endcall %}
 
-  {% call group('AI', footnote='Spent today: $%.2f. When the budget runs out, new stories show unscored until tomorrow.'|format(spent)) %}
+  {% call group('AI', footnote='Spent today: $%.2f. When the budget runs out, new stories show unscored until tomorrow. The provider and models are set under ai and scoring in config.yaml.'|format(spent)) %}
+    {% for t in ai_setup %}
+    <div class="srow"><span class="srow-main"><span class="srow-title">{{ t.label }} model</span><span class="srow-sub">{{ t.provider }}</span></span>
+      <span class="srow-end"><span class="srow-value">{{ t.model }}</span></span></div>
+    {% endfor %}
     {{ input_row('daily_usd', 'Daily budget', '%.2f'|format(cfg.budget.daily_usd), type='number', unit='$', step=0.05, min=0, width='5em') }}
   {% endcall %}
 

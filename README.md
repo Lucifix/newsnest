@@ -7,7 +7,8 @@
 **A self-hosted news feed that learns what you care about.**
 
 NewsNest gathers your RSS feeds into one calm stream, folds the same story from different outlets
-into a single card, and uses Claude to rank and summarise what matters to you.
+into a single card, and uses Claude (or a model of your choice, even a local one) to rank and summarise
+what matters to you.
 
 ![Status: early (v0.1)](https://img.shields.io/badge/status-early%20(v0.1)-orange)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
@@ -47,13 +48,14 @@ feeds fix that by learning what keeps you scrolling, which is not the same as wh
 
 NewsNest is the opposite deal. **You choose the sources, you write down what interests you, and you can
 see why every story ranks where it does.** It runs on your own machine, keeps everything in one SQLite
-file, and talks to the Anthropic API with your own key.
+file, and talks to the Anthropic API with your own key, or to any OpenAI-compatible API, including a
+local model in Ollama.
 
 ## Features
 
 - 📰 **Your own sources.** Any RSS or Atom feed, plus GitHub release feeds for software you run. Import an
   OPML file, or try new feeds on probation: they only earn a place in your feed once you read them.
-- 🧠 **Ranked for you.** Claude scores each story on topic, importance and personal fit against an
+- 🧠 **Ranked for you.** The AI scores each story on topic, importance and personal fit against an
   interests file that you write yourself or have drafted from a few ratings.
 - 🧩 **One story, not five.** Coverage of the same event by several outlets is grouped into one card,
   and wide coverage lifts a story up.
@@ -84,7 +86,8 @@ file, and talks to the Anthropic API with your own key.
 ## Quick start
 
 You need [Docker](https://docs.docker.com/get-docker/) with Compose, and, for the AI features, an
-[Anthropic API key](https://console.anthropic.com/). Pull the published image (no clone needed, and the
+[Anthropic API key](https://console.anthropic.com/) (or another provider, see
+[Choosing an AI provider](#choosing-an-ai-provider)). Pull the published image (no clone needed, and the
 one to use for a Portainer stack), or build from source.
 
 ### Option A: pull the published image
@@ -148,12 +151,12 @@ docker compose up -d --build
 
 Open <http://localhost:3095>, log in with your password, and tap **Set up my profile**:
 
-1. **Say where you live.** Your country and city tell Claude whose news is "big", and your time zone is
+1. **Say where you live.** Your country and city tell the AI whose news is "big", and your time zone is
    picked up from the browser.
 2. **Add local news.** NewsNest offers the local pack for your country (Australia, Austria, Canada,
    Croatia, France, Germany, Italy, Slovenia, the United Kingdom and the United States so far), or add your
    own feeds under Local in **Settings → Feeds**.
-3. **Rate about 30 headlines**, and Claude drafts your interests from them.
+3. **Rate about 30 headlines**, and the AI drafts your interests from them.
 
 On first start NewsNest copies a starter [`config.yaml`](config.example/config.yaml) into `config/`, with
 international news and tech feeds and no local ones. Change the feeds in **Settings → Feeds**, or edit
@@ -169,7 +172,7 @@ the file. It is re-read on every run, so there is nothing to restart.
 flowchart LR
     A["RSS / Atom feeds<br/>GitHub releases"] --> B["Fetch &<br/>de-duplicate"]
     B --> C["Group the same story<br/>across outlets"]
-    C --> D["Claude scores<br/>topic · importance · fit"]
+    C --> D["AI scores<br/>topic · importance · fit"]
     D --> E["Rank<br/>score × freshness × what you like"]
     E --> F(["Your feed"])
     F -- "likes · opens · ratings" --> E
@@ -180,8 +183,55 @@ for the ones above your threshold. Scoring uses a small, cheap model with prompt
 (drafting your profile, the weekly suggestions) use a stronger one. Both are configurable.
 
 **What leaves your server:** headlines and snippets, and for key points the article text, go to the
-Anthropic API using your key. Your feed list, ratings and database stay on your machine, and NewsNest
-itself sends no telemetry.
+Anthropic API using your key (or to the provider you configured; with a local model in Ollama, nothing
+leaves your network). Your feed list, ratings and database stay on your machine, and NewsNest itself sends
+no telemetry.
+
+### Choosing an AI provider
+
+Claude through the Anthropic API is the default and needs nothing beyond `ANTHROPIC_API_KEY`. To use
+something else, add an `ai:` section to `config.yaml` and set `scoring.model` and `scoring.profile_model`
+to models that provider serves. `provider: openai` speaks the OpenAI API, which OpenAI, OpenRouter, Groq,
+DeepSeek, Gemini, Ollama, LM Studio and vLLM all offer.
+
+```yaml
+# Ollama in the same stack (or http://host.docker.internal:11434/v1 for Ollama on this machine)
+ai:
+  provider: openai
+  base_url: http://ollama:11434/v1
+  timeout_seconds: 600
+  prices: {"*": [0, 0]}      # local: free, so the budget never stops it
+  profile:                   # optional: keep Claude for the rare profile jobs
+    provider: anthropic
+scoring:
+  model: qwen3:14b
+  profile_model: claude-opus-5-5
+```
+
+| Provider | `base_url` | Key |
+| --- | --- | --- |
+| OpenAI | *(empty)* | `OPENAI_API_KEY` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `api_key_env: OPENROUTER_API_KEY` (add it to the compose environment) |
+| Ollama / LM Studio | `http://<host>:11434/v1` / `http://<host>:1234/v1` | none |
+
+With a `base_url` the key is optional, since local servers need none, unless `api_key_env` names one: then a
+missing variable shows as "… is not set" on the status page instead of a 401 from the API.
+
+Things to know before switching:
+
+- **Quality.** Scoring, grouping by event and the profile draft were tuned on Claude. Small local models
+  (8B and below) rank noticeably worse and sometimes skip stories; 14B and up do reasonably. Keep a strong
+  model for `profile_model`, through `ai.profile` if needed.
+- **Prices.** Claude models are priced built in. Any other model counts at Claude Opus rates until you
+  set its price under `ai.prices` (USD per million tokens, `[input, output]`), so the daily budget runs out
+  early. The status page warns when a price is missing.
+- **Ollama on the host** listens on `127.0.0.1` only: start it with `OLLAMA_HOST=0.0.0.0` so the container
+  can reach it. Raise its context window (`OLLAMA_CONTEXT_LENGTH=16384` or more), or the scoring prompt is
+  cut off silently. On a CPU, raise `timeout_seconds`.
+- **Structured output.** NewsNest asks for a strict JSON schema. A server that rejects it needs
+  `json_mode: json`. Reasoning models get `scoring.effort` only with `send_effort: true`.
+- **Going back** to an older image: those don't know the `ai:` section. Remove it, or restore
+  `config.yaml.bak`.
 
 ## Configuration
 
@@ -220,7 +270,8 @@ Set these in `.env` (see [`.env.example`](.env.example)).
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `NEWSNEST_PASSWORD` | – | **Required.** Password for the web UI. With none set, access is refused. |
-| `ANTHROPIC_API_KEY` | – | Turns on scoring, key points and the weekly suggestions. |
+| `ANTHROPIC_API_KEY` | – | Turns on scoring, key points and the weekly suggestions with Claude. |
+| `OPENAI_API_KEY` | – | Key for `ai.provider: openai` (OpenAI and other hosted APIs). Local servers need none. |
 | `TZ` | `UTC` | Container time zone (logs). The app itself uses `timezone` from `config.yaml`. |
 | `NEWSNEST_PORT` | `3095` | Port the web UI is published on. |
 | `NEWSNEST_CONFIG_PATH` | `/opt/newsnest/config` | Host folder for `config.yaml` and the profile files. |

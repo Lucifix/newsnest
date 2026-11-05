@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from newsnest.ai import AIClient, BudgetExceeded, cost_usd, spent_today
+from newsnest.ai import AIClient, BudgetExceeded, Usage, cost_usd, spent_today
 from newsnest.config import Source
 from newsnest.db import iso
 from newsnest.pipeline import ingest
@@ -113,9 +113,7 @@ def test_budget_cap_stops_calls_and_keeps_items_pending(conn, cfg):
 
 
 def test_cost_accounting_includes_cache_rates(conn, cfg):
-    from types import SimpleNamespace
-    usage = SimpleNamespace(input_tokens=1_000_000, output_tokens=1_000_000,
-                            cache_creation_input_tokens=1_000_000, cache_read_input_tokens=1_000_000)
+    usage = Usage(input=1_000_000, output=1_000_000, cache_write=1_000_000, cache_read=1_000_000)
     assert cost_usd("claude-haiku-5-5", usage) == pytest.approx(0.10 + 0.50 + 0.125 + 0.01)
     write_profile("interests.md", "## Want\n- news\n")
     seed_items(conn, cfg, 1)

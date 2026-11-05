@@ -6,7 +6,7 @@
 {% block page %}
 {% if request.query_params.get('skipped', '0')|int(0) %}<p class="callout warn">{{ request.query_params.get('skipped') }} of the changes no longer fit your interests and were skipped.</p>{% endif %}
 {% if onboarding and cfg and not cfg.region.country %}
-{% call group('Where do you live?', footnote='Claude ranks stories for someone living there, and NewsNest offers local news for your country. You can change it later in Settings → General.') %}
+{% call group('Where do you live?', footnote='The AI ranks stories for someone living there, and NewsNest offers local news for your country. You can change it later in Settings → General.') %}
   <form method="post" action="/settings/region" class="sform" id="region-form">
     <input type="hidden" name="next" value="/profile">
     <input type="hidden" name="timezone" value="" data-browser-timezone>
@@ -27,7 +27,7 @@
 {% endif %}
 {% if request.query_params.get('localpack') is not none %}<p class="callout ok">Added {{ request.query_params.get('localpack') }} local feeds. Their first headlines arrive within about 15 minutes.</p>{% endif %}
 {% if onboarding %}
-{% call group('Get started: rate some headlines', footnote='Mark what you\'d want to see (👍) and what you\'d skip (👎). Aim for about 30, at least 10. Then Claude (' ~ (cfg.scoring.profile_model if cfg else '') ~ ') writes a first interests.md for you to edit.') %}
+{% call group('Get started: rate some headlines', footnote='Mark what you\'d want to see (👍) and what you\'d skip (👎). Aim for about 30, at least 10. Then the AI (' ~ (cfg.scoring.profile_model if cfg else '') ~ ') writes a first interests.md for you to edit.') %}
   {% for it in items %}
   <div class="srow">
     <span class="srow-main"><span class="srow-title wrap">{{ it.title }}</span><span class="srow-sub">{{ it.publisher or it.source_id }}</span></span>
@@ -62,7 +62,7 @@
 {% endcall %}
 {% endmacro %}
 
-{% call group('Your interests', footnote='Claude reads this on every scoring call; changes apply from the next run. Text inside HTML comments is ignored.') %}
+{% call group('Your interests', footnote='The AI reads this on every scoring call; changes apply from the next run. Text inside HTML comments is ignored.') %}
   {{ editor('interests.md', 'Interests', 'What you care about and what to skip', 14) }}
 {% endcall %}
 

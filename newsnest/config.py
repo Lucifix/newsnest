@@ -152,7 +152,7 @@ class ScoringCfg(_Strict):
     top_story_importance: int = 8
     summary_language: str = "English"
     calibration_mode: bool = True
-    # Fixed list so "news by category" stays a handful of sections; Claude must pick one of these
+    # Fixed list so "news by category" stays a handful of sections; the AI must pick one of these
     categories: list[str] = Field(default_factory=lambda: [
         "Local", "National", "Politics", "Economy", "World", "Crime & accidents", "Health",
         "Science", "Culture", "Sports", "Celebrities & lifestyle", "AI", "Software & releases",
@@ -226,6 +226,77 @@ class BudgetCfg(_Strict):
     daily_usd: float = 0.50
 
 
+class ProviderCfg(_Strict):
+    # anthropic = Claude through the Anthropic API. openai = any OpenAI-compatible API: OpenAI, OpenRouter,
+    # Ollama (http://ollama:11434/v1), LM Studio, vLLM...
+    provider: Literal["anthropic", "openai"] = "anthropic"
+    # openai only. Empty = https://api.openai.com/v1
+    base_url: str = ""
+    # Name of the environment variable that holds the key. Empty = ANTHROPIC_API_KEY or OPENAI_API_KEY.
+    # With a base_url the key is optional (local servers need none), unless api_key_env names one
+    api_key_env: str = ""
+    # Local models on a CPU can take minutes for a scoring batch
+    timeout_seconds: float = Field(default=120, gt=0)
+    # openai only: send scoring.effort as reasoning_effort (only reasoning models accept it)
+    send_effort: bool = False
+    # openai only: "schema" = strict JSON schema; "json" = plain JSON mode for servers without schema support
+    json_mode: Literal["schema", "json"] = "schema"
+
+    @field_validator("base_url", "api_key_env")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return v.strip()
+
+    @model_validator(mode="after")
+    def _fits_provider(self) -> "ProviderCfg":
+        if self.provider == "anthropic":
+            wrong = [k for k, default in (("base_url", ""), ("send_effort", False), ("json_mode", "schema"))
+                     if getattr(self, k) != default]
+            if wrong:
+                raise ValueError(f"{', '.join(wrong)} only applies to provider: openai")
+        elif self.base_url:
+            parts = urlsplit(self.base_url)
+            if parts.scheme not in ("http", "https") or not parts.netloc:
+                raise ValueError(f"base_url must be an http(s) address, e.g. http://ollama:11434/v1, "
+                                 f"not {self.base_url!r}")
+        return self
+
+    @property
+    def key_env(self) -> str:
+        return self.api_key_env or ("ANTHROPIC_API_KEY" if self.provider == "anthropic" else "OPENAI_API_KEY")
+
+    @property
+    def needs_key(self) -> bool:
+        """Hosted APIs need a key; a local server (base_url, no api_key_env) does not."""
+        return self.provider == "anthropic" or not self.base_url or bool(self.api_key_env)
+
+    @property
+    def label(self) -> str:
+        """"Anthropic", "OpenAI", or the host of a custom OpenAI-compatible server."""
+        if self.provider == "anthropic":
+            return "Anthropic"
+        return urlsplit(self.base_url).netloc if self.base_url else "OpenAI"
+
+
+class AICfg(ProviderCfg):
+    # USD per million tokens [input, output] by model name. Claude models are priced built in; "*" matches
+    # every other model. Local models: {"*": [0, 0]}
+    prices: dict[str, tuple[float, float]] = Field(default_factory=dict)
+    # Optional different provider for the profile jobs (scoring.profile_model); same keys as above
+    profile: ProviderCfg | None = None
+
+    @field_validator("prices")
+    @classmethod
+    def _prices(cls, v: dict[str, tuple[float, float]]) -> dict[str, tuple[float, float]]:
+        for model, pair in v.items():
+            if min(pair) < 0:
+                raise ValueError(f"prices.{model}: prices cannot be negative")
+        return v
+
+    def for_tier(self, tier: str) -> ProviderCfg:
+        return self.profile if tier == "profile" and self.profile is not None else self
+
+
 class HeartbeatCfg(_Strict):
     news_empty_hours: float = 3
 
@@ -281,6 +352,7 @@ class Config(_Strict):
     feed: HomeFeedCfg = Field(default_factory=HomeFeedCfg)
     discovery: DiscoveryCfg = Field(default_factory=DiscoveryCfg)
     budget: BudgetCfg = Field(default_factory=BudgetCfg)
+    ai: AICfg = Field(default_factory=AICfg)
     heartbeat: HeartbeatCfg = Field(default_factory=HeartbeatCfg)
 
     @field_validator("timezone")
