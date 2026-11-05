@@ -1239,6 +1239,7 @@ input.sinput:invalid { border-color: var(--danger); }
 .sform { display: grid; gap: 10px; padding-top: 12px; }
 .sform .button { justify-self: start; }
 .sform p { margin: 0; }
+.slist > .sform { padding: 12px 16px 16px; }
 @media (min-width: 640px) { .sform { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sform > p, .sform > .check, .sform > .button { grid-column: 1 / -1; } }
 /* Discover: what a trial is, then the sources on trial with their weekly reads as dots */
 .trial-how > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; min-height: 30px; padding-right: 16px; }
