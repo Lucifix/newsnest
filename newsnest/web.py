@@ -37,8 +37,8 @@ from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_so
                              region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
 from newsnest import feedsession
-from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, adjust_weight, build_feed, load_weights, nudge,
-                        read_stories, saved_stories, search_stories, story_hidden, view_feed, weight_strength)
+from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, TOP_STORIES, adjust_weight, build_feed, front_page,
+                        load_weights, nudge, read_stories, saved_stories, search_stories, story_hidden, view_feed, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
 from newsnest.missed import handle_missed
 from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
@@ -366,17 +366,23 @@ def _set_feed_cookie(request: Request, response, sid: str) -> None:
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, refresh: int = 0, conn=Depends(get_conn),
-         loaded: LoadedConfig = Depends(get_loaded)):
+def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, refresh: int = 0, view: str = "",
+         at: int | None = None, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     """The Discover-style feed. Only the first page is rendered; the rest loads while scrolling.
     The chosen filter chip is remembered in a cookie. The order comes from the device's feed session
     (newsnest.feedsession), so it holds still across reloads, tab switches and Back; refresh=1 starts
-    a new one and comes back here without it."""
+    a new one and comes back here without it.
+    On wide screens the page is a front page beside the first page of the feed, which ends in More stories;
+    view=list is that button's page: the whole feed alone, as one column (phones look the same either way).
+    at=<story id> starts the list at that story (the first one the lane left out), wherever it ranks now;
+    a story no longer in the feed starts it from the top."""
     cfg = _require_cfg(loaded)
     sources = named_sources(conn, cfg, loaded.sources)
+    list_view = view == "list"
     if refresh:
         sid, _ = feedsession.start(conn, cfg, sources)
-        response = RedirectResponse(("/?" + urlencode({"f": f})) if f else "/", status_code=303)
+        query = {k: v for k, v in (("f", f), ("view", "list" if list_view else None)) if v}
+        response = RedirectResponse(("/?" + urlencode(query)) if query else "/", status_code=303)
         _set_feed_cookie(request, response, sid)
         return response
     active = f or request.cookies.get(FILTER_COOKIE) or "all"
@@ -386,9 +392,14 @@ def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, refresh: in
     feed = view_feed(ranking, cfg, active)
     token = sid
     shown = max(PAGE_SIZE, min(n, 300))
+    start = next((i for i, it in enumerate(feed.items) if it.card.lead.id == at), 0) if list_view and at else 0
+    end = start + shown
     suggestion = (promotion_suggestions(conn, cfg) or [None])[0] if feed.active == "all" else None
+    # front: the desktop front page beside the feed (wide screens only; phones never show it)
     response = render(request, "home.html", conn, loaded, feed=feed, token=token, suggestion=suggestion,
-                      page=feed.items[:shown], next_offset=shown if shown < len(feed.items) else None)
+                      page=feed.items[start:end], next_offset=end if end < len(feed.items) else None,
+                      front=None if list_view else front_page(feed.items), top_stories=TOP_STORIES,
+                      list_view=list_view, start=start)
     response.set_cookie(FILTER_COOKIE, feed.active, max_age=365 * 86400, samesite="lax")
     _set_feed_cookie(request, response, sid)
     return response

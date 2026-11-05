@@ -108,9 +108,13 @@ html { -webkit-text-size-adjust: 100%; scroll-padding-top: 110px; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--sans); }
 a { color: var(--link); }
 code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
-main { max-width: 1080px; margin: 0 auto; padding: 0 16px 56px; }
+/* --page: the width of a page's content. --bar: the top bar's, where its brand and buttons line up: the page's,
+   except on wide screens, where every page has the home page's width, so the bar never jumps between pages */
+:root { --page: 1080px; }
+@media (min-width: 1240px) { :root { --bar: 1352px; } }
+main { max-width: var(--page); margin: 0 auto; padding: 0 16px 56px; }
 footer {
-  max-width: 1080px; margin: 0 auto; padding: 16px; text-align: center; color: var(--muted);
+  max-width: var(--page); margin: 0 auto; padding: 16px; text-align: center; color: var(--muted);
   font: 500 0.7rem var(--mono); text-transform: uppercase; letter-spacing: 0.03em;
 }
 footer .bad { color: var(--danger); font-weight: 700; }
@@ -143,7 +147,8 @@ footer .bad { color: var(--danger); font-weight: 700; }
 
 /* ---------- top bar ---------- */
 .topbar {
-  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 16px;
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 6px;
+  padding: 0 max(8px, (100% - var(--bar, var(--page))) / 2 + 8px) 0 max(16px, (100% - var(--bar, var(--page))) / 2 + 16px);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 .brand { display: flex; align-items: center; gap: 8px; margin-right: auto; text-decoration: none; color: var(--text); font: 700 1.15rem var(--display); padding: 10px 0; }
@@ -199,9 +204,9 @@ body.searching .searchlayer { opacity: 1; visibility: visible; transform: none; 
   .searchlayer { padding-bottom: calc(100px + max(env(safe-area-inset-bottom), var(--kb, 0px))); }
 }
 
-/* ⋯ menu: a popover under the top bar's right edge */
+/* ⋯ menu: a popover under the ⋯ button, which sits at the page's right edge (--page), not the window's */
 .appmenu {
-  position: fixed; inset: auto; top: calc(54px + env(safe-area-inset-top)); right: 10px; margin: 0;
+  position: fixed; inset: auto; top: calc(54px + env(safe-area-inset-top)); right: max(10px, (100% - var(--bar, var(--page))) / 2 + 10px); margin: 0;
   width: 250px; max-height: calc(100dvh - 70px); overflow-y: auto; padding: 6px; color: var(--text);
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 16px; box-shadow: var(--shadow-hi);
 }
@@ -1388,3 +1393,223 @@ input.chipinput:focus { outline: none; }
 .limit-row .srow-title .pill, .srow .srow-title .pill { vertical-align: 2px; margin-left: 4px; }
 .chart-narrow { display: none !important; }
 @media (max-width: 600px) { .chart-wide { display: none !important; } .chart-narrow { display: block !important; } }
+
+/* ---------- desktop home: a front page beside the feed ---------- */
+/* From 1240px the home page has two lanes, each read top to bottom. On the left the front page: the lead
+   story large, its headline on a panel over the photo and its score as a block on it, then packages (Top
+   stories, then a category each): one story large beside a few headlines, under a rule in the package's
+   colour. On the right, behind a dashed line, the feed itself, in rank order, as compact cards with the
+   buttons and the seen and read tracking. It stops after its first page with More stories, so both lanes
+   end together; that opens the list view (view=list, no front page): the whole feed as the phone's column,
+   with a way back. Below 1240px the front page is not shown and the feed is the phone's column, loading on.
+   The front page's stories are also in the feed; read state follows both copies.
+   Every two-lane rule is scoped to :has(> .front); the list view has its own section below. */
+.front, .lane-head, .lane-more { display: none; }
+.feedwrap.swapping > .front { opacity: 0.45; transition: opacity 0.15s ease; }
+.feedwrap.swapped > .front { animation: feed-in 0.18s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .feedwrap.swapping > .front { transition: none; }
+  .feedwrap.swapped > .front { animation: none; }
+}
+@media (min-width: 1240px) {
+  body.feedpage:has(.feedwrap.home > .front) { --page: 1352px; }
+  .feedwrap.home:has(> .front) { max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) 400px; column-gap: 28px; align-items: start; }
+  .feedwrap.home:has(> .front) > * { grid-column: 1 / -1; }
+  .feedwrap.home:has(> .front) .banner { max-width: none; }
+  /* Every chip shows, wrapped, instead of scrolling off the edge or folding behind More */
+  .feedwrap.home:has(> .front) > .cats { flex-wrap: wrap; overflow: visible; margin: 2px 0 -4px; padding: 4px 0 8px; -webkit-mask-image: none; mask-image: none; }
+  .feedwrap.home:has(> .front) > .cats.folded:not(.open) .extra { display: inline-flex; }
+  .feedwrap.home:has(> .front) > .cats .cats-more { display: none; }
+
+  /* --- the two lanes --- */
+  .feedwrap.home:has(> .front) > .front { display: block; grid-column: 1; min-width: 0; margin-top: 20px; }
+  .feedwrap.home:has(> .front) > .stream { grid-column: 2; min-width: 0; gap: 10px; margin-top: 20px; padding-left: 28px; border-left: 1px dashed var(--border); }
+  .feedwrap.home:has(> .front) .lane-head {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 6px;
+    font: 500 0.68rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+  }
+  .lane-head span { padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 0.74rem; }
+  /* The lane's end: the rest of the feed is one click away, in the list view */
+  .feedwrap.home:has(> .front) .stream > .loadmore { display: none; }
+  /* past the front page (app.js fitLane); above the cards' own display: grid below */
+  .feedwrap.home:has(> .front) .stream > .story.lane-over { display: none !important; }
+  /* fitLane measures the lane's cards: off-screen skipping would report placeholder heights (it is one page) */
+  .feedwrap.home:has(> .front) .stream > .story { content-visibility: visible; }
+  .feedwrap.home:has(> .front) .lane-more {
+    display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; min-height: 52px; padding: 0 18px;
+    border-radius: 999px; background: var(--text); color: var(--bg); text-decoration: none; font: 700 1rem var(--display);
+  }
+  .feedwrap.home:has(> .front) .lane-more[hidden] { display: none; }
+  .lane-more span { font: 500 0.72rem var(--mono); text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+  .lane-more svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .lane-more:hover { background: var(--accent); color: var(--accent-ink); }
+  .lane-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* --- front page: shared --- */
+  .front .story { position: relative; }
+  .front .story :is(h2, h3) a { color: var(--text); text-decoration: none; }
+  .front .story :is(h2, h3) a::after { content: ""; position: absolute; inset: 0; z-index: 1; }  /* the whole story opens it */
+  .front .story :is(h2, h3) a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .front .story:has(:is(h2, h3) a:focus-visible) { outline: 2px solid var(--accent); outline-offset: 4px; }
+  .front .story :is(h2, h3) a:focus-visible { outline: none; }
+  .front .big-media { border-radius: var(--radius); }
+  @media (hover: hover) {
+    .front .story:hover :is(.big-media, .thumb-img) img { transform: scale(1.03); }
+  }
+  .fdek { margin: 0; color: var(--text-2); font-size: 0.95rem; line-height: 1.5; }
+  .flabels { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .flabel {
+    padding: 0 7px; border-radius: 3px; background: var(--h, var(--muted)); color: #fff;
+    font: 700 0.64rem/1.6 var(--mono); text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .fbyline {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 10px 0 0;
+    font: 500 0.68rem var(--mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
+  }
+  .fbyline .src { color: var(--accent-text); font-weight: 700; }
+  .fbyline .badge { width: 18px; height: 18px; font-size: 0.5rem; }
+  .fbyline .fcov::before { content: "·"; margin-right: 8px; }
+  /* The score, as a block on the photo */
+  .fscore {
+    position: absolute; z-index: 3; top: 16px; right: 16px; display: grid; justify-items: center; min-width: 76px;
+    padding: 9px 12px 8px; border-radius: 4px; background: var(--lime); color: var(--neon-ink);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.28); pointer-events: none;
+  }
+  .fscore b { font: 800 2.15rem/1 var(--display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  .fscore small { margin-top: 3px; font: 700 0.6rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
+  .fscore.high { background: var(--accent); color: var(--accent-ink); }
+  .front .story.read :is(h2, h3) a, .front .story.read .fdek, .front .story.read .fpoints li { color: var(--muted); }
+  .front .story.read img, .front .story.read .fscore { opacity: 0.55; filter: grayscale(0.5); }
+
+  /* --- the lead --- */
+  .flead { margin: 0 0 52px; }
+  /* Wide but not a whole screen tall, so the headline panel shows on the first screen */
+  .flead-media { aspect-ratio: auto; height: clamp(320px, 46vh, 460px); }
+  .flead-media .hero-mono { font-size: 6rem; }
+  .flead-panel {
+    position: relative; z-index: 2; width: min(84%, 760px); margin: -128px 0 0 32px; padding: 22px 28px 18px;
+    background: var(--surface); border: 1px solid var(--edge); border-radius: var(--radius); box-shadow: var(--shadow-hi);
+  }
+  .flead h2 { margin: 12px 0 10px; font: 700 clamp(2rem, 2.6vw, 2.75rem)/1.04 var(--display); letter-spacing: -0.04em; text-wrap: balance; }
+  .flead .fdek { max-width: 64ch; font-size: 1.08rem; }
+  .flead .fdek:has(+ .fpoints) { -webkit-line-clamp: 2; }  /* the key points say the rest */
+  .fpoints {
+    list-style: none; display: grid; gap: 6px; margin: 14px 0 4px; padding: 11px 14px;
+    background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: var(--radius);
+  }
+  .fpoints li { position: relative; padding-left: 16px; font-size: 0.9rem; line-height: 1.4; }
+  .fpoints li::before { content: ""; position: absolute; left: 1px; top: 0.5em; width: 6px; height: 6px; border-radius: 1px; background: var(--accent); }
+
+  /* --- packages --- */
+  .fpack { margin: 0 0 52px; }
+  .fpack.top { --h: var(--accent); }
+  .fpack-head {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 0 0 22px; padding-top: 12px;
+    border-top: 4px solid var(--h, var(--accent)); font: 700 1.6rem/1.15 var(--display); letter-spacing: -0.025em;
+  }
+  .fpack-head span { font: 400 1.12rem var(--sans); letter-spacing: 0; color: var(--muted); }
+  .fpack-head i { font-style: normal; font-weight: 700; color: var(--h, var(--accent)); }
+  .fpack-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0 32px; align-items: start; }
+  .fbig-media { aspect-ratio: 4 / 3; margin-bottom: 14px; }
+  .fbig-media .hero-mono { font-size: 3.4rem; }
+  .fbig .fscore { top: 12px; right: 12px; min-width: 60px; padding: 7px 9px 6px; }
+  .fbig .fscore b { font-size: 1.55rem; }
+  .fbig h3 { margin: 8px 0; font: 700 1.7rem/1.1 var(--display); letter-spacing: -0.03em; text-wrap: balance; }
+  .fbig .fdek { font-size: 1rem; }
+  .fitem { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 0 16px; align-items: start; padding: 16px 0; border-top: 1px solid var(--border); }
+  .fitem:first-child { padding-top: 0; border-top: 0; }
+  .fitem h3 { margin: 6px 0; font: 700 1.12rem/1.22 var(--display); letter-spacing: -0.015em; }
+  .fitem .fdek { font-size: 0.9rem; }
+  .front .fitem-thumb { aspect-ratio: 1; border-radius: 6px; }
+
+  /* --- the feed lane: the phone's cards, compact, the photo as a square beside the text --- */
+  .feedwrap.home:has(> .front) .stream .card { padding: 12px 14px; }
+  .feedwrap.home:has(> .front) .stream .card.has-img { grid-template-columns: minmax(0, 1fr) 88px; column-gap: 12px; }
+  .feedwrap.home:has(> .front) .stream .thumb-img { aspect-ratio: 1; }
+  .feedwrap.home:has(> .front) .stream > .fcard.big { display: grid; grid-template-columns: minmax(0, 1fr) 88px; column-gap: 12px; align-items: start; padding: 12px 14px; }
+  .feedwrap.home:has(> .front) .stream > .fcard.big > .big-body, .feedwrap.home:has(> .front) .stream > .fcard.big .bodytext { display: contents; }
+  .feedwrap.home:has(> .front) .stream > .fcard.big > .big-body > *, .feedwrap.home:has(> .front) .stream > .fcard.big .bodytext > * { grid-column: 1; }
+  /* Beside the photo: the source line and the headline; the lede and everything after use the full width */
+  .feedwrap.home:has(> .front) .stream > .fcard.big :is(.slimfoot, .coverage, .tldr, .sumform, .summary, .snippet, .note) { grid-column: 1 / -1; }
+  .feedwrap.home:has(> .front) .stream > .fcard.big > .big-media { grid-column: 2; grid-row: 1 / span 2; aspect-ratio: 1; border-radius: 6px; }
+  .feedwrap.home:has(> .front) .stream > .fcard.big .hero-mono { font-size: 1.4rem; }
+  .feedwrap.home:has(> .front) .stream > .fcard.big.unseen::before { left: 0; right: auto; top: 12px; bottom: 12px; width: 4px; height: auto; border-radius: 0 4px 4px 0; }
+  .feedwrap.home:has(> .front) .stream .story h3 { margin: 6px 0 4px; font-size: 1.04rem; line-height: 1.25; }
+  .feedwrap.home:has(> .front) .stream .story :is(.snippet, .summary.lede) {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 0.9rem;
+  }
+}
+
+/* ---------- desktop home: the list view (More stories), like a social feed on a desktop ---------- */
+/* From 1240px: the same page width as the front page, in three columns. On the left (sticky) the way back to
+   the front page, the categories as a column of chips and shortcuts; in the middle the feed exactly as on the
+   phone; on the right (sticky) today's numbers and the top five. Below 1240px the left sidebar is display:
+   contents with only its chips showing (they are the usual row under the masthead) and the right one is gone. */
+.listnav { display: contents; }
+.listnav > :not(.cats), .listrail { display: none; }
+.listnote { margin: 14px 0 -4px; font: 500 0.7rem var(--mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.listnote a { color: var(--accent-text); font-weight: 700; }
+@media (min-width: 1240px) {
+  body.feedpage:has(.feedwrap.home > .listnav) { --page: 1352px; }
+  .feedwrap.home:has(> .listnav) {
+    max-width: none; display: grid; grid-template-columns: 248px minmax(0, 1fr) 300px; column-gap: 40px; align-items: start;
+  }
+  .feedwrap.home:has(> .listnav) > * { grid-column: 2; min-width: 0; }
+  .feedwrap.home:has(> .listnav) .banner { max-width: none; }
+  /* The sidebars span every row of the page grid and stay in view while the feed scrolls */
+  .feedwrap.home:has(> .listnav) > :is(.listnav, .listrail) {
+    grid-row: 1 / span 12; position: sticky; top: calc(49px + 20px); margin-top: 28px;
+    max-height: calc(100dvh - 49px - 40px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  }
+  .feedwrap.home:has(> .listnav) > .listnav { grid-column: 1; display: flex; flex-direction: column; }
+  .feedwrap.home:has(> .listnav) > .listrail { grid-column: 3; display: grid; gap: 14px; align-content: start; }
+  .listnav > :not(.cats) { display: revert; }
+
+  /* --- left: back, categories, shortcuts --- */
+  .listnav > .listback {
+    display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin: 0 0 16px; padding: 8px 16px 8px 10px;
+    border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 0.92rem var(--display); text-decoration: none;
+  }
+  .listback:hover { background: var(--text); color: var(--bg); }
+  .listback svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .listnav > .cats {
+    flex-direction: column; flex-wrap: nowrap; gap: 6px; margin: 0; padding: 2px; overflow: visible;
+    -webkit-mask-image: none; mask-image: none;
+  }
+  .listnav > .cats a { min-height: 40px; padding: 0 14px; }
+  .listnav > .cats a span { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .listnav > .cats a.scope + a:not(.scope) { margin: 8px 0 0; }
+  .listnav > .cats.folded:not(.open) .extra { display: inline-flex; }  /* the column has room for all */
+  .listnav > .cats .cats-more { display: none; }
+  .listnav > .skel-chips .skel { width: 100%; height: 40px; }
+  .railtitle { margin: 22px 4px 8px; font: 700 0.66rem var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .listnav > .railtitle:first-child { margin-top: 0; }
+  .listnav > .raillinks { display: grid; gap: 2px; }  /* as specific as the revert above, and after it */
+  .raillinks a {
+    display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 10px;
+    color: var(--text); text-decoration: none; font: 600 0.92rem var(--sans);
+  }
+  .raillinks a:hover { background: var(--surface-2); }
+  .raillinks svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* --- right: today, top five --- */
+  .railbox { padding: 16px 18px; background: var(--surface); border: 1px solid var(--edge); border-radius: var(--radius); box-shadow: var(--chip-shadow); }
+  .railbox .railtitle { margin: 0 0 10px; }
+  .railnew { display: flex; align-items: baseline; gap: 8px; margin: 0; font: 500 0.78rem var(--mono); text-transform: uppercase; color: var(--muted); }
+  .railnew b { font: 700 2rem/1 var(--display); letter-spacing: -0.03em; color: var(--text); }
+  .railnew b.hot { padding: 2px 8px; border-radius: 4px; background: var(--lime); color: var(--neon-ink); }
+  .railstats { list-style: none; display: grid; gap: 4px; margin: 10px 0 0; padding: 0; font: 500 0.72rem var(--mono); text-transform: uppercase; letter-spacing: 0.03em; }
+  .railstats a { color: var(--text-2); text-decoration: none; }
+  .railstats a:hover { text-decoration: underline; }
+  .railstats a.bad { color: var(--danger); font-weight: 700; }
+  .railtop { list-style: none; display: grid; gap: 14px; margin: 0; padding: 0; counter-reset: top; }
+  .railtop li { display: grid; grid-template-columns: 24px minmax(0, 1fr); column-gap: 8px; counter-increment: top; }
+  .railtop li::before { content: counter(top); grid-row: 1 / span 2; font: 800 1.35rem/1.1 var(--display); color: var(--accent); }
+  .railtop a {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+    color: var(--text); text-decoration: none; font: 700 0.95rem/1.25 var(--display); letter-spacing: -0.01em;
+  }
+  .railtop a:hover { text-decoration: underline; }
+  .railtop span { margin-top: 3px; font: 500 0.64rem var(--mono); text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+  .railtop li.read a, .railtop li.read::before { color: var(--muted); }
+}

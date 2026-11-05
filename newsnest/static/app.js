@@ -23,16 +23,23 @@ async function postForm(url, data) {
 }
 
 // ---------- read state ----------
+// On wide screens a story can be on the page twice (the front page and the feed beside it): both copies
+// carry the same data-ids, and both change together.
 function setStoryRead(story, read) {
-  story.dataset.read = read ? "1" : "0";
-  story.classList.toggle("read", read);
-  const button = story.querySelector(".readtoggle");
-  if (button) {
-    button.setAttribute("aria-pressed", String(read));
-    button.value = read ? "0" : "1";
-    const label = read ? "Mark as unread" : "Mark as read";
-    button.setAttribute("aria-label", label);
-    button.title = label;
+  if (!story) return;
+  const ids = story.dataset.ids;
+  const copies = ids ? document.querySelectorAll(`.story[data-ids="${CSS.escape(ids)}"]`) : [story];
+  for (const copy of copies) {
+    copy.dataset.read = read ? "1" : "0";
+    copy.classList.toggle("read", read);
+    const button = copy.querySelector(".readtoggle");
+    if (button) {
+      button.setAttribute("aria-pressed", String(read));
+      button.value = read ? "0" : "1";
+      const label = read ? "Mark as unread" : "Mark as read";
+      button.setAttribute("aria-label", label);
+      button.title = label;
+    }
   }
 }
 
@@ -211,7 +218,7 @@ async function summarize(form, button) {
 
 // Opening a story marks it read on the server (/go/<id>); reflect it right away.
 document.addEventListener("click", (event) => {
-  const link = event.target.closest(".story h3 a, .thumb-img, .hero-media, .big-media, .story .openlink");
+  const link = event.target.closest(".story :is(h2, h3) a, .thumb-img, .hero-media, .big-media, .story .openlink");
   if (link) {
     setStoryRead(link.closest(".story"), true);
     setTimeout(applyFilters, 400);  // let the new tab open before the card disappears
@@ -426,8 +433,10 @@ document.addEventListener("click", async (event) => {
 
 // ---------- infinite scroll: the next 20 stories load before you reach the end ----------
 let loadingMore = false;
+// Beside the front page (wide screens) the feed ends in More stories instead of loading on
+const laneEnds = () => wideFront.matches && !!document.querySelector(".feedwrap.home > .front");
 async function loadMore(link) {
-  if (loadingMore || !link.isConnected) return;
+  if (loadingMore || !link.isConnected || laneEnds()) return;
   loadingMore = true;
   link.classList.add("loading");
   link.textContent = "Loading…";
@@ -455,6 +464,7 @@ const moreObserver = "IntersectionObserver" in window &&
   new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) loadMore(e.target); }),
                            { rootMargin: "900px 0px" });
 function watchLoadMore() {
+  if (laneEnds()) return;
   const link = document.querySelector(".loadmore[data-fragment]");
   if (link && moreObserver) moreObserver.observe(link);
 }
@@ -466,6 +476,48 @@ document.addEventListener("DOMContentLoaded", watchLoadMore);
 
 // ---------- Home categories: More folds the long tail, a tap swaps the feed in place (no reload) ----------
 const CATS_OPEN = "newsnest.catsOpen";
+
+// The phone opens the first top story's key points; on wide screens the front page's lead already shows
+// them beside the feed, so the feed's copy starts closed instead of repeating them at length.
+const wideFront = matchMedia("(min-width: 1240px)");
+function closeLaneLead() {
+  if (!wideFront.matches || !document.querySelector(".feedwrap.home > .front")) return;
+  document.querySelector(".feedwrap.home .stream > .story:first-of-type .tldr[open]")?.removeAttribute("open");
+}
+
+// Beside the front page the feed lane shows as many stories as fit next to it (at least LANE_MIN), so the two
+// lanes end together; More stories then opens the list view starting at the first story left out. Measured on load,
+// on resize and after a tab swap; not while reading (opening key points in the lane does not cut it again).
+// Without the script the lane shows the whole first page and the button's link starts after it.
+const LANE_MIN = 8;
+function fitLane() {
+  const wrap = document.querySelector(".feedwrap.home");
+  const front = wrap?.querySelector(":scope > .front");
+  const more = wrap?.querySelector(".lane-more");
+  if (!front || !more) return;  // no button: the whole feed fits in the first page, so nothing is cut
+  const cards = [...wrap.querySelectorAll(".stream > .story")];
+  cards.forEach((card) => card.classList.remove("lane-over"));
+  let shown = cards.length;
+  if (wideFront.matches) {
+    const end = front.getBoundingClientRect().bottom + 80;  // a card may run a little past the front page
+    const over = cards.findIndex((card, i) => i >= LANE_MIN && card.getBoundingClientRect().bottom > end);
+    if (over > 0) shown = over;
+  }
+  cards.slice(shown).forEach((card) => card.classList.add("lane-over"));
+  const next = cards[shown];
+  // Nothing left out and nothing past the first page: no button
+  more.hidden = !next && more.dataset.rest !== "1";
+  if (next) {  // else the server's link already starts after the first page
+    const url = new URL(more.getAttribute("href"), location.href);
+    url.searchParams.set("at", next.id.replace("item-", ""));  // the list starts at this story
+    more.setAttribute("href", url.pathname + url.search);
+    more.querySelector("span").textContent = `${Number(more.dataset.total) - shown} more`;
+  }
+}
+addEventListener("load", fitLane);
+wideFront.addEventListener?.("change", fitLane);
+let laneResize = null;
+addEventListener("resize", () => { clearTimeout(laneResize); laneResize = setTimeout(fitLane, 200); });
 
 function setupCats(scrollLeft = 0) {
   const nav = document.querySelector(".cats");
@@ -620,6 +672,8 @@ async function showFeed(href, { push = false, tab = false } = {}) {
     if (push) history.pushState(state, "", address);
     else history.replaceState(state, "", address);
     setupCats(scrollLeft);
+    closeLaneLead();
+    fitLane();
     applyBanner();
     rememberNewsChip();
     trackStories(wrap.querySelectorAll("[data-track-seen] .story"));
@@ -646,7 +700,14 @@ document.addEventListener("click", (event) => {
   if (tab.dataset.tab === "headlines" && document.body.dataset.tab !== "headlines") {
     let saved = null;
     try { saved = sessionStorage.getItem(NEWS_CHIP); } catch { /* storage blocked */ }
-    if (saved) href = new URL(saved, location.href).href;
+    if (saved) {
+      // The chip, in the view the tab was tapped in (front page or the list of all stories)
+      const chip = new URL(saved, location.href);
+      const list = new URL(href).searchParams.get("view");
+      if (list) chip.searchParams.set("view", list);
+      else chip.searchParams.delete("view");
+      href = chip.href;
+    }
   }
   const refresh = new URL(href).searchParams.has("refresh");
   lightTab(tab.dataset.tab);
@@ -682,6 +743,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const wrap = document.querySelector(".feedwrap[data-href]");
   if (wrap && !history.state?.search) history.replaceState({ feed: true, href: wrap.dataset.href }, "");
   setupCats();
+  closeLaneLead();
+  fitLane();
 });
 // Backup for browsers where the observer does not fire: check on scroll, at most once per frame
 let scrollCheck = false;

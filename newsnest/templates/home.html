@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import feed_card, mark_all, banner_box with context %}
+{% from "_macros.html" import feed_card, mark_all, banner_box, front_lead, front_package with context %}
 {% block title %}For you · NewsNest{% endblock %}
 {% block body_class %}feedpage{% endblock %}
 {% block banner %}{% endblock %}
@@ -8,7 +8,10 @@
 {% set ok_sources = live_sources|rejectattr('health.level', 'equalto', 'failing')|list %}
 {% set hour = now_local.hour %}
 {# data-href: this view's own address, for Back and in-place tab switches (app.js showFeed) #}
-<div class="feedwrap" data-href="/?f={{ feed.active|urlencode }}">
+{# home: the desktop layout (front page beside the feed) is scoped to it. vq: the list view (More stories)
+   stays the list view across chips and tabs #}
+{% set vq = '&view=list' if list_view else '' %}
+<div class="feedwrap home" data-href="/?f={{ feed.active|urlencode }}{{ vq }}{% if start %}&amp;at={{ feed.items[start].card.lead.id }}{% endif %}">
 {{ banner_box(banner) }}
 <header class="masthead">
   <p class="dateline">{{ now_local.strftime('%A, %d %B') }}</p>
@@ -24,18 +27,62 @@
   </div>
 </header>
 
-{% if feed.subchips %}
 {# One row: the parts of this tab (All, or All / Local / World on News), then its categories. The four
-   you read most show; the rest (except the selected one) fold behind More. #}
+   you read most show; the rest (except the selected one) fold behind More. On wide screens every chip shows;
+   in the list view (wide screens) they are a column in the left sidebar. #}
+{% macro cats_nav() %}
+{% if feed.subchips %}
 {% set extra = feed.subchips|selectattr('fold')|list|length %}
 <nav class="cats" aria-label="Categories">
   {% for chip in feed.subchips %}
   {% set classes = (['scope'] if chip.scope else ['c' ~ cat_hue(chip.label)]) + (['extra'] if chip.fold else []) %}
-  <a class="{{ classes|join(' ') }}" href="/?f={{ chip.key|urlencode }}" {% if chip.key == feed.active %}aria-current="true"{% endif %}>
+  <a class="{{ classes|join(' ') }}" href="/?f={{ chip.key|urlencode }}{{ vq }}" {% if chip.key == feed.active %}aria-current="true"{% endif %}>
     {% if not chip.scope %}<i class="dot" aria-hidden="true"></i>{% endif %}{{ chip.label }} <span>{{ chip.count if chip.count < 100 else '99+' }}</span></a>
   {% endfor %}
   {% if extra %}<button type="button" class="cats-more" aria-expanded="false" data-count="{{ extra }}" hidden>More <span>{{ extra }}</span></button>{% endif %}
 </nav>
+{% endif %}
+{% endmacro %}
+{% if list_view %}
+{# The list view on wide screens, like a social feed on a desktop: the way back, the categories and shortcuts
+   on the left, the feed in the middle, today's numbers and the top stories on the right. Below 1240px the
+   left sidebar is display: contents with only its chips showing, so they are the usual row under the masthead,
+   and the right one is not shown. #}
+<aside class="listnav" aria-label="Browse">
+  <a class="listback" href="/?f={{ feed.active|urlencode }}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Front page</a>
+  {{ cats_nav() }}
+  <p class="railtitle">Go to</p>
+  <nav class="raillinks" aria-label="Go to">
+    <a href="/saved"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"/></svg>Saved</a>
+    <a href="/swipe"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="12" height="16" rx="2"/><path d="M5 7v11.5A2.5 2.5 0 0 0 7.5 21H15"/></svg>Swipe</a>
+    <a href="/archive"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v4H4zM5 10v9h14v-9M10 14h4"/></svg>Archive</a>
+    <a href="/missed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Missed this</a>
+  </nav>
+</aside>
+<aside class="listrail" aria-label="Today">
+  <section class="railbox">
+    <p class="railtitle">Today</p>
+    <p class="railnew"><b class="{{ 'hot' if feed.unseen }}">{{ feed.unseen }}</b> new</p>
+    <ul class="railstats">
+      {% if feed.read_count %}<li><a href="/read">{{ feed.read_count }} read</a></li>{% endif %}
+      <li><a href="/status" class="{{ 'bad' if ok_sources|length < live_sources|length }}">{{ ok_sources|length }}/{{ live_sources|length }} sources ok</a></li>
+    </ul>
+  </section>
+  {% if feed.items %}
+  <section class="railbox">
+    <p class="railtitle">Top stories</p>
+    <ol class="railtop">
+      {% for it in feed.items[:5] %}{% set c = it.card %}
+      <li class="{{ 'read' if c.read }}"><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ c.lead.row.title }}</a>
+        <span>{{ c.lead.source_name }} · {{ ago(c.lead.row.published or c.lead.row.fetched_at) }}</span></li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+</aside>
+{% else %}
+{{ cats_nav() }}
 {% endif %}
 
 {% if not feed.profile %}
@@ -56,8 +103,33 @@
 </div>
 {% endif %}
 
+{# Wide screens: the front page on the left (the lead, Top stories, a package per category), the feed in a lane
+   on the right. Phones never show the front page; the feed alone is the page there. #}
+{% if front and front.lead %}
+<section class="front" aria-label="Front page">
+  {{ front_lead(front.lead) }}
+  {% for p in front.packages %}{{ front_package(p) }}{% endfor %}
+</section>
+{% endif %}
+
+{% if list_view and start %}
+{# Opened from More stories: the list starts at the first story the front page's lane left out #}
+<p class="listnote">From story {{ start + 1 }} of {{ feed.items|length }} · <a href="/?f={{ feed.active|urlencode }}&amp;view=list">From the top</a></p>
+{% endif %}
+
 <div class="stream" data-track-seen id="stream">
+  <h2 class="lane-head"><span>Your feed</span> ranked for you</h2>
   {% include "_feed_page.html" %}
+  {# Beside the front page the feed stops where the front page ends (app.js fitLane; without it, after its
+     first page), so the two end together; the rest is in the list view, which starts at the first story not
+     shown here (at=). data-rest: stories past the first page; with none, fitLane hides the button if all fit.
+     Phones keep loading in place (.loadmore). #}
+  {% if front and front.lead %}
+  <a class="lane-more" data-total="{{ feed.items|length }}" data-rest="{{ 1 if next_offset else 0 }}"
+     href="/?f={{ feed.active|urlencode }}&amp;view=list{% if next_offset %}&amp;at={{ feed.items[next_offset].card.lead.id }}{% endif %}"{% if not next_offset %} hidden{% endif %}>
+    More stories <span>{{ feed.items|length - next_offset if next_offset else 0 }} more</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+  {% endif %}
 </div>
 </div>
 

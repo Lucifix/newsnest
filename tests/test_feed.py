@@ -213,7 +213,8 @@ def test_feed_pages_load_incrementally_without_repeats(db, cfg, monkeypatch):
     from newsnest.web import app
     with TestClient(app) as client:
         page = client.get("/?f=all").text
-        assert page.count('<article class="story') == 20
+        # the feed's own cards (the wide-screen front page before it repeats some of them)
+        assert page.split('id="stream"', 1)[1].count('<article class="story') == 20
         assert page.count('id="cardmenu"') == 1 and page.count("<form") < 30  # one shared menu, not 5 forms per card
         seen = set(__import__("re").findall(r'id="item-(\d+)"', page))
         url = page.split('data-fragment="')[1].split('"')[0].replace("&amp;", "&")
@@ -356,3 +357,40 @@ def test_ranking_lookups_do_not_read_every_stored_story(db, cfg, monkeypatch):
     add(db, cfg, "a", "New story", "https://a.si/new")
     add(db, cfg, "b", "New story too", "https://b.si/new")
     assert feed_mod._new_sources(db, 14, set(), NOW) == {"b"}
+
+
+def _front_item(name, category="AI", read=False, image=True):
+    from types import SimpleNamespace
+    return SimpleNamespace(name=name, category=category, card=SimpleNamespace(read=read, image="x.jpg" if image else None))
+
+
+def _names(package):
+    return [it.name for it in package.items]
+
+
+def test_front_page_leads_with_the_best_unread_story_then_top_stories_then_categories():
+    from newsnest.feed import TOP_STORIES, front_page
+    items = [_front_item("read-best", read=True), _front_item("lead"), _front_item("t1"), _front_item("t2", image=False),
+             _front_item("t3"), _front_item("t4"), _front_item("s1", "Security"), _front_item("a1"),
+             _front_item("s2", "Security", image=False), _front_item("x1", "Space"), _front_item("a2")]
+    front = front_page(items)
+    assert front.lead.name == "lead"   # unread first: the read best story only fills up
+    assert [p.title for p in front.packages] == [TOP_STORIES, "Security", "AI"]
+    assert _names(front.packages[0]) == ["t1", "t2", "t3", "t4"]
+    assert _names(front.packages[1]) == ["s1", "s2"]
+    # Every story at most once; Space has a single story left, too few for a package
+    assert _names(front.packages[2]) == ["a1", "a2", "read-best"]
+    shown = [front.lead.name] + [n for p in front.packages for n in _names(p)]
+    assert len(shown) == len(set(shown)) and "x1" not in shown
+
+
+def test_front_page_puts_a_photo_first_and_skips_lone_or_unscored_categories():
+    from newsnest.feed import front_page
+    items = [_front_item("lead"), _front_item("t1", image=False), _front_item("t2")]
+    assert _names(front_page(items).packages[0]) == ["t2", "t1"]   # the large slot wants a photo
+    unscored = [_front_item(f"u{i}", "Unscored") for i in range(8)]
+    assert [p.title for p in front_page(unscored).packages] == ["Top stories"]
+    # A category view: every story shares the category, so no package repeats it
+    one = [_front_item(f"a{i}") for i in range(10)]
+    assert [p.title for p in front_page(one).packages] == ["Top stories"]
+    assert front_page([]).lead is None and front_page([_front_item("only")]).packages == []
