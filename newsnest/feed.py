@@ -518,6 +518,56 @@ def view_feed(ranking: Ranking, cfg: Config, active: str = "all") -> Feed:
                 read_count=ranking.read_count + sum(1 for it in capped if it.card.read), dropped=ranking.dropped)
 
 
+TOP_STORIES = "Top stories"
+
+
+@dataclass
+class Package:
+    """A block of the desktop front page: one story large, the rest as headlines beside it."""
+    title: str               # TOP_STORIES or a category
+    items: list[FeedItem]    # the large one first
+
+
+@dataclass
+class FrontPage:
+    lead: FeedItem | None
+    packages: list[Package]
+
+
+def front_page(items: list[FeedItem], per_package: int = 4, max_packages: int = 4, min_package: int = 2) -> FrontPage:
+    """The desktop front page beside the feed, picked from the feed's own ranked stream: the best story as
+    the lead, then Top stories (the next ones by rank), then a package for each category in the order of its
+    best story. Unread stories come first, so the page shows what is still new; read ones only fill up.
+    Every story appears at most once on it (the feed beside it still lists them all, in rank order).
+    In a package the first story with a photo is the large one. No database access."""
+    pool = [it for it in items if not it.card.read] + [it for it in items if it.card.read]
+    if not pool:
+        return FrontPage(lead=None, packages=[])
+    lead, rest = pool[0], pool[1:]
+
+    def package(title: str, chosen: list[FeedItem]) -> Package:
+        with_photo = next((it for it in chosen if it.card.image), chosen[0])
+        return Package(title, [with_photo] + [it for it in chosen if it is not with_photo])
+
+    packages: list[Package] = []
+    top = rest[:per_package]
+    if len(top) >= min_package:
+        packages.append(package(TOP_STORIES, top))
+    used = {id(it) for it in [lead, *top]}
+    by_category: dict[str, list[FeedItem]] = {}
+    for it in rest:  # by rank, so the categories come in the order of their best remaining story
+        if id(it) not in used and it.category and it.category != "Unscored":
+            by_category.setdefault(it.category, []).append(it)
+    # Inside one category every story shares it: a package of that category would only repeat the feed
+    if len(by_category) > 1 or (by_category and lead.category not in by_category):
+        for title, members in by_category.items():
+            if len(packages) >= max_packages:
+                break
+            if len(members) >= min_package:
+                packages.append(package(title, members[:per_package]))
+    return FrontPage(lead=lead, packages=packages)
+
+
 def read_stories(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now: datetime | None = None) -> list[tuple[Card, datetime]]:
     """Stories read inside the feed window, most recently read first."""
     now = now or utcnow()

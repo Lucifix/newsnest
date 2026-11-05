@@ -30,7 +30,8 @@
 {# Tapping the tab you are on, at its All, is Refresh (a new feed session: fresh ranking, new stories), as in
    most feed apps; from a chip inside it, the first tap goes back to All #}
 {% set refresh_tab = feed.active if feed is defined and path == '/' else none %}
-{% macro tab_href(key) %}/?f={{ key }}{% if key == refresh_tab %}&amp;refresh=1{% endif %}{% endmacro %}
+{# In the home's list view (wide screens' More stories) the tabs stay in the list view #}
+{% macro tab_href(key) %}/?f={{ key }}{% if list_view %}&amp;view=list{% endif %}{% if key == refresh_tab %}&amp;refresh=1{% endif %}{% endmacro %}
 <header class="topbar">
   <a class="brand" href="/" aria-label="NewsNest, today's digest">
     {{ logo_mark() }}

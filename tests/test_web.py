@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 
 import pytest
@@ -495,8 +496,9 @@ def test_cards_have_one_tap_feedback_and_fresh_assets(client, env):
     from newsnest.web import ASSET_VERSION
     assert f"/static/app.js?v={ASSET_VERSION}" in r.text
     assert r.headers["cache-control"] == "no-cache"
-    cards = r.text.count('<article class="story')
-    assert cards and r.text.count('class="act like"') == cards and r.text.count('class="act dislike"') == cards
+    feed = r.text.split('id="stream"', 1)[1]  # the feed's cards; the wide-screen front page's copies have no buttons
+    cards = feed.count('<article class="story')
+    assert cards and feed.count('class="act like"') == cards and feed.count('class="act dislike"') == cards
     assert 'data-action="like"' not in r.text  # like/dislike live on the card, not in the menu
 
 
@@ -701,3 +703,41 @@ def test_the_feed_names_its_own_view_for_in_place_tab_switches(client):
     assert 'class="feedwrap home" data-href="/?f=tech"' in client.get("/?f=tech").text
     assert 'class="feedwrap home" data-href="/?f=tech"' in client.get("/").text   # the filter cookie reopens Tech
     assert 'data-href="/?f=cat%3Aheadlines%3AWorld"' in client.get("/?f=cat:headlines:World").text
+
+
+def test_home_has_a_front_page_for_wide_screens_beside_the_feed(client):
+    """The front page repeats stories from the feed: its copies share data-ids (read state follows both) but
+    not the feed card's id, and they are not seen-tracked (only the feed's [data-track-seen] counts)."""
+    html = client.get("/?f=all").text
+    front = html.split('<section class="front"', 1)[1].split("</section>\n")[0]
+    lead_ids = re.search(r'class="story flead[^"]*" data-ids="([^"]+)"', front).group(1)
+    assert f'data-ids="{lead_ids}"' in html.split('id="stream"', 1)[1]   # the lead is in the feed too
+    assert 'id="item-' not in front and "data-track-seen" not in front
+    assert '<h2 class="lane-head">' in html
+    assert 'class="lane-more"' in html and "&amp;view=list" in html.split('class="lane-more"', 1)[1].split(">")[0]
+
+
+def test_the_list_view_is_the_feed_alone_and_tabs_and_chips_stay_in_it(client):
+    """More stories (wide screens) opens view=list: no front page, the sidebars (the way back and the chips on
+    the left, today's numbers and the top stories on the right), and every tab and chip link keeps the list
+    view, also after a Refresh."""
+    html = client.get("/?f=headlines&view=list").text
+    assert '<section class="front"' not in html and 'class="lane-more"' not in html
+    nav = html.split('<aside class="listnav"', 1)[1].split("</aside>")[0]
+    assert 'class="listback" href="/?f=headlines"' in nav and '<nav class="cats"' in nav   # chips move into it
+    assert html.count('<nav class="cats"') == 1 and '<aside class="listrail"' in html and 'class="railtop"' in html
+    assert 'data-href="/?f=headlines&amp;view=list"' in html
+    tabs = re.findall(r'<a href="(/\?f=[^"]+)" data-tab=', html)
+    assert tabs and all("view=list" in t for t in tabs)
+    assert all("view=list" in c for c in re.findall(r'<a class="[^"]*" href="(/\?f=[^"]+)"', html.split('<nav class="cats"', 1)[1].split("</nav>")[0]))
+    # at=<story>: the list starts at that story (More stories' first story left out), wherever it ranks now
+    stream = html.split('id="stream"', 1)[1]
+    ids = re.findall(r'id="item-(\d+)"', stream)
+    later = client.get(f"/?f=headlines&view=list&at={ids[1]}").text
+    assert re.findall(r'id="item-(\d+)"', later.split('id="stream"', 1)[1]) == ids[1:]
+    assert 'class="listnote">From story 2 of' in later
+    gone = client.get("/?f=headlines&view=list&at=999999").text   # no longer in the feed: from the top
+    assert re.findall(r'id="item-(\d+)"', gone.split('id="stream"', 1)[1]) == ids
+    r = client.get("/?f=headlines&view=list&refresh=1", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/?f=headlines&view=list"
+    assert "view=list" not in client.get("/?f=headlines").text.split('<nav class="sections"', 1)[1].split("</nav>")[0]

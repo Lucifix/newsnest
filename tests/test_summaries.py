@@ -192,6 +192,7 @@ def test_subscriber_articles_show_a_lock_and_keep_their_place(client):
     client.post("/api/items/1/summarize", headers={"Accept": "application/json"})
     client.post("/api/items/2/summarize", headers={"Accept": "application/json"})
     page = client.get("/?f=all").text
+    page = page[page.index('id="stream"'):]  # the feed (the wide-screen front page before it repeats stories)
     assert page.count('aria-label="Subscriber article"') == 1
     lock = page.index('aria-label="Subscriber article"')
     assert page.rindex('id="item-', 0, lock) == page.index('id="item-1"')  # on the paid story's card

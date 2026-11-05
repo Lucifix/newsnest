@@ -288,10 +288,8 @@
 
 {% macro feed_card(it, calibration) %}
 {% set c = it.card %}{% set r = c.lead.row %}
-{# lead: on desktop the first story heads the page, with the next few stacked beside it #}
-{% set place = ' lead' if it.first else '' %}
 {% if it.big %}
-<article {{ card_attrs(c, 'fcard big h' ~ hue(c.lead.source_name) ~ place) }}>
+<article {{ card_attrs(c, 'fcard big h' ~ hue(c.lead.source_name)) }}>
   <a class="big-media" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
     <img src="{{ c.image }}" alt="" decoding="async" referrerpolicy="no-referrer" loading="{{ 'eager' if it.first else 'lazy' }}">
     <span class="hero-mono">{{ initials(c.lead.source_name) }}</span>
@@ -304,7 +302,7 @@
   </div>
 </article>
 {% else %}
-<article {{ card_attrs(c, 'card fcard' ~ (' has-img' if c.image else '') ~ place) }}>
+<article {{ card_attrs(c, 'card fcard' ~ (' has-img' if c.image else '')) }}>
   <div class="card-text">
     {{ feed_meta(it) }}
     <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h3>
@@ -318,6 +316,95 @@
   {{ feed_foot(it, calibration) }}
 </article>
 {% endif %}
+{% endmacro %}
+
+{# ---------- desktop front page: the lead and the packages beside the feed (wide screens only) ----------
+   Reading entry points: every story here is also in the feed lane, which keeps the buttons. They carry
+   data-ids, so marking a story read in either place dims both (app.js setStoryRead), but no id attribute
+   (that belongs to the feed's card) and no seen tracking (the feed's card counts that). #}
+{% macro front_attrs(c, kind) %}class="story {{ kind }}{% if c.read %} read{% endif %}" data-ids="{{ c.ids }}" data-read="{{ 1 if c.read else 0 }}"{% endmacro %}
+
+{% macro front_labels(it) %}
+{% set c = it.card %}
+<div class="flabels">
+  {% if it.category and it.category != 'Unscored' %}<span class="flabel c{{ cat_hue(it.category) }}">{{ it.category }}</span>{% endif %}
+  {% if it.updated %}<span class="pill updated">Updated</span>{% elif c.unseen %}<span class="pill new">New</span>{% endif %}
+  {% if it.extra == 'exploring' %}<span class="pill exploring">Exploring</span>{% elif it.discovered %}<span class="pill discovered">Discovered</span>{% endif %}
+  {% for w in c.watches %}<span class="pill watch">{{ w }}</span>{% endfor %}
+  <span class="pill readmark">Read</span>
+</div>
+{% endmacro %}
+
+{# The AI's lede when the story has key points, else the feed's snippet #}
+{% macro front_dek(c, lines) %}
+{% set text = c.summary_member.row.summary if c.summary_member else c.lead.row.snippet %}
+{% if text %}<p class="fdek clamp-{{ lines }}">{{ text }}</p>{% endif %}
+{% endmacro %}
+
+{% macro front_byline(it) %}
+{% set c = it.card %}{% set r = c.lead.row %}
+<p class="fbyline">{{ badge(c.lead.source_name, c.logo, r.source_id) }}<span class="src">{{ c.lead.source_name }}</span>{{ paid_mark(c.lead) }}
+  <time datetime="{{ r.published or r.fetched_at }}" title="{{ localtime(r.published or r.fetched_at, '%d.%m. %H:%M') }}">{{ ago(r.published or r.fetched_at) }}</time>
+  {% if c.others %}<span class="fcov">{{ c.outlets }} outlets</span>{% endif %}</p>
+{% endmacro %}
+
+{# The score as a block on the photo: lime, or pink from 7 up (the feed's "high") #}
+{% macro front_score(c) %}
+{% if c.final is not none %}<span class="fscore{% if c.final >= 7 %} high{% endif %}" title="Score {{ '%.1f'|format(c.final) }} of 10"><b>{{ '%.1f'|format(c.final) }}</b><small>Score</small></span>{% endif %}
+{% endmacro %}
+
+{% macro front_media(c, kind, eager=false) %}
+<a class="big-media {{ kind }}" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+  {% if c.image %}<img src="{{ c.image }}" alt="" decoding="async" referrerpolicy="no-referrer" loading="{{ 'eager' if eager else 'lazy' }}">{% endif %}
+  <span class="hero-mono">{{ initials(c.lead.source_name) }}</span>
+</a>
+{% endmacro %}
+
+{% macro front_lead(it) %}
+{% set c = it.card %}{% set r = c.lead.row %}
+{% set points = key_points(c.summary_member.row) if c.summary_member else none %}
+<article {{ front_attrs(c, 'flead h' ~ hue(c.lead.source_name)) }}>
+  {{ front_media(c, 'flead-media', eager=true) }}
+  {{ front_score(c) }}
+  <div class="flead-panel">
+    {{ front_labels(it) }}
+    <h2><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h2>
+    {{ front_dek(c, 3) }}
+    {% if points %}<ul class="fpoints">{% for p in points[:3] %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+    {{ front_byline(it) }}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro front_package(p) %}
+{% set big = p.items[0] %}{% set bc = big.card %}
+<section class="fpack {{ 'top' if p.title == top_stories else 'c' ~ cat_hue(p.title) }}">
+  <h2 class="fpack-head">{{ p.title }} <span><i>/</i> {{ 'the highest scores right now' if p.title == top_stories else p.items|length ~ ' stories' }}</span></h2>
+  <div class="fpack-body">
+    <article {{ front_attrs(bc, 'fbig h' ~ hue(bc.lead.source_name)) }}>
+      {{ front_media(bc, 'fbig-media') }}
+      {{ front_score(bc) }}
+      {{ front_labels(big) }}
+      <h3><a href="/go/{{ bc.lead.id }}" target="_blank" rel="noopener">{{ bc.lead.row.title }}</a></h3>
+      {{ front_dek(bc, 3) }}
+      {{ front_byline(big) }}
+    </article>
+    <div class="fpack-list">
+      {% for it in p.items[1:] %}{% set c = it.card %}
+      <article {{ front_attrs(c, 'fitem') }}>
+        <div class="fitem-text">
+          {{ front_labels(it) }}
+          <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ c.lead.row.title }}</a></h3>
+          {{ front_dek(c, 2) }}
+          {{ front_byline(it) }}
+        </div>
+        {% if c.image %}<a class="thumb-img fitem-thumb" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+          <img src="{{ c.image }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></a>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 {% endmacro %}
 
 {% macro mark_all(feed, token) %}
