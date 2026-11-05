@@ -447,7 +447,7 @@
   <section class="screens" aria-labelledby="scr-h">
     <div class="section-head reveal">
       <p class="eyebrow">Screens</p>
-      <h2 id="scr-h">Made for your phone first.</h2>
+      <h2 id="scr-h">Made for your phone first.<br><span class="soft">A front page on desktop.</span></h2>
     </div>
     <!-- Same HTML phone as the hero; ui-light / ui-dark pin each screen's theme whatever the page uses -->
     <div class="shots">
@@ -584,6 +584,73 @@
         <figcaption>Dark mode, automatically</figcaption>
       </figure>
     </div>
+
+    <!-- The home page on a wide screen, rebuilt in HTML like the phones: laid out at 1440 × 1060, then scaled to
+         fit. It follows the page's theme, like the hero phone. Same made-up outlets and stories as above. -->
+    <figure class="desk reveal">
+      <div class="browser" role="img" aria-label="NewsNest on a desktop: a front page with the top story scored 8.7, Top stories below it, and the ranked feed beside it">
+        <div class="browser-bar" aria-hidden="true"><i></i><i></i><i></i><span class="mono">newsnest.home</span></div>
+        <div class="desk-view" aria-hidden="true"><div class="desk-screen">
+          <div class="d-top">
+            <svg class="logo" viewBox="0 0 32 32"><path class="logo-arc" d="M8.8 13.6A9.6 9.6 0 0 1 18.4 23.2"/><path class="logo-arc" d="M8.8 6.4A16.8 16.8 0 0 1 25.6 23.2"/><circle class="logo-dot" cx="8.8" cy="23.2" r="4.2"/></svg>
+            <b>NewsNest</b>
+            <span class="d-tabs"><span class="on">For you</span><span>News</span><span>Tech</span></span>
+            <svg class="d-icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+            <svg class="d-icon d-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+          </div>
+          <div class="d-page">
+            <p class="app-date">Saturday, 31 October</p>
+            <p class="d-hi">Good morning</p>
+            <div class="d-row"><span class="app-new"><b>8</b> new</span><span class="d-mark">✓ Mark all read</span></div>
+            <div class="d-chips">
+              <span class="on">All <i>24</i></span>
+              <span><b style="--h: var(--h1)"></b>Climate <i>5</i></span>
+              <span><b style="--h: var(--h3)"></b>Local <i>6</i></span>
+              <span><b style="--h: var(--h4)"></b>Travel <i>4</i></span>
+              <span><b style="--h: var(--h7)"></b>AI <i>9</i></span>
+            </div>
+            <div class="d-lanes">
+              <div class="d-front">
+                <div class="d-lead">
+                  <div class="d-photo"><img src="photos/sea-wall.webp" alt="" width="720" height="420" loading="lazy"><span class="d-score"><b>8.7</b><small>Score</small></span></div>
+                  <div class="d-panel">
+                    <p class="d-labels"><span class="d-label" style="--h: var(--h1)">Climate</span><span class="d-new">New</span></p>
+                    <h3>Coastal cities agree on a shared flood-defence fund</h3>
+                    <p class="d-dek">Twelve port cities will pool money for sea walls and pumps, with the first payments due next spring.</p>
+                    <ul class="d-points"><li>Fund starts at €1.2 billion</li><li>Covers sea walls, pumps and sensors</li></ul>
+                    <p class="d-by"><span class="badge" style="--h: var(--h8)">MP</span><b>Meridian Post</b>1 h ago · 5 outlets</p>
+                  </div>
+                </div>
+                <div class="d-pack">
+                  <p class="d-pack-head">Top stories <span><i>/</i> the highest scores right now</span></p>
+                  <div class="d-pack-body">
+                    <div class="d-big">
+                      <div class="d-photo"><img src="photos/night-train.webp" alt="" width="720" height="420" loading="lazy"><span class="d-score sm"><b>8.1</b><small>Score</small></span></div>
+                      <p class="d-labels"><span class="d-label" style="--h: var(--h4)">Travel</span><span class="d-new">New</span></p>
+                      <h4>Night trains return on four European routes</h4>
+                      <p class="d-dek">Sleeper services link Amsterdam, Vienna, Prague and Milan again from December.</p>
+                      <p class="d-by"><span class="badge" style="--h: var(--h1)">HT</span><b>Harbor Times</b>2 h ago</p>
+                    </div>
+                    <div class="d-list">
+                      <div class="d-item"><div><p class="d-labels"><span class="d-label" style="--h: var(--h7)">AI</span></p><h4>Open model now matches last year's frontier on coding tasks</h4><p class="d-by"><span class="badge" style="--h: var(--h7)">BL</span><b>Byte Ledger</b>3 h ago</p></div><img src="photos/code.webp" alt="" width="720" height="420" loading="lazy"></div>
+                      <div class="d-item"><div><p class="d-labels"><span class="d-label" style="--h: var(--h3)">Local</span></p><h4>Old town closes its main bridge to cars for good</h4><p class="d-by"><span class="badge" style="--h: var(--h3)">TC</span><b>The Courier</b>3 h ago</p></div><img src="photos/city-bike.webp" alt="" width="720" height="420" loading="lazy"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="d-lane">
+                <p class="d-lane-head"><span>Your feed</span> ranked for you</p>
+                <div class="d-card new"><p class="d-meta"><span class="badge" style="--h: var(--h8)">MP</span><b>Meridian Post</b>· 1 h ago</p><h4>Coastal cities agree on a shared flood-defence fund</h4><img src="photos/sea-wall.webp" alt="" width="720" height="420" loading="lazy"><p class="d-lede">Twelve port cities will pool money for sea walls and pumps, with the first payments due next spring.</p><p class="d-foot"><span class="score sm">8.7</span><span class="acts"><svg viewBox="0 0 24 24"><path d="M7 10v10H4V10zM7 10l4-7a2 2 0 0 1 3 2l-1 5h6a2 2 0 0 1 2 2.3l-1.3 6A2 2 0 0 1 17.7 20H7"/></svg><svg viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"/></svg><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17 19 7"/></svg></span></p></div>
+                <div class="d-card new"><p class="d-meta"><span class="badge" style="--h: var(--h1)">HT</span><b>Harbor Times</b>· 2 h ago</p><h4>Night trains return on four European routes</h4><img src="photos/night-train.webp" alt="" width="720" height="420" loading="lazy"><p class="d-lede">Sleeper services link Amsterdam, Vienna, Prague and Milan again from December.</p><p class="d-foot"><span class="score sm">8.1</span><span class="acts"><svg viewBox="0 0 24 24"><path d="M7 10v10H4V10zM7 10l4-7a2 2 0 0 1 3 2l-1 5h6a2 2 0 0 1 2 2.3l-1.3 6A2 2 0 0 1 17.7 20H7"/></svg><svg viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"/></svg><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17 19 7"/></svg></span></p></div>
+                <div class="d-card"><p class="d-meta"><span class="badge" style="--h: var(--h7)">BL</span><b>Byte Ledger</b>· 3 h ago</p><h4>Open model now matches last year's frontier on coding tasks</h4><img src="photos/code.webp" alt="" width="720" height="420" loading="lazy"><p class="d-lede">Weights are released under an open licence and run on a single high-end GPU.</p><p class="d-foot"><span class="score sm">7.9</span><span class="acts"><svg viewBox="0 0 24 24"><path d="M7 10v10H4V10zM7 10l4-7a2 2 0 0 1 3 2l-1 5h6a2 2 0 0 1 2 2.3l-1.3 6A2 2 0 0 1 17.7 20H7"/></svg><svg viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"/></svg><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17 19 7"/></svg></span></p></div>
+                <div class="d-card"><p class="d-meta"><span class="badge" style="--h: var(--h3)">TC</span><b>The Courier</b>· 3 h ago</p><h4>Old town closes its main bridge to cars for good</h4><img src="photos/city-bike.webp" alt="" width="720" height="420" loading="lazy"><p class="d-lede">Cyclists and buses only from March; deliveries keep a morning window.</p><p class="d-foot"><span class="score sm low">6.8</span><span class="acts"><svg viewBox="0 0 24 24"><path d="M7 10v10H4V10zM7 10l4-7a2 2 0 0 1 3 2l-1 5h6a2 2 0 0 1 2 2.3l-1.3 6A2 2 0 0 1 17.7 20H7"/></svg><svg viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"/></svg><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17 19 7"/></svg></span></p></div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <figcaption>A front page on bigger screens</figcaption>
+    </figure>
   </section>
 
   <!-- Quick start -->
