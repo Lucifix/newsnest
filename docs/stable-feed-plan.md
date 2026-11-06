@@ -63,8 +63,9 @@ Signals (impressions, reads, opens, weights) are recorded exactly as before; the
    - **Refresh** in the ⋯ menu: on the feed a new session, on every other page a reload as before. The
      installed app's separate top bar Refresh button is gone: with pull to refresh it was one control too
      many, and the menu item covers every page.
-   - **Tap the tab you are on**, as in most feed apps; from a part or chip inside the tab the first tap
-     goes back to its All.
+   - **Tap the tab you are on**, in two steps as in most feed apps: scrolled down, the tap only goes back
+     to the top (the order stays); at the top it refreshes. From a part or chip inside the tab the first
+     tap goes back to its All.
 3. **"N new stories" pill** (later): stories fetched after the session started that would make the feed;
    a top story is named, so breaking news is not hidden until the next session.
 

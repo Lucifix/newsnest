@@ -691,12 +691,19 @@ async function showFeed(href, { push = false, tab = false } = {}) {
   }
 }
 
-// A dock tab: lit at once, back to the top, its stories follow. Tapping the tab you are on refreshes
-// (its link carries refresh=1), with the same placeholders instead of a blank reload.
+// A dock tab: lit at once, back to the top, its stories follow. Tapping the tab you are on takes two
+// steps, as in most feed apps: scrolled down, the tap only goes back to the top (the feed keeps its order);
+// at the top it refreshes (its link carries refresh=1), with the same placeholders instead of a blank reload.
+const AT_TOP = 8;  // px: this close to the top counts as there
 document.addEventListener("click", (event) => {
   const tab = event.target.closest(".sections a[data-tab], .tabbar a[data-tab]");
   if (!tab || !plainClick(event) || !swapsInPlace()) return;
   event.preventDefault();
+  if (new URL(tab.href).searchParams.has("refresh") && scrollY > AT_TOP) {
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollTo({ top: 0, behavior: still ? "instant" : "smooth" });
+    return;
+  }
   let href = tab.href;
   // News reopens the chip I was on inside it (tapping News while on it goes back to its All)
   if (tab.dataset.tab === "headlines" && document.body.dataset.tab !== "headlines") {

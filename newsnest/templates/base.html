@@ -28,7 +28,8 @@
    sections in config.yaml: one shows once it has a feed to read. #}
 {% set sections = dock(section) %}
 {# Tapping the tab you are on, at its All, is Refresh (a new feed session: fresh ranking, new stories), as in
-   most feed apps; from a chip inside it, the first tap goes back to All #}
+   most feed apps; scrolled down, app.js makes that tap only go back to the top first. From a chip inside
+   it, the first tap goes back to All #}
 {% set refresh_tab = feed.active if feed is defined and path == '/' else none %}
 {# In the home's list view (wide screens' More stories) the tabs stay in the list view #}
 {% macro tab_href(key) %}/?f={{ key }}{% if list_view %}&amp;view=list{% endif %}{% if key == refresh_tab %}&amp;refresh=1{% endif %}{% endmacro %}
