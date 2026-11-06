@@ -200,7 +200,6 @@ async function summarize(form, button) {
     const result = await postForm(`/api/items/${button.dataset.summarize}/summarize`, { lines: button.dataset.lines });
     if (result.html) {
       const body = form.closest(".bodytext");
-      body.querySelector(".snippet")?.remove();
       form.outerHTML = result.html;
       body.classList.add("fresh");
       body.querySelector(".tldr summary")?.focus({ preventScroll: true });

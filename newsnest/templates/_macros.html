@@ -72,16 +72,15 @@
 </div>
 {% endmacro %}
 
-{# The card's text: key points when summarized, else the feed snippet plus a button that writes them #}
+{# The card's text: the publisher's snippet, then the AI's key points when summarized, else a button that writes them #}
 {% macro body_text(c, lines=3, open=false) %}
 {% set r = c.lead.row %}
 {% set sm = c.summary_member %}
 <div class="bodytext">
-{% if sm %}
-{{ summary_body(sm.row, lines, open) }}
-{% else %}
 {% if r.snippet %}<p class="snippet clamp-{{ lines }}">{{ r.snippet }}</p>{% endif %}
-{% if c.can_summarize %}{{ summarize_button(c.lead.id, lines, r.summary_status == 'error') }}{% endif %}
+{% if sm %}
+{{ summary_body(sm.row, lines, open, under_snippet=r.snippet) }}
+{% elif c.can_summarize %}{{ summarize_button(c.lead.id, lines, r.summary_status == 'error') }}
 {% endif %}
 </div>
 {% endmacro %}
@@ -95,14 +94,16 @@
 </div>
 {% endmacro %}
 
-{# row: the summarized item. Older summaries (before key points) are a prose paragraph. #}
-{% macro summary_body(row, lines=3, open=false) %}
+{# row: the summarized item. Older summaries (before key points) are a prose paragraph.
+   under_snippet: the card shows the publisher's snippet above, so the AI's lede goes inside the key points box
+   (labelled as the AI's) instead of standing in for the description; with no snippet it stays on the card. #}
+{% macro summary_body(row, lines=3, open=false, under_snippet=false) %}
 {% set points = key_points(row) %}
 {% if points is none %}
 <p class="summary clamp-{{ lines }}">{{ row.summary }}</p>
 {% if row.summary_source == 'snippet' %}<p class="note">Summary from the feed snippet only</p>{% endif %}
 {% else %}
-<p class="summary lede">{{ row.summary }}</p>
+{% if not under_snippet %}<p class="summary lede">{{ row.summary }}</p>{% endif %}
 <details class="tldr"{% if open %} open{% endif %}>
   <summary>
     <span class="tldr-label">
@@ -113,6 +114,7 @@
     {% if row.summary_depth == 'full' %}<span class="depth">Worth a full read{% if row.summary_depth_tag %} · {{ row.summary_depth_tag }}{% endif %}</span>{% endif %}
   </summary>
   <div class="tldr-body">
+    {% if under_snippet %}<p class="tldr-lede"><span class="tag ai">AI summary</span>{{ row.summary }}</p>{% endif %}
     {% if row.summary_why %}<p class="tldr-why"><span class="tag">For you</span>{{ row.summary_why }}</p>{% endif %}
     {% if points %}<ul class="points">{% for p in points %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
     <p class="tldr-foot">
@@ -335,9 +337,9 @@
 </div>
 {% endmacro %}
 
-{# The AI's lede when the story has key points, else the feed's snippet #}
+{# The feed's snippet, else the AI's lede when the story has key points #}
 {% macro front_dek(c, lines) %}
-{% set text = c.summary_member.row.summary if c.summary_member else c.lead.row.snippet %}
+{% set text = c.lead.row.snippet or (c.summary_member.row.summary if c.summary_member else none) %}
 {% if text %}<p class="fdek clamp-{{ lines }}">{{ text }}</p>{% endif %}
 {% endmacro %}
 

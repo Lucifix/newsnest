@@ -157,8 +157,13 @@ def test_cards_offer_the_button_then_show_key_points(client):
     assert '<details class="tldr" open>' in body["html"] and "Buses 2, 6 and 11 rerouted" in body["html"]
     # the lede is never clamped, so opening the key points moves nothing above the toggle
     assert "Worth a full read · guide" in body["html"] and "clamp-" not in body["html"]
+    # the publisher's snippet stays on the card, so the AI's lede goes inside the box, labelled as the AI's
+    assert '<p class="tldr-lede"><span class="tag ai">AI summary</span>' in body["html"]
+    assert 'class="summary lede"' not in body["html"]
     page = client.get("/?f=all").text  # stored: the next load shows it without another call
     assert page.count("Get key points") == 1 and "Reopens in spring" in page
+    card = page[page.index('id="item-1"'):]
+    assert card.index('class="snippet') < card.index('class="tldr"')  # the snippet is kept, above the key points
     log = connect().execute("SELECT purpose, COUNT(*) FROM ai_calls GROUP BY purpose").fetchall()
     assert [tuple(r) for r in log] == [("summary_tap", 1)]
     client.post("/api/items/1/summarize", headers={"Accept": "application/json"})
