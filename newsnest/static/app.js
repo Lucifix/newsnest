@@ -576,11 +576,15 @@ function rememberNewsChip() {
 // The tapped tab or chip lights at once and the old stories dim; if the server takes a moment (ranking a
 // new feed session can), placeholder cards hold the place until the stories arrive. Two timers keep the
 // placeholders from flickering: an answer within SKELETON_DELAY swaps straight in and never shows them,
-// and once shown they stay at least SKELETON_MIN, so they never flash by. Anything unexpected falls back
+// and once shown they stay at least SKELETON_MIN, so they never flash by. A dock tab is another page, so
+// its placeholders go up at once, before the jump to the top (the old tab's top never shows); they stay a
+// shorter SKELETON_MIN_TAB, so a quick answer is not held back for long. Anything unexpected falls back
 // to loading the page.
-const SKELETON_DELAY = 250;  // ms
-const SKELETON_MIN = 400;    // ms
+const SKELETON_DELAY = 250;    // ms
+const SKELETON_MIN = 400;      // ms
+const SKELETON_MIN_TAB = 200;  // ms
 let skeletonShownAt = null;  // when the placeholders on screen appeared (a later tap keeps them up)
+let skeletonMin = SKELETON_MIN;
 const SKELETON_CARD = '<div class="skel-card"><div class="skel-text"><i class="skel skel-meta"></i>' +
   '<i class="skel skel-title"></i><i class="skel skel-title short"></i><i class="skel skel-line"></i></div><i class="skel skel-thumb"></i></div>';
 const SKELETON = '<div class="skel-feed" aria-hidden="true"><div class="skel-card big"><i class="skel skel-media"></i>' +
@@ -591,12 +595,13 @@ const SKELETON_CHIPS = `<div class="cats skel-chips" aria-hidden="true">${'<i cl
 const swapsInPlace = () => !!document.body.dataset.tab && !!document.querySelector(".feedwrap #stream");
 const plainClick = (event) => !(event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
 
-function showSkeleton(wrap, tab) {
+function showSkeleton(wrap, tab, min = SKELETON_MIN) {
   const stream = wrap.querySelector("#stream");
   if (!stream) return;
   if (!stream.querySelector(".skel-feed")) {
     stream.innerHTML = SKELETON;
     skeletonShownAt = performance.now();
+    skeletonMin = min;
   }
   if (!tab || wrap.querySelector(".skel-chips")) return;
   // Another tab: its chips and notes are not known yet either
@@ -638,8 +643,9 @@ function syncDock(doc) {
 }
 
 let feedLoad = null;
-// push: a new history entry (a tap); otherwise the current one is updated (Back, or a refresh)
-async function showFeed(href, { push = false, tab = false } = {}) {
+// push: a new history entry (a tap); otherwise the current one is updated (Back, or a refresh).
+// now: the placeholders go up at once instead of after SKELETON_DELAY (a dock tab)
+async function showFeed(href, { push = false, tab = false, now = false } = {}) {
   const wrap = document.querySelector(".feedwrap");
   const scrollLeft = tab ? 0 : wrap.querySelector(".cats")?.scrollLeft ?? 0;
   feedLoad?.abort();  // a later tap wins
@@ -647,7 +653,8 @@ async function showFeed(href, { push = false, tab = false } = {}) {
   wrap.classList.remove("swapped");
   wrap.classList.add("swapping");
   wrap.querySelector("#stream")?.setAttribute("aria-busy", "true");
-  const skeleton = setTimeout(() => showSkeleton(wrap, tab), SKELETON_DELAY);
+  if (now) showSkeleton(wrap, tab, SKELETON_MIN_TAB);
+  const skeleton = now ? null : setTimeout(() => showSkeleton(wrap, tab), SKELETON_DELAY);
   try {
     const response = await fetch(href, { headers: { Accept: "text/html" }, signal: load.signal });
     // Refresh (?refresh=1) redirects back to the feed; anything else (the login page) loads for real
@@ -659,7 +666,7 @@ async function showFeed(href, { push = false, tab = false } = {}) {
     if (load !== feedLoad) return;
     clearTimeout(skeleton);  // arrived in time: the placeholders never show
     if (skeletonShownAt !== null) {  // already showing: keep them up long enough not to flash
-      const wait = SKELETON_MIN - (performance.now() - skeletonShownAt);
+      const wait = skeletonMin - (performance.now() - skeletonShownAt);
       if (wait > 0) await new Promise((resolve) => { setTimeout(resolve, wait); });
       if (load !== feedLoad) return;  // tapped elsewhere meanwhile
     }
@@ -691,7 +698,7 @@ async function showFeed(href, { push = false, tab = false } = {}) {
   }
 }
 
-// A dock tab: lit at once, back to the top, its stories follow. Tapping the tab you are on takes two
+// A dock tab: lit at once, its placeholders at once, back to the top behind them, its stories follow. Tapping the tab you are on takes two
 // steps, as in most feed apps: scrolled down, the tap only goes back to the top (the feed keeps its order);
 // at the top it refreshes (its link carries refresh=1), with the same placeholders instead of a blank reload.
 const AT_TOP = 8;  // px: this close to the top counts as there
@@ -720,8 +727,8 @@ document.addEventListener("click", (event) => {
   }
   const refresh = new URL(href).searchParams.has("refresh");
   lightTab(tab.dataset.tab);
+  showFeed(href, { push: !refresh, tab: true, now: true });  // puts the placeholders up before it waits
   scrollTo({ top: 0, behavior: "instant" });
-  showFeed(href, { push: !refresh, tab: true });
 });
 
 document.addEventListener("click", (event) => {
