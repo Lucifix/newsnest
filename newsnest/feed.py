@@ -427,6 +427,50 @@ def rank_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now:
                    read_count=read_count, dropped=dropped, cutoff=cutoff)
 
 
+# Scores within this distance of digest.min_final are close calls: the stories the swipe deck asks about
+SWIPE_BAND = 1.5
+
+
+def swipe_deck(conn: sqlite3.Connection, cfg: Config, sources: list[Source], skip: set[str] = frozenset(),
+               now: datetime | None = None) -> list[FeedItem]:
+    """The stories NewsNest is least sure about, for the swipe deck: a rating there teaches it the most.
+    In order: scores close to the cutoff (closest first, on either side, so stories the feed hides
+    are asked about too), then stories from new sources, then unscored ones; newest first within each.
+    Left out: read, rated, hidden or muted stories and those in `skip` (swiped up for later)."""
+    now = now or utcnow()
+    names = {s.id: s.name for s in sources}
+    discovered_ids = {s.id for s in sources if s.params.get("discovered")}
+    new_ids = _new_sources(conn, cfg.feed.new_source_days, discovered_ids, now)
+    sections = section_keys(cfg)
+    cutoff = cfg.digest.min_final
+    cards = make_cards(window_rows(conn, iso(now - timedelta(hours=cfg.feed.window_hours))), cfg, names)
+    picked: list[tuple[tuple, FeedItem]] = []
+    for card in cards:
+        members = [card.lead, *card.others]
+        if card.muted or card.lead.row["category"] not in sections or str(card.lead.id) in skip:
+            continue
+        if any(m.row["hidden_at"] or m.row["rating"] is not None for m in members) or story_read_at(card):
+            continue
+        final = card.final
+        if final is not None and abs(final - cutoff) <= SWIPE_BAND:
+            group, distance = 0, abs(final - cutoff)
+        elif card.lead.row["source_id"] in new_ids:
+            group, distance = 1, 0.0
+        elif final is None:
+            group, distance = 2, 0.0
+        else:
+            continue  # NewsNest is sure about this one either way
+        published = card.newest or card.published or now
+        item = FeedItem(card, 0.0, block_of(card.lead.row["category"], card.lead.row["ai_category"]),
+                        _category(card), card.lead.row["importance"] is not None
+                        and card.importance >= cfg.scoring.top_story_importance,
+                        discovered=card.lead.row["source_id"] in discovered_ids,
+                        below=final is not None and final < cutoff)
+        picked.append(((group, round(distance, 1), -published.timestamp()), item))
+    picked.sort(key=lambda p: p[0])
+    return [it for _, it in picked]
+
+
 def view_feed(ranking: Ranking, cfg: Config, active: str = "all") -> Feed:
     """One tab of a ranking: its stream, the dock's tabs and the chips under it. No database access."""
     capped, extras, affinity = ranking.items, ranking.extras, ranking.affinity

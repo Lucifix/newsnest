@@ -28,7 +28,7 @@ Learned outlet weights (card menu → "Less from …") keep a noisy new source i
 
 ## Feed ideas not built yet
 - [ ] PWA (home-screen app, pull to refresh, offline shell): needs HTTPS via NPM or VPN.
-- [x] Swipe section (Tinder-style deck at /swipe: right 👍, left not interested, up later, tap opens).
+- [x] Swipe section (Tinder-style deck at /swipe: right 👍, left not interested, up later, tap opens). Asks about close calls: scores near the cutoff first, then new sources, then unscored.
 - [ ] Swipe gestures on the feed cards themselves (not built; the deck is a separate section).
 - [ ] Feed catalog: a weekly check of every catalog URL (scheduled Action that opens an issue), reusing
       `python -m newsnest.catalog --check`.

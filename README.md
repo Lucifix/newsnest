@@ -71,7 +71,7 @@ local model in Ollama.
   for an outlet or topic, and review the weekly suggestions for your interests before they apply.
 - 🔎 **No black box.** Calibration mode shows every story with its scores and reasons, and
   *Missed this* lets you paste a link the feed should have shown you.
-- 🃏 **Swipe to sort.** A one-thumb deck to rate a backlog in minutes.
+- 🃏 **Swipe to sort.** A one-thumb deck of the stories NewsNest is least sure about, so a few minutes of rating teaches it the most.
 - 🖥️ **A front page on bigger screens.** On a laptop or desktop the home page becomes a front page: your
   top story large with its score, then Top stories and a block for each category, with your ranked feed
   beside it. *More stories* opens the rest of the feed as one column.
