@@ -543,6 +543,7 @@ def test_swipe_deck(client):
     assert 'href="/swipe"' in client.get("/").text  # Swipe is in the ⋯ menu while it is being tried out
     page = client.get("/swipe")
     assert page.status_code == 200
+    # Every source is new here, so all three stories are asked about
     assert page.text.count('<article class="swipecard') == 3 and 'data-left>3<' in page.text
     assert 'href="/go/1"' in page.text  # a tap opens the story through /go like the feed does
     assert "data-track-seen" not in page.text  # the deck counts no impressions

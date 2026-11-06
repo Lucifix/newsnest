@@ -394,3 +394,40 @@ def test_front_page_puts_a_photo_first_and_skips_lone_or_unscored_categories():
     one = [_front_item(f"a{i}") for i in range(10)]
     assert [p.title for p in front_page(one).packages] == ["Top stories"]
     assert front_page([]).lead is None and front_page([_front_item("only")]).packages == []
+
+
+def test_swipe_deck_asks_about_close_calls_first(db, cfg):
+    from newsnest.feed import swipe_deck
+    for sid in "abc":  # every source has older stories, so none is on trial as a new source
+        add(db, cfg, sid, f"Stara novica {sid}", f"https://{sid}.si/old", NOW - timedelta(days=30))
+    cut = cfg.digest.min_final
+    sure_yes = add(db, cfg, "a", "Vlada sprejela proračun", "https://a.si/1", topic=9, importance=9, personal=9)
+    sure_no = add(db, cfg, "a", "Nogometni rezultati tedna", "https://a.si/2", topic=1, importance=1, personal=1)
+    on_cut = add(db, cfg, "b", "Nova kolesarska steza v Mariboru", "https://b.si/1",
+                 topic=cut, importance=cut, personal=cut)
+    just_below = add(db, cfg, "b", "Cene elektrike rahlo navzgor", "https://b.si/2",
+                     topic=cut - 1, importance=cut - 1, personal=cut - 1)
+    just_above = add(db, cfg, "c", "Zdravniki opozarjajo na gripo", "https://c.si/1",
+                     topic=cut + 1.2, importance=cut + 1.2, personal=cut + 1.2)
+    unscored = add(db, cfg, "c", "Poplave na Koroškem", "https://c.si/2")
+    rated = add(db, cfg, "a", "Muzej odpira novo razstavo", "https://a.si/3", topic=cut, importance=cut, personal=cut)
+    db.execute("UPDATE items SET rating = -1 WHERE id = ?", (rated,))
+
+    def deck(skip=frozenset()):
+        return [it.card.lead.id for it in swipe_deck(db, cfg, SOURCES, skip)]
+
+    # Closest to the cutoff first, on either side (the feed hides the one just below), then unscored;
+    # the stories it is sure about and the one already rated are not asked about
+    assert deck() == [on_cut, just_below, just_above, unscored]
+    assert sure_yes not in deck() and sure_no not in deck()
+    assert just_below not in ids_in(build_feed(db, cfg, SOURCES))
+    assert deck({str(on_cut)}) == [just_below, just_above, unscored]  # swiped up: later
+
+
+def test_swipe_deck_includes_new_sources_whatever_they_score(db, cfg):
+    from newsnest.feed import swipe_deck
+    add(db, cfg, "a", "Stara novica", "https://a.si/old", NOW - timedelta(days=30))
+    trial = add(db, cfg, "d", "Prva novica novega vira", "https://d.si/1", topic=9, importance=9, personal=9)
+    settled = add(db, cfg, "a", "Vlada sprejela proračun", "https://a.si/1", topic=9, importance=9, personal=9)
+    ids = [it.card.lead.id for it in swipe_deck(db, cfg, SOURCES)]
+    assert trial in ids and settled not in ids

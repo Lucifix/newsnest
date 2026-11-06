@@ -37,8 +37,9 @@ from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_so
                              region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
 from newsnest import feedsession
-from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, TOP_STORIES, adjust_weight, build_feed, front_page,
-                        load_weights, nudge, read_stories, saved_stories, search_stories, story_hidden, view_feed, weight_strength)
+from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, TOP_STORIES, adjust_weight, front_page,
+                        load_weights, nudge, read_stories, saved_stories, search_stories, story_hidden, swipe_deck, view_feed,
+                        weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
 from newsnest.missed import handle_missed
 from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
@@ -428,14 +429,12 @@ SWIPE_LATER_COOKIE = "newsnest_swipe_later"  # lead ids swiped up ("later"), wri
 
 @app.get("/swipe", response_class=HTMLResponse)
 def swipe(request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
-    """Tinder-style deck over the For you ranking: right = 👍, left = not interested, up = later, tap opens.
-    Liked and "later" stories stay in the feed, so the deck leaves them out; impressions and auto-read
-    are not tracked here."""
+    """Tinder-style deck of the stories NewsNest is least sure about (feed.swipe_deck): right = 👍,
+    left = not interested, up = later, tap opens. Impressions and auto-read are not tracked here."""
     cfg = _require_cfg(loaded)
-    feed = build_feed(conn, cfg, named_sources(conn, cfg, loaded.sources), "all")
     later = set(request.cookies.get(SWIPE_LATER_COOKIE, "").split("."))
-    deck = [it for it in feed.items if it.card.lead.row["rating"] != 1 and str(it.card.lead.id) not in later]
-    return render(request, "swipe.html", conn, loaded, feed=feed, deck=deck[:SWIPE_DECK], left=len(deck))
+    deck = swipe_deck(conn, cfg, named_sources(conn, cfg, loaded.sources), later)
+    return render(request, "swipe.html", conn, loaded, deck=deck[:SWIPE_DECK], left=len(deck))
 
 
 @app.get("/read", response_class=HTMLResponse)
