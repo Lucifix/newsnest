@@ -195,6 +195,10 @@ A 60-second loop fetches the sources that are due, scores new stories in batches
 for the ones above your threshold. Scoring uses a small, cheap model with prompt caching; the rarer jobs
 (drafting your profile, the weekly suggestions) use a stronger one. Both are configurable.
 
+**Want the full story?** [How NewsNest works](docs/how-it-works.md) follows one headline from the moment
+it's published to your feed: how it's grouped, scored and ranked, and how the feed learns from the way
+you read.
+
 **What leaves your server:** headlines and snippets, and for key points the article text, go to the
 Anthropic API using your key (or to the provider you configured; with a local model in Ollama, nothing
 leaves your network). Your feed list, ratings and database stay on your machine, and NewsNest itself sends
