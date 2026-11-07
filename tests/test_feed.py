@@ -262,6 +262,27 @@ def test_old_boosts_are_skipped_only_when_asked(db):
     assert load_weights(db, skip_old_boosts=True) == {("source", "b"): 1.25, ("category", "AI"): 0.75, ("source", "c"): 1.8}
 
 
+def test_a_menu_choice_never_builds_on_an_old_boost(db, cfg, monkeypatch):
+    """Drift ignores old boosts, so "less" on a boosted category must still mean less, on or off."""
+    monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
+    from newsnest.feed import adjust_weight, load_weights
+    from newsnest.web import app
+    for kind, key in (("category", "Watches"), ("category", "Gear"), ("source", "a")):
+        db.execute("INSERT INTO weights (kind, key, weight, updated_at) VALUES (?, ?, 1.5, ?)", (kind, key, iso(NOW)))
+    with TestClient(app) as client:
+        client.post("/api/feedback", data={"action": "less_category", "target": "Watches"})
+        client.post("/api/feedback", data={"action": "more_category", "target": "Gear"})
+        client.post("/api/feedback", data={"action": "less_source", "target": "a"})
+    weights = load_weights(db)
+    assert weights[("category", "Watches")] == 0.75                 # from neutral, not 1.5 × 0.75 = 1.125
+    assert weights[("source", "a")] == 0.75
+    assert weights[("category", "Gear")] == 1.5                     # "more" never below the old boost
+    assert load_weights(db, skip_old_boosts=True) == weights        # all three are the reader's choices now
+    # later choices build on the earlier ones, as before
+    assert adjust_weight(db, "category", "Watches", 0.75) == 0.562
+    assert adjust_weight(db, "category", "Gear", 1.25) == 1.875
+
+
 def test_world_block_gets_its_own_chip(db, cfg):
     world = Source(id="w", type="rss", category="world", name="W", url="https://w.example/rss")
     ingest(db, world, [Item("w", "world", "Summit ends in Geneva", "https://w.example/1", "https://w.example/1", NOW)],
