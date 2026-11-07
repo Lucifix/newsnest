@@ -22,9 +22,9 @@ flowchart LR
 
 ## 07:12 · A headline is born
 
-Somewhere, an outlet publishes: **"Dončić scores 40 as the Lakers beat Boston."** (A made-up game, but the
-kind of headline NewsNest sees every day.) Three other outlets will write about the same game within the
-hour, one of them in Slovenian.
+On 6 November 2026, Luka Dončić scored 53 points as the Lakers beat Portland 124–118. By morning in Europe,
+an outlet publishes: **"Dončić scores 53 as the Lakers beat Portland."** Say three other outlets write
+about the same game within the hour, one of them in Slovenian.
 
 Let's follow it.
 
@@ -50,11 +50,11 @@ Four outlets, one game. You want **one card**, not four.
 
 NewsNest groups stories two ways:
 
-- **By rare words.** Two headlines sharing "Dončić" and "Boston" probably match; two sharing only
+- **By rare words.** Two headlines sharing "Dončić" and "Portland" probably match; two sharing only
   "government" probably don't. Rare words count for much more than common ones, which works in any
   language without word lists.
 - **By event.** When the AI scores a story (next step), it also names the real-world event it's about,
-  like `lakers-celtics-game`, reusing labels it already gave to other stories. That catches what word
+  like `lakers-trail-blazers-game`, reusing labels it already gave to other stories. That catches what word
   matching can't, like the Slovenian article that shares hardly a word with the English ones.
 
 The result is a **card**: one story, all its outlets. Covered by two or more outlets? It earns a small
@@ -74,12 +74,12 @@ For every headline it answers with:
 | | Question | Our game |
 |---|---|---|
 | **Topic** (0–10) | Does this match what you said you like? | 9: you follow the NBA |
-| **Importance** (0–10) | How big is this news, for anyone? | 4: one regular-season game |
+| **Importance** (0–10) | How big is this news, for anyone? | 4: one early-season NBA Cup game |
 | **Personal** (0–10) | Would *you* actually want to read it? | 8 |
-| **Reason** | One sentence explaining the scores | "Dončić's big night; you follow him." |
+| **Reason** | One sentence explaining the scores | "Dončić's 53-point night; you follow him." |
 | **Category** | One of a fixed list (Sports, Politics, AI, …) | Sports |
 | **Interest** | Which line of your interests file it matches | "Luka Dončić and NBA basketball" |
-| **Event** | A short name for the real-world event | `lakers-celtics-game` |
+| **Event** | A short name for the real-world event | `lakers-trail-blazers-game` |
 
 All three scores use the same scale: **9–10** you'd be annoyed to miss it, **7–8** you'd likely read
 it, **5–6** the headline is enough, **0–4** skip.
