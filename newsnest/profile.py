@@ -46,8 +46,19 @@ def profile_exists() -> bool:
 
 
 def strip_comments(text: str) -> str:
-    import re
-    return re.sub(r"<!--.*?-->", "", text, flags=re.S).strip()
+    """Drop every <!-- ... --> comment. An unclosed <!-- and everything after it is kept.
+
+    A plain loop, not re.sub(r"<!--.*?-->"): that regex got very slow on text with many unclosed <!--
+    (CodeQL py/polynomial-redos)."""
+    out, pos = [], 0
+    while (start := text.find("<!--", pos)) != -1:
+        end = text.find("-->", start + 4)
+        if end == -1:
+            break
+        out.append(text[pos:start])
+        pos = end + 3
+    out.append(text[pos:])
+    return "".join(out).strip()
 
 
 def seed_examples() -> list[tuple[bool, str]]:

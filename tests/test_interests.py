@@ -1,9 +1,10 @@
 import json
+import time
 from datetime import datetime, timezone
 
 from newsnest.ai import AIClient
 from newsnest.interests import apply_changes, bullet_diff, bullets, word_diff
-from newsnest.profile import read_profile, write_profile
+from newsnest.profile import read_profile, strip_comments, write_profile
 from newsnest.profile_ai import weekly_proposal
 from tests.conftest import fake_client
 
@@ -17,6 +18,22 @@ def change(op, section, old="", new="", reason="because"):
 
 def test_bullets_ignore_comments_and_other_text():
     assert bullets(FILE) == {"want": ["Linux and homelab", "AI coding tools"], "skip": ["Sports."]}
+
+
+def test_bullets_and_headings_are_trimmed():
+    assert bullets("##   Want  \r\n*\tTabs and spaces  \r\n-   \n-x\n") == {"want": ["Tabs and spaces"], "skip": []}
+
+
+def test_strip_comments_keeps_an_unclosed_comment():
+    assert strip_comments("a<!-- one -->b<!--> still open --> c <!-- never closed") == "ab c <!-- never closed"
+
+
+def test_long_odd_lines_stay_fast():
+    # The old regexes took minutes on these (CodeQL py/polynomial-redos); now they take milliseconds
+    start = time.perf_counter()
+    bullets("## Want\n* " + " " * 100_000 + "\n## x" + " " * 100_000 + "y")
+    strip_comments("<!--" * 100_000)
+    assert time.perf_counter() - start < 1
 
 
 def test_apply_changes_touches_only_what_it_names():

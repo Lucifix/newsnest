@@ -24,8 +24,10 @@ def _section_of(heading: str) -> str | None:
 
 
 def _bullet(line: str) -> str | None:
-    m = re.match(r"^\s*[-*]\s+(.*\S)\s*$", line)
-    return m.group(1) if m else None
+    # The regex only finds the marker; strip() trims the text. A regex that also trimmed it got very slow
+    # on a line of thousands of spaces (CodeQL py/polynomial-redos).
+    m = re.match(r"\s*[-*]\s(.*)", line)
+    return (m.group(1).strip() or None) if m else None
 
 
 def _scan(lines: list[str]) -> list[tuple[str | None, str | None, bool]]:
@@ -40,9 +42,9 @@ def _scan(lines: list[str]) -> list[tuple[str | None, str | None, bool]]:
             in_comment = "-->" not in line.split("<!--", 1)[1]
             out.append((None, None, False))
             continue
-        m = re.match(r"^##\s+(.*?)\s*$", line)
+        m = re.match(r"##\s(.*)", line)  # trimmed with strip(), not the regex, for the same reason as _bullet
         if m:
-            section = _section_of(m.group(1))
+            section = _section_of(m.group(1).strip())
             out.append((section, None, True))
         else:
             out.append((section, _bullet(line) if section else None, False))
