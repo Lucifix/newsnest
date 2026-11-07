@@ -193,6 +193,10 @@ Anthropic API using your key (or to the provider you configured; with a local mo
 leaves your network). Your feed list, ratings and database stay on your machine, and NewsNest itself sends
 no telemetry.
 
+**Known limits:** stories are grouped by their headlines, so two different stories are sometimes merged
+(both headlines stay visible on the card). Most feeds only hold about a day of news, so the first start
+can only fetch what the feeds still have (at most 3 days, `max_item_age_days`).
+
 ### Choosing an AI provider
 
 Claude through the Anthropic API is the default and needs nothing beyond `ANTHROPIC_API_KEY`. To use
@@ -388,7 +392,7 @@ tests/              pytest suite
 
 </details>
 
-Planned work and known limits are tracked in [TODO.md](TODO.md).
+Planned work is tracked in [GitHub issues](https://github.com/Lucifix/newsnest/issues).
 
 ## Contributing
 
