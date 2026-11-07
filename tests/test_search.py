@@ -18,7 +18,8 @@ def found(db, cfg, q, **kw):
 
 def test_migration_builds_index_from_existing_items(env):
     conn = connect()
-    migrate_to = len(MIGRATIONS) - 1  # everything before the search migration
+    # everything before the search migration, found by what it does: later migrations keep being added
+    migrate_to = next(i for i, sql in enumerate(MIGRATIONS) if "CREATE VIRTUAL TABLE items_fts" in sql)
     from newsnest.db import _run_script, transaction
     conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
     for version, sql in enumerate(MIGRATIONS[:migrate_to], start=1):
@@ -28,6 +29,7 @@ def test_migration_builds_index_from_existing_items(env):
             conn.execute("INSERT INTO schema_version (version) VALUES (?)", (version,))
     conn.execute("INSERT INTO items (source_id, category, url, url_norm, title, fetched_at) "
                  "VALUES ('a', 'news', 'https://a.si/x', 'a.si/x', 'Koncept fiat multiplay', '2026-10-24T08:00:00+00:00')")
+    assert not conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'items_fts'").fetchone()
     migrate(conn)
     triggers = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'")}
     assert {"items_fts_insert", "items_fts_update", "items_fts_delete"} <= triggers
