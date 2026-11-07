@@ -2,7 +2,7 @@
 
 Without this every page load, tab switch or Back ranked the feed again, and much of what the ranking
 reads changes while you scan: an opened story is read (and left the feed), a card on screen for a second
-sinks, an open nudges its outlet's weight, new articles arrive. Opening a story and coming back then
+sinks, new articles arrive. Opening a story and coming back then
 showed a reshuffled page.
 
 A session stores the ranking for every tab (newsnest.feed.Ranking) as story positions. Each view loads
@@ -29,8 +29,9 @@ from newsnest.digest import make_cards
 from newsnest.feed import FeedItem, Ranking, rank_feed, story_hidden, story_read_at, window_rows
 
 COOKIE = "newsnest_feed"
-# Bumped whenever the stored payload changes shape: a session of another format is ranked again
-FORMAT = 1
+# Bumped whenever the stored payload changes shape or meaning: a session of another format is ranked again
+# (2: drift and revisit stories, newsnest.drift)
+FORMAT = 2
 # Sessions nobody used for this long are deleted, and only the newest few are kept
 KEEP = timedelta(hours=24)
 KEEP_MAX = 20

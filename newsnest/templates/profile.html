@@ -68,8 +68,19 @@
 
 <section class="sgroup" id="tuning">
   <h2 class="sgroup-title tuning-title">How your feed is tuned</h2>
-  <p class="sgroup-foot tuning-intro">NewsNest shows more or less from these, based on what you open, like, and pick in a story's ⋯ menu. Nothing is ever hidden.</p>
+  <p class="sgroup-foot tuning-intro">NewsNest shows more or less from these, based on what you read lately and what you pick in a story's ⋯ menu. Nothing is ever hidden.</p>
 </section>
+{% if tuning.lately_more or tuning.lately_less %}
+{% call group('Lately', footnote='From what you read, open, save and like these weeks. It changes as you read; nothing to set.') %}
+  {% if tuning.lately_more %}<div class="srow"><span class="srow-main"><span class="srow-title">More</span><span class="srow-sub wrap">{{ tuning.lately_more|join(', ') }}</span></span></div>{% endif %}
+  {% if tuning.lately_less %}<div class="srow"><span class="srow-main"><span class="srow-title">Less</span><span class="srow-sub wrap">{{ tuning.lately_less|join(', ') }}</span></span></div>{% endif %}
+{% endcall %}
+{% elif tuning.warmup_days_left is not none %}
+{% call group('Lately') %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Learning what you read lately</span>
+    <span class="srow-sub">{% if tuning.warmup_days_left > 0 %}Ready in about {{ tuning.warmup_days_left }} day{{ 's' if tuning.warmup_days_left != 1 }}{% else %}Ready after a bit more reading{% endif %}</span></span></div>
+{% endcall %}
+{% endif %}
 {% if tuning.more or tuning.less or tuning.small %}
 {% if tuning.more %}{% call group('Showing more', icons=true) %}{{ tuning_rows(tuning.more, 'more') }}{% endcall %}{% endif %}
 {% if tuning.less %}{% call group('Showing less', icons=true) %}{{ tuning_rows(tuning.less, 'less') }}{% endcall %}{% endif %}

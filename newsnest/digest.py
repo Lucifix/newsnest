@@ -153,6 +153,35 @@ def make_cards(rows: list[sqlite3.Row], cfg: Config, names: dict[str, str]) -> l
     """Group item rows into cards. Items belong together when the headline matcher put them in one
     story or Claude gave them the same event label; either link is enough. The best-scoring item
     leads, and the cross-outlet bonus counts the outlets of the whole group."""
+    cards: list[Card] = []
+    for rows_in in group_rows(rows):
+        ranked = rank_members(rows_in, cfg)
+        members = [Member(r, final, names.get(r["source_id"], r["source_id"])) for r, final in ranked]
+        lead, others = members[0], members[1:]
+        watches = sorted({w for m in members for w in loads(m.row["watches"], [])})
+        cards.append(Card(
+            lead=lead, others=others,
+            # New = no version of the story has been on screen yet
+            unseen=not any(m.row["seen_at"] or m.row["read_at"] for m in members),
+            must_show=any(m.row["prefilter"] == "must_show" for m in members),
+            muted=all(m.row["prefilter"] == "muted" for m in members),
+            watches=watches))
+    return cards
+
+
+def rank_members(rows: list[sqlite3.Row], cfg: Config) -> list[tuple[sqlite3.Row, float | None]]:
+    """A card's items with their final score, best first (newest on a tie): the first one leads. The
+    cross-outlet bonus counts the outlets of the whole card. Rows need id, source_id, published and the
+    sub-scores (scoring.final_score)."""
+    outlets = len({r["source_id"] for r in rows})
+    ranked = [(r, final_score(r, outlets, cfg)) for r in rows]
+    ranked.sort(key=lambda m: (m[1] if m[1] is not None else -1, m[0]["published"] or ""), reverse=True)
+    return ranked
+
+
+def group_rows(rows: list[sqlite3.Row]) -> list[list[sqlite3.Row]]:
+    """Item rows grouped as cards: a shared story_id or a shared event label joins them, and the links chain.
+    Rows need id, story_id and event."""
     parent: dict[int, int] = {}
 
     def find(x: int) -> int:
@@ -177,22 +206,7 @@ def make_cards(rows: list[sqlite3.Row], cfg: Config, names: dict[str, str]) -> l
     groups: dict[int, list[sqlite3.Row]] = defaultdict(list)
     for r in rows:
         groups[find(r["id"])].append(r)
-
-    cards: list[Card] = []
-    for rows_in in groups.values():
-        outlets = len({r["source_id"] for r in rows_in})
-        members = [Member(r, final_score(r, outlets, cfg), names.get(r["source_id"], r["source_id"])) for r in rows_in]
-        members.sort(key=lambda m: (m.final if m.final is not None else -1, m.row["published"] or ""), reverse=True)
-        lead, others = members[0], members[1:]
-        watches = sorted({w for m in members for w in loads(m.row["watches"], [])})
-        cards.append(Card(
-            lead=lead, others=others,
-            # New = no version of the story has been on screen yet
-            unseen=not any(m.row["seen_at"] or m.row["read_at"] for m in members),
-            must_show=any(m.row["prefilter"] == "must_show" for m in members),
-            muted=all(m.row["prefilter"] == "muted" for m in members),
-            watches=watches))
-    return cards
+    return list(groups.values())
 
 
 def _sort_key(card: Card):

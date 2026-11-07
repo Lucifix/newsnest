@@ -216,6 +216,7 @@
   {% endif %}
   {% set cutoff = '%g'|format(cfg.digest.min_final) %}
   {% set lead_note = [(0, 'Outside your usual topics, shown to explore')] if it.extra == 'exploring'
+       else [(0, 'Something you used to read, shown now and then')] if it.extra == 'revisit'
        else [(0, 'From a source you added recently')] if it.extra == 'new source'
        else [(-1, 'Below your ' ~ cutoff ~ ' cut-off; shown because calibration mode is on')] if it.below else [] %}
   {% set notes = lead_note + it.why %}

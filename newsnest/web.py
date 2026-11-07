@@ -37,9 +37,9 @@ from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_so
                              region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
 from newsnest import feedsession
-from newsnest.feed import (LIKE_NUDGE, OPEN_NUDGE, SEARCH_DAYS, TOP_STORIES, adjust_weight, front_page,
-                        load_weights, nudge, read_stories, saved_stories, search_stories, story_hidden, swipe_deck, view_feed,
-                        weight_strength)
+from newsnest.drift import FADED, LIFTED, current_drift
+from newsnest.feed import (SEARCH_DAYS, TOP_STORIES, adjust_weight, front_page, load_weights, read_stories,
+                        saved_stories, search_stories, story_hidden, swipe_deck, view_feed, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
 from newsnest.missed import handle_missed
 from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
@@ -526,7 +526,7 @@ def _mark_expanded(conn, item_id: int) -> None:
 
 @app.get("/go/{item_id}")
 def go(request: Request, item_id: int, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
-    row = conn.execute("SELECT url, source_id, ai_category, opened_at FROM items WHERE id = ?", (item_id,)).fetchone()
+    row = conn.execute("SELECT url, opened_at FROM items WHERE id = ?", (item_id,)).fetchone()
     if not row:
         raise HTTPException(404)
     _mark_story_read(conn, [item_id])
@@ -534,7 +534,6 @@ def go(request: Request, item_id: int, conn=Depends(get_conn), loaded: LoadedCon
         feedsession.touch(conn, loaded.config, request.cookies.get(feedsession.COOKIE))
     if row["opened_at"] is None:  # first open only; auto-read on scroll never comes through here
         conn.execute("UPDATE items SET opened_at = ? WHERE id = ?", (iso(utcnow()), item_id))
-        nudge(conn, row["source_id"], row["ai_category"], OPEN_NUDGE)
     return RedirectResponse(row["url"], status_code=302)
 
 
@@ -542,11 +541,8 @@ def go(request: Request, item_id: int, conn=Depends(get_conn), loaded: LoadedCon
 def rate(item_id: int, request: Request, value: int = Form(...), conn=Depends(get_conn)):
     if value not in (-1, 0, 1):
         raise HTTPException(400, "value must be -1, 0 or 1")
-    before = conn.execute("SELECT rating, source_id, ai_category FROM items WHERE id = ?", (item_id,)).fetchone()
     conn.execute("UPDATE items SET rating = ?, rated_at = ? WHERE id = ?",
                  (value or None, iso(utcnow()) if value else None, item_id))
-    if before is not None and (before["rating"] == 1) != (value == 1):  # 👍 added or taken back
-        nudge(conn, before["source_id"], before["ai_category"], LIKE_NUDGE, undo=value != 1)
     if "application/json" in request.headers.get("accept", ""):
         return JSONResponse({"id": item_id, "rating": value})
     return RedirectResponse(request.headers.get("referer", "/"), status_code=303)
@@ -717,9 +713,6 @@ def feedback(request: Request, action: str = Form(...), ids: str = Form(""), tar
     if action in ("not_interested", "undo_not_interested") and id_list:
         marks = ",".join("?" * len(id_list))
         hide = action == "not_interested"
-        lead = conn.execute("SELECT rating, source_id, ai_category FROM items WHERE id = ?", (id_list[0],)).fetchone()
-        if hide and lead is not None and lead["rating"] == 1:  # a liked story disliked: take the like boost back
-            nudge(conn, lead["source_id"], lead["ai_category"], LIKE_NUDGE, undo=True)
         conn.execute(f"UPDATE items SET hidden_at = ? WHERE id IN ({marks})", (now if hide else None, *id_list))
         conn.execute("UPDATE items SET rating = ?, rated_at = ? WHERE id = ?",
                      (-1 if hide else None, now if hide else None, id_list[0]))
@@ -844,17 +837,33 @@ def profile_page(request: Request, conn=Depends(get_conn), loaded: LoadedConfig 
                   **settings_context("profile", conn, loaded))
 
 
-def tuning_rows(conn, loaded: LoadedConfig) -> dict[str, list[dict]]:
-    """What the feed learned, in the groups the profile page shows: more, less, and tiny nudges."""
+LATELY_SHOWN = 5
+
+
+def tuning_rows(conn, loaded: LoadedConfig) -> dict:
+    """How the feed is tuned, in the groups the profile page shows: what you've read lately (drift, read-only),
+    then the outlet/category weights: more, less, and tiny ones. While drift is active the older learned
+    boosts are left out, as the feed leaves them out."""
     names = {s.id: s.name for s in named_sources(conn, loaded.config, loaded.sources)} if loaded.config else {}
+    drift = current_drift(conn, loaded.config) if loaded.config else None
     more, less, small = [], [], []
-    for (kind, key), w in load_weights(conn).items():
+    for (kind, key), w in load_weights(conn, skip_old_boosts=bool(drift and drift.active)).items():
         direction, level = weight_strength(w)
         row = {"kind": kind, "key": key, "name": names.get(key, key) if kind == "source" else key, "weight": w,
                "level": level, "outlet": kind == "source"}
         (small if level == 0 else more if direction == "more" else less).append(row)
+    lately_more: list[str] = []
+    lately_less: list[str] = []
+    if drift and drift.active:
+        def name(key: str) -> str:
+            return names.get(key[7:], key[7:]) if key.startswith("source:") else drift.label(key)
+        ranked = sorted(drift.weights.items(), key=lambda kv: -abs(kv[1] - 1))
+        lately_more = [name(k) for k, w in ranked if w >= LIFTED][:LATELY_SHOWN]
+        lately_less = [name(k) for k, w in ranked if w <= FADED][:LATELY_SHOWN]
     return {"more": sorted(more, key=lambda r: -r["weight"]), "less": sorted(less, key=lambda r: r["weight"]),
-            "small": sorted(small, key=lambda r: r["name"].lower())}
+            "small": sorted(small, key=lambda r: r["name"].lower()),
+            "lately_more": lately_more, "lately_less": lately_less,
+            "warmup_days_left": drift.warmup_days_left if drift else None}
 
 
 @app.post("/profile/save/{name}")
@@ -1102,6 +1111,19 @@ def _onboarding_next(form) -> bool:
     return form.get("next") == "/profile"
 
 
+def _write_drift_enabled(data, on: bool) -> None:
+    """"Follow what I've been reading lately". On is the default, so turning it on removes the setting
+    rather than writing it: configs of people who never touch it stay as they were."""
+    if not on:
+        section_map(data, "drift")["enabled"] = False
+        return
+    drift = data.get("drift")
+    if drift is not None:
+        drift.pop("enabled", None)
+        if not drift:
+            del data["drift"]
+
+
 def _write_region(data, form) -> None:
     """Country and city from a form, plus the web domain and time zone when it has them. A country with a
     Local pack fills in the pack's domain and zone when the form leaves them out (the onboarding form does)."""
@@ -1256,6 +1278,7 @@ async def settings_action(action: str, request: Request):
             data["budget"]["daily_usd"] = float(form["daily_usd"])
             data["scoring"]["summary_language"] = form["summary_language"].strip() or "English"
             section_map(data, "feed")["auto_read_on_scroll"] = form.get("auto_read_on_scroll") == "on"
+            _write_drift_enabled(data, form.get("follow_lately") == "on")
             if "country" in form:
                 _write_region(data, form)
         elif action == "region":

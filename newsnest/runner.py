@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 from newsnest.bootstrap import config_dir, ensure_dirs
 from newsnest.config import Config, LoadedConfig, Source, load_config
 from newsnest.discovery import HOST_SPACING, discovery_sources, retire_candidates
+from newsnest.drift import refresh_drift
 from newsnest.db import dumps, get_meta, iso, migrate, parse_iso, session, set_meta, transaction, utcnow
 from newsnest.grouping import GROUPING_VERSION, regroup
 from newsnest import icons
@@ -110,6 +111,11 @@ def tick(force: bool = False, ai: bool = True) -> dict:
                 log.error("config invalid", extra={"errors": loaded.errors})
                 return {"config_errors": loaded.errors}
             summary = fetch_sources(conn, loaded, force=force)
+            try:  # what you've read lately, worked out ahead so rankings don't wait for it (newsnest.drift)
+                if refresh_drift(conn, loaded.config):
+                    summary["drift"] = "refreshed"
+            except Exception:
+                log.exception("drift refresh failed")
             today = datetime.now().date().isoformat()
             if get_meta(conn, "discovery_retire_day") != today:
                 set_meta(conn, "discovery_retire_day", today)

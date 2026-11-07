@@ -69,6 +69,9 @@ local model in Ollama.
   hint whether the full article is worth your time.
 - 👍 **It learns from you.** Likes, dislikes and opens shift what you see. Pick *more about* or *less from*
   for an outlet or topic, and review the weekly suggestions for your interests before they apply.
+- 🔄 **Follows your changing interests on its own.** Topics you've been reading lately, even just the headline
+  and summary, move up; ones you stopped reading move down, never out, and come back when you do. No
+  questions asked. Profile shows what it noticed; Settings → General turns it off.
 - 🔎 **No black box.** Calibration mode shows every story with its scores and reasons, and
   *Missed this* lets you paste a link the feed should have shown you.
 - 🃏 **Swipe to sort.** A one-thumb deck of the stories NewsNest is least sure about, so a few minutes of rating teaches it the most.
