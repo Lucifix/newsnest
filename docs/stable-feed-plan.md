@@ -1,6 +1,6 @@
 # Stable feed sessions
 
-Status: phases 1 and 2 built (`newsnest/feedsession.py`, tests in `tests/test_feedsession.py`); phase 3 later.
+Status: phases 1 and 2 built (`newsnest/feedsession.py`, tests in `tests/test_feedsession.py`); phase 3 is issue #65.
 
 ## Problem
 
@@ -66,7 +66,7 @@ Signals (impressions, reads, opens, weights) are recorded exactly as before; the
    - **Tap the tab you are on**, in two steps as in most feed apps: scrolled down, the tap only goes back
      to the top (the order stays); at the top it refreshes. From a part or chip inside the tab the first
      tap goes back to its All.
-3. **"N new stories" pill** (later): stories fetched after the session started that would make the feed;
+3. **"N new stories" pill** (not built yet, issue #65): stories fetched after the session started that would make the feed;
    a top story is named, so breaking news is not hidden until the next session.
 
 ## Risks and how they are covered
