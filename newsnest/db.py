@@ -1,7 +1,9 @@
 """SQLite storage. One connection per call site (thread-safe with WAL); schema is versioned.
 
 The production database survives redeploys, so every schema change is a new entry in
-MIGRATIONS and is applied in order on start.
+MIGRATIONS and is applied in order on start. Append only: never edit, reorder or remove an entry that has
+shipped, since an entry's position is its version number. Before pending migrations run, the database is
+copied to backups/ next to it, and a database written by a newer release is refused rather than used.
 """
 
 from __future__ import annotations
@@ -283,16 +285,51 @@ def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
     conn.execute("COMMIT")
 
 
+BACKUPS_KEPT = 3
+
+
+class SchemaTooNew(RuntimeError):
+    """The database was upgraded by a newer release than this one (a rollback): running on would misread it."""
+
+
 def migrate(conn: sqlite3.Connection) -> int:
     conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)")
     row = conn.execute("SELECT version FROM schema_version").fetchone()
     current = row["version"] if row else 0
+    if current > len(MIGRATIONS):
+        raise SchemaTooNew(
+            f"The database is at schema version {current}, but this NewsNest release only knows versions up to "
+            f"{len(MIGRATIONS)}: it was upgraded by a newer release. Run that release again, or restore the copy "
+            f"taken before the upgrade from {backup_dir(conn) or 'the backups folder next to the database'}.")
+    if 0 < current < len(MIGRATIONS):  # a fresh database has nothing to keep
+        backup_before_migrating(conn, current)
     for version, sql in enumerate(MIGRATIONS[current:], start=current + 1):
         with transaction(conn):
             _run_script(conn, sql)
             conn.execute("DELETE FROM schema_version")
             conn.execute("INSERT INTO schema_version (version) VALUES (?)", (version,))
     return len(MIGRATIONS)
+
+
+def backup_dir(conn: sqlite3.Connection) -> Path | None:
+    """backups/ beside the database file, or None for an in-memory database."""
+    file = conn.execute("PRAGMA database_list").fetchone()["file"]
+    return Path(file).parent / "backups" if file else None
+
+
+def backup_before_migrating(conn: sqlite3.Connection, version: int) -> Path | None:
+    """Copy the database before its schema changes, so a bad release can be undone by putting the copy back.
+    Keeps the newest BACKUPS_KEPT copies. A failure raises, and the migrations then don't run."""
+    folder = backup_dir(conn)
+    if folder is None:
+        return None
+    folder.mkdir(exist_ok=True)
+    # the timestamp leads so that sorting by name is sorting by age
+    dest = folder / f"newsnest-{utcnow():%Y%m%d-%H%M%S}-v{version}.db"
+    conn.execute("VACUUM INTO ?", (str(dest),))  # a consistent copy, WAL included, safe while others read
+    for old in sorted(folder.glob("newsnest-*-v*.db"))[:-BACKUPS_KEPT]:
+        old.unlink()
+    return dest
 
 
 def _run_script(conn: sqlite3.Connection, sql: str) -> None:
