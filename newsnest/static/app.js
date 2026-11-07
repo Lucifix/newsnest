@@ -333,11 +333,92 @@ if ("IntersectionObserver" in window) {
       }
     }
   }, { threshold: 0.6 });
-  trackStories = (stories) => stories.forEach((s) => observer.observe(s));
+  trackStories = (stories) => stories.forEach((s) => {
+    observer.observe(s);
+    attention.observe(s);
+  });
   document.addEventListener("DOMContentLoaded", () => trackStories(document.querySelectorAll("[data-track-seen] .story")));
   setInterval(flushSeen, 3000);
   addEventListener("pagehide", flushSeen);
 }
+
+// ---------- attention: how long each card is in view while you read (feed page only) ----------
+// Most stories are read from the headline and summary, never opened, so the time a card stays on screen
+// is the main sign of interest (newsnest.drift). Time only runs while the page is visible and you did
+// something in the last ATTENTION_IDLE ms, and it is split between the cards in view at once, so two
+// cards side by side get half each. A card is in view when 60% of it shows, or when it fills at least
+// half the screen (a tall card can never show 60%).
+const ATTENTION_TICK = 500;
+const ATTENTION_IDLE = 30000;
+const ATTENTION_CARD_MAX = 60000;   // per card per page load; the server caps the total
+const attentionMs = new Map();      // story element -> ms not sent yet
+const attentionTotal = new WeakMap(); // story element -> ms this page load
+const inView = new Set();
+let lastInput = performance.now();  // the first screen counts without a scroll
+let lastTick = performance.now();
+
+for (const type of ["scroll", "wheel", "touchstart", "touchmove", "pointerdown", "pointermove", "keydown"]) {
+  addEventListener(type, () => { lastInput = performance.now(); }, { passive: true, capture: true });
+}
+
+const attention = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    const big = entry.intersectionRect.height >= 0.5 * innerHeight;
+    if (entry.isIntersecting && (entry.intersectionRatio >= 0.6 || big)) inView.add(entry.target);
+    else inView.delete(entry.target);
+  }
+}, { threshold: [0, 0.25, 0.5, 0.6, 0.75, 1] }) : { observe() {} };
+
+setInterval(() => {
+  const now = performance.now();
+  const dt = Math.min(now - lastTick, 1000);  // a sleeping tab or laptop wakes up without a jump
+  lastTick = now;
+  if (document.visibilityState !== "visible" || now - lastInput > ATTENTION_IDLE) return;
+  for (const story of inView) if (!story.isConnected || story.hidden) inView.delete(story);
+  if (!inView.size) return;
+  const share = dt / inView.size;
+  for (const story of inView) {
+    const total = attentionTotal.get(story) || 0;
+    const add = Math.min(share, ATTENTION_CARD_MAX - total);
+    if (add <= 0) continue;
+    attentionTotal.set(story, total + add);
+    attentionMs.set(story, (attentionMs.get(story) || 0) + add);
+  }
+}, ATTENTION_TICK);
+
+function leadId(story) {
+  const m = /^item-(\d+)$/.exec(story?.id || "");
+  return m ? m[1] : story?.dataset.ids?.split(",")[0];
+}
+
+function flushAttention() {
+  const pairs = [];
+  for (const [story, ms] of attentionMs) {
+    const id = leadId(story);
+    if (ms >= 100 && id) {
+      pairs.push(`${id}:${Math.round(ms)}`);
+      attentionMs.delete(story);  // before sending, so a second trigger right after sends nothing twice
+    }
+  }
+  if (!pairs.length) return;
+  const body = new FormData();
+  body.set("ms", pairs.join(","));
+  if (!navigator.sendBeacon("/api/attention", body)) fetch("/api/attention", { method: "POST", body, keepalive: true });
+}
+setInterval(flushAttention, 3000);
+addEventListener("pagehide", flushAttention);
+// iOS Safari often skips pagehide when you switch apps; this one does fire
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushAttention(); });
+
+// Opening a card's key points yourself (not a page that shows them open) is a sign of interest too
+document.addEventListener("click", (event) => {
+  const summary = event.target.closest(".tldr > summary");
+  if (!summary || summary.parentElement.open) return;  // the click opens it only if it was closed
+  const id = leadId(summary.closest(".story, [data-ids]"));
+  if (!id) return;
+  const url = `/api/items/${id}/expanded`;
+  if (!navigator.sendBeacon(url)) fetch(url, { method: "POST", keepalive: true });
+});
 
 // ---------- card menu: more like this, not interested (with undo), less/more of outlet or category ----------
 function toast(message) {

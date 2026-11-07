@@ -225,3 +225,16 @@ def test_config_defaults_to_claude_and_checks_the_ai_section(env):
                            "  profile:\n    provider: anthropic\n")
     ai = load_config(env.config).config.ai
     assert ai.label == "ollama:11434" and ai.for_tier("profile").label == "Anthropic"
+
+
+def test_strict_scoring_schema_lists_every_property_as_required(conn, cfg):
+    """OpenAI strict mode rejects a schema with an optional property: scoring would fail for everyone on it."""
+    openai_cfg(cfg)
+    write_profile("interests.md", "## Want\n- Ljubljana\n- Basketball\n")
+    seed_items(conn, cfg, 1)
+    ai = AIClient(cfg, conn, fake_openai_client(echo_openai))
+    assert run_scoring(conn, cfg, ai)["scored"] == 1
+    schema = ai.client.chat.completions.calls[0]["response_format"]["json_schema"]["schema"]
+    item = schema["properties"]["items"]["items"]
+    assert set(item["required"]) == set(item["properties"]) and item["additionalProperties"] is False
+    assert item["properties"]["interest"]["enum"] == [0, 1, 2]

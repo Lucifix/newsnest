@@ -69,7 +69,7 @@ def test_scoring_stores_event_and_shows_active_events_to_claude(db, cfg):
     run_scoring(db, cfg, ai)
     prompt = ai.client.messages.calls[-1]["messages"][0]["content"]
     assert any("<active_events>" in blk["text"] and "php2shell-vulnerability" in blk["text"] for blk in prompt)
-    assert ai.client.messages.calls[-1]["output_config"]["format"]["schema"]["properties"]["items"]["items"]["required"][-1] == "event"
+    assert "event" in ai.client.messages.calls[-1]["output_config"]["format"]["schema"]["properties"]["items"]["items"]["required"]
 
 
 def test_cards_merge_by_event_even_when_headlines_share_nothing(db, cfg):

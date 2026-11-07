@@ -148,3 +148,64 @@ def test_prompts_follow_the_region(cfg):
     assert '"National" means Germany' in text
     assert "Berlin, Germany" in draft_system(cfg)
     assert dict(subscore_labels(cfg))["importance"] == "Big news for Germany"
+
+
+def interest_answers(values):
+    """An answer that gives the items, in order, these interest values (a missing key for MISSING)."""
+    def handler(kwargs):
+        import re
+        text = kwargs["messages"][0]["content"][-1]["text"]
+        ids = [int(i) for i in re.findall(r"id=(\d+)", text)]
+        items = []
+        for i, value in zip(ids, values):
+            item = {"id": i, "topic": 7, "importance": 5, "personal": 6, "reason": "test", "category": "Local"}
+            if value is not MISSING:
+                item["interest"] = value
+            items.append(item)
+        return json.dumps({"items": items}), "end_turn"
+    return handler
+
+
+MISSING = object()
+
+
+def test_scoring_labels_each_item_with_a_want_line(conn, cfg):
+    write_profile("interests.md", "## Want\n- Basketball\n- Local  news.\n- basketball\n\n## Skip\n- Celebrities\n")
+    seed_items(conn, cfg, 6)
+    ai = AIClient(cfg, conn, fake_client(interest_answers([2, 1, 0, 7, "2", MISSING])))
+    assert run_scoring(conn, cfg, ai)["scored"] == 6
+    call = ai.client.messages.calls[0]
+    # numbered once each (the repeated basketball line is dropped), in the cached profile block
+    assert "<want_lines>\n1. Basketball\n2. Local  news.\n</want_lines>" in call["system"][1]["text"]
+    schema = call["output_config"]["format"]["schema"]["properties"]["items"]["items"]
+    assert schema["properties"]["interest"] == {"type": "integer", "enum": [0, 1, 2]}
+    assert "interest" in schema["required"]
+    rows = conn.execute("SELECT interest, score_status FROM items ORDER BY fetched_at DESC, id DESC").fetchall()
+    # 2 and 1 map to their lines (normalized); 0, out of range, a string and a missing key store nothing
+    assert [r["interest"] for r in rows] == ["local news", "basketball", None, None, None, None]
+    assert {r["score_status"] for r in rows} == {"scored"}  # a missing or wrong label never means a retry
+
+
+def test_scoring_without_want_lines_offers_only_none(conn, cfg):
+    write_profile("interests.md", "## Skip\n- Celebrities\n")
+    seed_items(conn, cfg, 2)
+    ai = AIClient(cfg, conn, fake_client(echo_scores))
+    assert run_scoring(conn, cfg, ai)["scored"] == 2
+    call = ai.client.messages.calls[0]
+    assert "<want_lines>" not in call["system"][1]["text"]
+    schema = call["output_config"]["format"]["schema"]["properties"]["items"]["items"]
+    assert schema["properties"]["interest"]["enum"] == [0]
+
+
+def test_reworded_want_lines_keep_their_labels(conn, cfg):
+    from newsnest.scoring import carry_interest_labels
+    seed_items(conn, cfg, 3)
+    conn.execute("UPDATE items SET interest = 'linux' WHERE id IN (1, 2)")
+    conn.execute("UPDATE items SET interest = 'ai coding' WHERE id = 3")
+    changes = [{"op": "reword", "section": "want", "old": "Linux", "new": "Linux and homelab"},
+               {"op": "reword", "section": "want", "old": "AI coding", "new": "AI agents"},  # edited away before saving
+               {"op": "add", "section": "want", "old": "", "new": "Recalls"}]
+    moved = carry_interest_labels(conn, changes, "## Want\n- Linux and homelab\n- AI coding\n- Recalls\n")
+    assert moved == 2
+    assert [r[0] for r in conn.execute("SELECT interest FROM items ORDER BY id")] == [
+        "linux and homelab", "linux and homelab", "ai coding"]

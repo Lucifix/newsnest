@@ -4,21 +4,28 @@ import sqlite3
 
 import pytest
 
-from newsnest.db import BACKUPS_KEPT, MIGRATIONS, SchemaTooNew, connect, migrate
+from newsnest.db import BACKUPS_KEPT, MIGRATIONS, SchemaTooNew, _run_script, connect, migrate, transaction
 
 
 def version(conn) -> int:
     return conn.execute("SELECT version FROM schema_version").fetchone()[0]
 
 
+def schema(conn) -> list[str]:
+    return sorted(r[0] for r in conn.execute("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL"))
+
+
 def at_previous_version(env):
-    """A database one release behind: all but the last migration applied, with a story in it."""
+    """A database one release behind: all but the last migration applied, with a story in it.
+    Built forward from the migrations, so it stays right whichever migration is added next."""
     conn = connect()
-    migrate(conn)
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    with transaction(conn):
+        for sql in MIGRATIONS[:-1]:
+            _run_script(conn, sql)
+        conn.execute("INSERT INTO schema_version (version) VALUES (?)", (len(MIGRATIONS) - 1,))
     conn.execute("INSERT INTO items (source_id, category, url, url_norm, title, fetched_at) "
                  "VALUES ('a', 'news', 'https://a.si/x', 'a.si/x', 'Kept', '2026-11-01T08:00:00+00:00')")
-    conn.execute("ALTER TABLE ai_calls DROP COLUMN provider")  # undo the last migration
-    conn.execute("UPDATE schema_version SET version = ?", (len(MIGRATIONS) - 1,))
     return conn
 
 
@@ -36,6 +43,7 @@ def test_a_fresh_install_takes_no_backup(env):
 
 def test_an_upgrade_backs_up_the_database_as_it_was(env):
     conn = at_previous_version(env)
+    before = schema(conn)
     assert migrate(conn) == len(MIGRATIONS)
     assert version(conn) == len(MIGRATIONS)
     [backup] = backups(env)
@@ -43,7 +51,7 @@ def test_an_upgrade_backs_up_the_database_as_it_was(env):
     copy = sqlite3.connect(backup)
     assert copy.execute("SELECT version FROM schema_version").fetchone()[0] == len(MIGRATIONS) - 1
     assert copy.execute("SELECT title FROM items").fetchall() == [("Kept",)]
-    assert "provider" not in {r[1] for r in copy.execute("PRAGMA table_info(ai_calls)")}
+    assert schema(copy) == before != schema(conn)  # the layout before the upgrade, not after
     copy.close()
     migrate(conn)  # nothing pending now: no second copy
     assert len(backups(env)) == 1
