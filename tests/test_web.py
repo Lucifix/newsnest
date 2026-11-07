@@ -743,3 +743,53 @@ def test_the_list_view_is_the_feed_alone_and_tabs_and_chips_stay_in_it(client):
     r = client.get("/?f=headlines&view=list&refresh=1", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/?f=headlines&view=list"
     assert "view=list" not in client.get("/?f=headlines").text.split('<nav class="sections"', 1)[1].split("</nav>")[0]
+
+
+def _card_ids(conn):
+    """Items 1 and 2 are one story (two outlets); item 3 joins them by event; item 4 has no story."""
+    story = conn.execute("SELECT story_id FROM items WHERE id = 1").fetchone()[0]
+    assert conn.execute("SELECT story_id FROM items WHERE id = 2").fetchone()[0] == story
+    conn.execute("UPDATE items SET event = 'pope-health' WHERE id IN (1, 3)")
+    conn.execute("UPDATE items SET story_id = NULL WHERE id = 4")
+
+
+def test_attention_time_counts_for_the_whole_card(client):
+    from newsnest.db import get_meta
+    conn = connect()
+    _card_ids(conn)
+    assert get_meta(conn, "attention_since") is None
+    r = client.post("/api/attention", data={"ms": "1:4200,4:900,x:5,7,2:-3,"})
+    assert r.json() == {"ok": 2}  # junk and non-positive times are skipped
+    view = lambda: [r[0] for r in conn.execute("SELECT view_ms FROM items ORDER BY id")]  # noqa: E731
+    assert view() == [4200, 4200, 4200, 900]  # same story, same event, and an item without a story
+    since = get_meta(conn, "attention_since")
+    assert since is not None
+    # one report adds at most a minute; a card collects at most five
+    for _ in range(6):
+        client.post("/api/attention", data={"ms": "3:999999"})
+    assert view() == [300000, 300000, 300000, 900]
+    assert get_meta(conn, "attention_since") == since  # set once, at the first report
+    assert client.post("/api/attention", data={"ms": ""}).json() == {"ok": 0}
+
+
+def test_opening_key_points_is_recorded_once_per_card(client):
+    conn = connect()
+    _card_ids(conn)
+    assert client.post("/api/items/2/expanded").json() == {"ok": True}
+    first = [r[0] for r in conn.execute("SELECT expanded_at FROM items ORDER BY id")]
+    assert all(first[:3]) and first[3] is None
+    client.post("/api/items/3/expanded")
+    assert [r[0] for r in conn.execute("SELECT expanded_at FROM items ORDER BY id")] == first  # not overwritten
+
+
+def test_accepting_a_reword_keeps_the_interest_labels(client, env):
+    import json
+    conn = connect()
+    (env.config / "interests.md").write_text("## Want\n- Linux\n- AI coding\n", encoding="utf-8")
+    conn.execute("UPDATE items SET interest = 'linux' WHERE id IN (1, 2)")
+    items = [{"op": "reword", "section": "want", "old": "Linux", "new": "Linux and homelab", "reason": "r"}]
+    pid = conn.execute("INSERT INTO proposals (created_at, kind, status, current_text, proposed_text, rationale, changes) "
+                       "VALUES (?, 'weekly', 'pending', 'old', 'proposed', 'x', ?)",
+                       (iso(NOW), json.dumps({"basis": {}, "items": items}))).lastrowid
+    client.post(f"/profile/proposals/{pid}/apply", data={"accept": ["0"]})
+    assert [r[0] for r in conn.execute("SELECT interest FROM items WHERE id IN (1, 2)")] == ["linux and homelab"] * 2

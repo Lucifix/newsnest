@@ -16,6 +16,7 @@ from newsnest.ai import AIClient, AIError, BudgetExceeded, Refused, Truncated, p
 from newsnest.config import Config
 from newsnest.events import EVENT_RULES, active_events_text, normalize_label
 from newsnest.db import iso, parse_iso, utcnow
+from newsnest.interests import bullets, norm
 from newsnest.profile import profile_exists, read_profile, seed_examples, strip_comments
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ promotional pages score low.
 as it did: what it is about and how that relates to their interests, e.g. "New parking rules in your \
 city; you follow local news." or "Product promo from a fashion shop; not one of your topics."
 - category: exactly one of the allowed categories.{place_note}
+- interest: the number of the line in want_lines this item matches best, or 0 if none matches well.
 {event_rules}
 
 Use this anchored scale for all three scores:
@@ -74,7 +76,41 @@ def instructions(cfg: Config) -> str:
         place_note=place_note, categories=", ".join(cfg.scoring.categories), event_rules=EVENT_RULES)
 
 
-def score_schema(categories: list[str]) -> dict:
+def want_lines() -> list[str]:
+    """The Want bullets of interests.md, each once (compared with interests.norm), in file order. The
+    scoring call labels each item with one of them by number, so recent reading can be followed per
+    interest (newsnest.drift), finer than the category."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for line in bullets(strip_comments(read_profile("interests.md")))["want"]:
+        if norm(line) not in seen:
+            seen.add(norm(line))
+            out.append(line)
+    return out
+
+
+def carry_interest_labels(conn: sqlite3.Connection, changes: list[dict], text: str) -> int:
+    """After an accepted proposal rewords Want lines, move the stories labelled with the old wording to the
+    new one, so that interest keeps its history. Only rewords that made it into the saved text count (the
+    reader can edit a proposal before accepting it). Returns how many items moved."""
+    want = {norm(line) for line in bullets(strip_comments(text))["want"]}
+    moved = 0
+    for change in changes:
+        if change.get("op") != "reword" or change.get("section") != "want":
+            continue
+        old, new = norm(change.get("old") or ""), norm(change.get("new") or "")
+        if old and new and old != new and new in want and old not in want:
+            moved += conn.execute("UPDATE items SET interest = ? WHERE interest = ?", (new, old)).rowcount
+    return moved
+
+
+def want_lines_text(lines: list[str]) -> str:
+    return "<want_lines>\n" + "\n".join(f"{i}. {line}" for i, line in enumerate(lines, 1)) + "\n</want_lines>"
+
+
+def score_schema(categories: list[str], n_lines: int = 0) -> dict:
+    # interest is listed as required because OpenAI-compatible strict mode rejects a schema with optional
+    # properties; it is still not in _REQUIRED, so an answer without it is accepted and never retried
     return {
         "type": "object",
         "properties": {
@@ -90,8 +126,9 @@ def score_schema(categories: list[str]) -> dict:
                         "reason": {"type": "string"},
                         "category": {"type": "string", "enum": categories},
                         "event": {"type": "string"},
+                        "interest": {"type": "integer", "enum": list(range(n_lines + 1))},
                     },
-                    "required": ["id", "topic", "importance", "personal", "reason", "category", "event"],
+                    "required": ["id", "topic", "importance", "personal", "reason", "category", "event", "interest"],
                     "additionalProperties": False,
                 },
             }
@@ -101,11 +138,14 @@ def score_schema(categories: list[str]) -> dict:
     }
 
 
-def system_blocks(cfg: Config) -> list[dict]:
+def system_blocks(cfg: Config, lines: list[str] | None = None) -> list[dict]:
     seeds = seed_examples()
     seed_text = "\n".join(f"{'+' if want else '-'} {title}" for want, title in seeds) or "(none yet)"
+    lines = want_lines() if lines is None else lines
     profile = (f"<interest_profile>\n{strip_comments(read_profile('interests.md'))}\n</interest_profile>\n\n"
                f"<seed_examples>\n{seed_text}\n</seed_examples>")
+    if lines:
+        profile += "\n\n" + want_lines_text(lines)
     return [
         {"type": "text", "text": instructions(cfg)},
         {"type": "text", "text": profile, "cache_control": {"type": "ephemeral"}},
@@ -153,9 +193,11 @@ def score_items(ai: AIClient, cfg: Config, conn: sqlite3.Connection, items: list
         {"type": "text", "text": f"<active_events>\n{active_events_text(conn)}\n</active_events>"},
         {"type": "text", "text": f"<items>\n{_item_lines(items)}\n</items>"},
     ]}]
+    lines = want_lines()
     try:
-        result = ai.call(purpose="score", model=cfg.scoring.model, system=system_blocks(cfg), messages=messages,
-                         max_tokens=16000, effort=cfg.scoring.effort, schema=score_schema(cfg.scoring.categories))
+        result = ai.call(purpose="score", model=cfg.scoring.model, system=system_blocks(cfg, lines), messages=messages,
+                         max_tokens=16000, effort=cfg.scoring.effort,
+                         schema=score_schema(cfg.scoring.categories, len(lines)))
     except (Refused, Truncated) as e:
         if len(items) == 1:
             log.warning("item could not be scored", extra={"item": items[0].id, "error": str(e)})
@@ -177,8 +219,16 @@ def score_items(ai: AIClient, cfg: Config, conn: sqlite3.Connection, items: list
                 "personal": _clamp(entry["personal"]), "reason": str(entry.get("reason") or "")[:300],
                 "category": entry["category"] if entry["category"] in cfg.scoring.categories else "Other",
                 "event": normalize_label(entry.get("event")),
+                "interest": _interest(entry.get("interest"), lines),
             }
     return out
+
+
+def _interest(value, lines: list[str]) -> str | None:
+    """The Want line an answer's number points at, normalized; None for 0, a missing or a wrong value."""
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= len(lines):
+        return None
+    return norm(lines[value - 1])
 
 
 _REQUIRED = {"id", "topic", "importance", "personal", "category"}
@@ -241,10 +291,11 @@ def run_scoring(conn: sqlite3.Connection, cfg: Config, ai: AIClient, max_batches
             if res and "error" not in res:
                 conn.execute(
                     """UPDATE items SET score_status = 'scored', topic = ?, importance = ?, personal = ?,
-                       reason = ?, ai_category = ?, scored_at = ?, event = ?, event_tries = event_tries + 1
+                       reason = ?, ai_category = ?, scored_at = ?, event = ?, event_tries = event_tries + 1,
+                       interest = ?
                        WHERE id = ?""",
                     (res["topic"], res["importance"], res["personal"], res["reason"], res["category"], now,
-                     res["event"], r["id"]))
+                     res["event"], res["interest"], r["id"]))
                 scored += 1
                 newly.append(r["id"])
             elif res:  # refused on its own
