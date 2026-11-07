@@ -267,7 +267,7 @@ details.group:not([open]) > summary .sec::after { transform: rotate(-90deg); }
   font: 800 0.62rem/1 var(--sans); letter-spacing: -0.02em; color: #fff; background: var(--h, var(--muted));
 }
 /* Logos sit on a white tile in both themes: many are dark marks on a transparent background */
-.badge.logo, .savatar.logo { object-fit: contain; background: #fff; outline: 1px solid var(--border); outline-offset: -1px; }
+.badge.logo, .savatar.logo { object-fit: contain; background: #fff; }
 .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 0.74rem; font-weight: 600; }
 .pill.new { background: var(--accent); color: var(--accent-ink); }
 .pill.watch { background: color-mix(in srgb, var(--link) 14%, transparent); color: var(--link); }
