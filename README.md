@@ -394,6 +394,11 @@ tests/              pytest suite
 
 Planned work is tracked in [GitHub issues](https://github.com/Lucifix/newsnest/issues).
 
+## AI-assisted development
+
+NewsNest started as a personal project, built with the help of AI tools. Eventually, I decided to
+open-source it so others could use it too.
+
 ## Contributing
 
 Bug reports, ideas and pull requests are welcome. Found a bug? Settings → *About & report a bug* in the
