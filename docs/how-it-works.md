@@ -22,8 +22,9 @@ flowchart LR
 
 ## 07:12 · A headline is born
 
-Somewhere, an outlet publishes: **"Dončić scores 40 as Dallas beats Boston."**
-Three other outlets will write about the same game within the hour, one of them in Slovenian.
+Somewhere, an outlet publishes: **"Dončić scores 40 as the Lakers beat Boston."** (A made-up game, but the
+kind of headline NewsNest sees every day.) Three other outlets will write about the same game within the
+hour, one of them in Slovenian.
 
 Let's follow it.
 
@@ -53,7 +54,7 @@ NewsNest groups stories two ways:
   "government" probably don't. Rare words count for much more than common ones, which works in any
   language without word lists.
 - **By event.** When the AI scores a story (next step), it also names the real-world event it's about,
-  like `mavericks-celtics-game`, reusing labels it already gave to other stories. That catches what word
+  like `lakers-celtics-game`, reusing labels it already gave to other stories. That catches what word
   matching can't, like the Slovenian article that shares hardly a word with the English ones.
 
 The result is a **card**: one story, all its outlets. Covered by two or more outlets? It earns a small
@@ -78,7 +79,7 @@ For every headline it answers with:
 | **Reason** | One sentence explaining the scores | "Dončić's big night; you follow him." |
 | **Category** | One of a fixed list (Sports, Politics, AI, …) | Sports |
 | **Interest** | Which line of your interests file it matches | "Luka Dončić and NBA basketball" |
-| **Event** | A short name for the real-world event | `mavericks-celtics-game` |
+| **Event** | A short name for the real-world event | `lakers-celtics-game` |
 
 All three scores use the same scale: **9–10** you'd be annoyed to miss it, **7–8** you'd likely read
 it, **5–6** the headline is enough, **0–4** skip.
