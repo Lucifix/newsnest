@@ -181,23 +181,12 @@ the file. It is re-read on every run, so there is nothing to restart.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A["RSS / Atom feeds<br/>GitHub releases"] --> B["Fetch &<br/>de-duplicate"]
-    B --> C["Group the same story<br/>across outlets"]
-    C --> D["AI scores<br/>topic · importance · fit"]
-    D --> E["Rank<br/>score × freshness × what you like"]
-    E --> F(["Your feed"])
-    F -- "likes · opens · ratings" --> E
-```
+NewsNest collects headlines from your feeds, groups the same story from different outlets into one card,
+and has an AI score each one against your interests. The best rise to the top of your feed, which keeps
+learning from how you read it.
 
-A 60-second loop fetches the sources that are due, scores new stories in batches, and writes key points
-for the ones above your threshold. Scoring uses a small, cheap model with prompt caching; the rarer jobs
-(drafting your profile, the weekly suggestions) use a stronger one. Both are configurable.
-
-**Want the full story?** [How NewsNest works](docs/how-it-works.md) follows one headline from the moment
-it's published to your feed: how it's grouped, scored and ranked, and how the feed learns from the way
-you read.
+**The full story:** [How NewsNest works](docs/how-it-works.md) follows one real headline all the way to
+your feed.
 
 **What leaves your server:** headlines and snippets, and for key points the article text, go to the
 Anthropic API using your key (or to the provider you configured; with a local model in Ollama, nothing
