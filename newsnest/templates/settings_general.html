@@ -14,6 +14,7 @@
 
   {% call group('Reading') %}
     {{ toggle_row('auto_read_on_scroll', 'Mark read when I scroll past', 'In the feed list. The desktop front page only marks what you open.', cfg.feed.auto_read_on_scroll) }}
+    {{ toggle_row('follow_lately', "Follow what I've been reading lately", 'Moves topics you read a lot up and ones you stopped reading down. Nothing is hidden.', cfg.drift.enabled) }}
     {{ toggle_row('calibration_mode', 'Calibration mode', 'Show every story with its score', cfg.scoring.calibration_mode) }}
   {% endcall %}
 

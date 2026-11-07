@@ -258,6 +258,29 @@ feed:
   # session_idle_minutes: 45
   # stable_sessions: true
 
+# drift:
+#   # The feed follows what you've read lately: topics you keep reading move up, ones you stopped reading
+#   # move down (never out), and now and then one story from a faded interest is shown early. It looks at
+#   # how long stories stay on your screen, the key points you open, what you save, open, 👍 and 👎.
+#   # Turn it off here or in Settings → General.
+#   enabled: true
+#   # A sign of interest counts half after this many days; older ones fade further.
+#   half_life_days: 14
+#   # Nothing older than this is looked at.
+#   window_days: 90
+#   # Every interest starts with this many stories' worth of "your usual", so a few skips change little.
+#   prior: 40
+#   # It starts once reading time has been recorded this many days and on this many stories.
+#   warmup_days: 14
+#   warmup_stories: 500
+#   # How far an interest or category (and an outlet) can move up or down.
+#   min_weight: 0.6
+#   max_weight: 1.4
+#   source_min_weight: 0.8
+#   source_max_weight: 1.25
+#   # Stories per feed visit from an interest you've drifted away from (0 turns it off).
+#   revisit_slots: 1
+
 discovery:
   # Discovered sources: feeds on trial from OPML imports or the feed catalog (Settings → Discover).
   enabled: true

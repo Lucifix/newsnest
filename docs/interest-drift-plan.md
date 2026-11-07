@@ -1,6 +1,6 @@
 # Changing interests
 
-Status: part 1 (collecting the signals) built; part 2 (the feed adapts) not built yet.
+Status: built. Part 1 collects the signals, part 2 makes the feed adapt (`newsnest/drift.py`).
 
 ## Problem
 
@@ -73,11 +73,12 @@ the card menu's "more / less" choices stay exactly as they are.
 
 ## Parts
 
-1. **Collect the signals** (built): the interest label in scoring, attention time and key-point opens.
-   Nothing visible changes.
-2. **The feed adapts** (not built): the weights above, the why-panel lines ("You've been reading about …
-   lately"), the revisit story, a read-only "Lately" list on the Profile page and a Settings toggle. The
-   old nudges stop.
+1. **Collect the signals**: the interest label in scoring, attention time and key-point opens. Nothing
+   visible changes.
+2. **The feed adapts**: the weights above, the why-panel lines ("You've been reading about … lately"),
+   the revisit story, a read-only "Lately" list on the Profile page and a Settings switch. The old nudges
+   stop. The scheduler works the weights out every 30 minutes and stores them, so a ranking doesn't wait
+   for them (a ranking works them out itself when they're over 3 hours old or made for other settings).
 
 ## Known limits
 
