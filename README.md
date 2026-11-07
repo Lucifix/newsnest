@@ -305,6 +305,13 @@ not include.
 With Docker volumes (the Option A snippet), copy it in while the container is stopped:
 `docker cp backup.db newsnest:/data/newsnest.db`.
 
+**Automatic backups before upgrades:** when a new release changes the database layout, NewsNest first
+copies the database to `backups/` in your data folder (for example
+`backups/newsnest-20261107-093000-v16.db`, where `v16` is the layout it had). It keeps the three newest
+copies. To undo an upgrade, stop the container, put that copy back as `newsnest.db`, and start the
+previous release. If you start an older release on a database a newer one has already upgraded, NewsNest
+refuses to start and says so in the log, rather than running on a layout it doesn't know.
+
 </details>
 
 <details>
