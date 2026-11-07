@@ -99,8 +99,14 @@ def load_weights(conn: sqlite3.Connection, skip_old_boosts: bool = False) -> dic
 
 
 def adjust_weight(conn: sqlite3.Connection, kind: str, key: str, factor: float) -> float:
-    current = load_weights(conn).get((kind, key), 1.0)
-    new = round(min(WEIGHT_MAX, max(WEIGHT_MIN, current * factor)), 3)
+    """A card menu choice (factor below 1: less, above: more). It builds on the reader's earlier choices, never
+    on an old boost: drift ignores old boosts, so "less" applied to one (1.5 × 0.75 = 1.125) would end up a
+    lift. "More" never ends below the old boost, so it still lifts while drift is off."""
+    chosen = load_weights(conn, skip_old_boosts=True).get((kind, key), 1.0)
+    new = chosen * factor
+    if factor > 1:
+        new = max(new, load_weights(conn).get((kind, key), 1.0))
+    new = round(min(WEIGHT_MAX, max(WEIGHT_MIN, new)), 3)
     conn.execute("INSERT INTO weights (kind, key, weight, updated_at) VALUES (?, ?, ?, ?) "
                  "ON CONFLICT(kind, key) DO UPDATE SET weight = excluded.weight, updated_at = excluded.updated_at",
                  (kind, key, new, iso(utcnow())))
