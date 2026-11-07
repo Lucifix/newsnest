@@ -57,6 +57,9 @@ NewsNest groups stories two ways:
   like `lakers-trail-blazers-game`, reusing labels it already gave to other stories. That catches what word
   matching can't, like the Slovenian article that shares hardly a word with the English ones.
 
+Grouping by headline isn't perfect: two different stories are sometimes merged into one card. When that
+happens, both headlines stay visible on the card.
+
 The result is a **card**: one story, all its outlets. Covered by two or more outlets? It earns a small
 bonus, because news that several newsrooms chase is usually worth a look.
 
@@ -215,8 +218,8 @@ what you don't want.
 
 Run a local model (for example with Ollama) and nothing leaves your network at all.
 
-Before every upgrade that changes the database, NewsNest copies it to `backups/` and keeps the 3 newest
-copies. You can also download the whole database any time from Settings.
+NewsNest also backs up the database before every upgrade that changes it, and you can download it any
+time from Settings: see [Backup and restore](install.md#backup-and-restore).
 
 ---
 
@@ -247,7 +250,7 @@ Where each step lives in the code:
 | Grouping | `newsnest/grouping.py`, `newsnest/events.py`, `newsnest/digest.py` |
 | Scoring and key points | `newsnest/scoring.py`, `newsnest/summaries.py` |
 | Ranking and the feed | `newsnest/feed.py`, `newsnest/feedsession.py` |
-| Following what you read | `newsnest/drift.py` ([design notes](interest-drift-plan.md)) |
+| Following what you read | `newsnest/drift.py` ([design notes](design/interest-drift-plan.md)) |
 | Weekly suggestions | `newsnest/profile_ai.py` |
 
 Words used here are defined in [GLOSSARY.md](../GLOSSARY.md).

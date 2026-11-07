@@ -1,4 +1,4 @@
-"""Following what the reader is into lately (docs/interest-drift-plan.md; terms in GLOSSARY.md).
+"""Following what the reader is into lately (docs/design/interest-drift-plan.md; terms in GLOSSARY.md).
 
 Most stories are read from the headline and summary and never opened, so a tap is only one sign of interest.
 Every card that was shown in the feed gets an engagement value from how it was read:
