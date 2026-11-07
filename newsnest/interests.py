@@ -24,10 +24,12 @@ def _section_of(heading: str) -> str | None:
 
 
 def _bullet(line: str) -> str | None:
-    # The regex only finds the marker; strip() trims the text. A regex that also trimmed it got very slow
-    # on a line of thousands of spaces (CodeQL py/polynomial-redos).
-    m = re.match(r"\s*[-*]\s(.*)", line)
-    return (m.group(1).strip() or None) if m else None
+    # String methods, not a regex: the regex this replaced got very slow on a line of thousands of spaces
+    # (CodeQL py/polynomial-redos)
+    line = line.lstrip()
+    if line[:1] not in ("-", "*") or not line[1:2].isspace():
+        return None
+    return line[2:].strip() or None
 
 
 def _scan(lines: list[str]) -> list[tuple[str | None, str | None, bool]]:
