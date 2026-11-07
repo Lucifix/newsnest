@@ -6,7 +6,10 @@ rank = final score x freshness x boosts x learned weights
   boosts     top story (importance >= threshold), watch / must-show, not seen yet
   sinking    every time a story was on screen without being opened it sinks; after
              feed.seen_drop_after impressions it drops out (top stories only sink)
-  weights    per outlet and per category, learned from the card menu ("less from <outlet>")
+  weights    per outlet and per category, set in the card menu ("less from <outlet>")
+  drift      what you've read lately, per interest (or category) and outlet (newsnest.drift): up to 40%
+             up or down, never lowering top stories or watches; one story per session from a faded
+             interest is placed early ("revisit"). While it's active the older learned boosts are ignored
 Read stories leave the feed (they are listed under "Read"), unless the story was updated
 afterwards: new outlets joined it after it was read (two for a top story, otherwise
 three, at least one of them in the last few hours). It is then back as unread, marked Updated.
@@ -26,6 +29,7 @@ from itertools import zip_longest
 from newsnest.config import NEWS, WORLD, Config, Source
 from newsnest.db import iso, parse_iso, utcnow
 from newsnest.digest import Card, Member, make_cards
+from newsnest.drift import FADED, LIFTED, Drift, current_drift
 from newsnest.profile import profile_exists
 from newsnest.sections import HEADLINES, block_of, dock_tabs, section_keys, section_labels, scope_blocks, tab_of
 
@@ -43,7 +47,9 @@ class FeedItem:
     big: bool = False
     discovered: bool = False  # from a candidate source still on trial
     first: bool = False       # only the first story's image loads eagerly
-    extra: str = ""           # "new source" | "exploring": shown below the score threshold to widen the feed
+    # "new source" | "exploring": shown below the score threshold to widen the feed; "revisit": from an
+    # interest you've drifted away from, placed early (_revisit)
+    extra: str = ""
     below: bool = False       # under digest.min_final; only shown as an extra or in calibration mode
     # What moved the story up or down the feed, in words, for the card's "why" panel: (+1 | -1, text)
     why: list[tuple[int, str]] = field(default_factory=list)
@@ -78,8 +84,18 @@ class Feed:
     dropped: int                       # skipped too often, below threshold or over a cap
 
 
-def load_weights(conn: sqlite3.Connection) -> dict[tuple[str, str], float]:
-    return {(r["kind"], r["key"]): r["weight"] for r in conn.execute("SELECT kind, key, weight FROM weights")}
+def load_weights(conn: sqlite3.Connection, skip_old_boosts: bool = False) -> dict[tuple[str, str], float]:
+    """Outlet and category weights. skip_old_boosts leaves out the small lifts older versions learned from
+    opens and likes (above 1.0, at most IMPLICIT_MAX, with no "more / less" menu choice behind them): drift
+    replaces them while it's active, and they come back as they were if it's turned off."""
+    if not skip_old_boosts:
+        return {(r["kind"], r["key"]): r["weight"] for r in conn.execute("SELECT kind, key, weight FROM weights")}
+    rows = conn.execute(
+        """SELECT kind, key, weight FROM weights w
+           WHERE NOT (w.weight > 1.0 AND w.weight <= ? AND NOT EXISTS (
+               SELECT 1 FROM feedback f WHERE f.target = w.key AND f.kind IN ('more_' || w.kind, 'less_' || w.kind)))""",
+        (IMPLICIT_MAX,))
+    return {(r["kind"], r["key"]): r["weight"] for r in rows}
 
 
 def adjust_weight(conn: sqlite3.Connection, kind: str, key: str, factor: float) -> float:
@@ -91,8 +107,8 @@ def adjust_weight(conn: sqlite3.Connection, kind: str, key: str, factor: float) 
     return new
 
 
-# Implicit signals (opening, liking) can lift an outlet or category this far at most; explicit
-# "More about …" in the card menu can go up to WEIGHT_MAX
+# Older versions lifted an outlet or category a little on every open and like, this far at most (explicit
+# "More about …" in the card menu can go up to WEIGHT_MAX). No longer written; drift took their place
 IMPLICIT_MAX = 1.5
 
 
@@ -102,30 +118,6 @@ def weight_strength(weight: float) -> tuple[str, int]:
     if weight >= 1:
         return "more", 0 if weight < 1.05 else 1 if weight < 1.2 else 2 if weight < 1.5 else 3
     return "less", 0 if weight > 0.95 else 1 if weight > 0.8 else 2 if weight > 0.5 else 3
-OPEN_NUDGE = {"source": 1.03, "category": 1.02}
-LIKE_NUDGE = {"source": 1.06, "category": 1.04}
-
-
-def nudge(conn: sqlite3.Connection, source_id: str, category: str | None, factors: dict[str, float],
-          undo: bool = False) -> None:
-    """Small automatic weight change from opening or liking a story. Never pushes above IMPLICIT_MAX
-    and never touches a weight that is already above it (set explicitly)."""
-    weights = load_weights(conn)
-    for kind, key in (("source", source_id), ("category", category)):
-        if not key:
-            continue
-        current = weights.get((kind, key), 1.0)
-        factor = factors[kind]
-        if undo:
-            new = max(1.0, current / factor) if current > 1.0 else current
-        elif current >= IMPLICIT_MAX:
-            continue
-        else:
-            new = min(IMPLICIT_MAX, current * factor)
-        if new != current:
-            conn.execute("INSERT INTO weights (kind, key, weight, updated_at) VALUES (?, ?, ?, ?) "
-                         "ON CONFLICT(kind, key) DO UPDATE SET weight = excluded.weight, updated_at = excluded.updated_at",
-                         (kind, key, round(new, 4), iso(utcnow())))
 
 
 def story_read_at(card: Card) -> datetime | None:
@@ -173,12 +165,22 @@ def _age(hours: float) -> str:
     return f"{max(1, round(hours * 60))} min" if hours < 1 else f"{round(hours)} h" if hours < 48 else f"{round(hours / 24)} d"
 
 
-def _taste(weight: float, name: str) -> list[tuple[int, str]]:
-    """A learned source/category weight, in words; small drifts from 1.0 aren't worth a line."""
+def _taste(weight: float, name: str, asked: bool = False) -> list[tuple[int, str]]:
+    """An outlet/category weight, in words; small differences from 1.0 aren't worth a line. asked: only
+    the card menu's choices are left (drift is active), so say so."""
     if weight >= 1.1:
-        return [(1, f"You tend to like {name}")]
+        return [(1, f"You asked for more of {name}" if asked else f"You tend to like {name}")]
     if weight <= 0.9:
-        return [(-1, f"You've passed on {name} before")]
+        return [(-1, f"You asked for less of {name}" if asked else f"You've passed on {name} before")]
+    return []
+
+
+def _lately(weight: float, name: str, outlet: bool = False) -> list[tuple[int, str]]:
+    """A drift weight, in words (newsnest.drift)."""
+    if weight >= LIFTED:
+        return [(1, f"You've been reading {name} lately" if outlet else f"You've been reading about {name} lately")]
+    if weight <= FADED:
+        return [(-1, f"You've read less from {name} lately" if outlet else f"You've read less about {name} lately")]
     return []
 
 
@@ -276,6 +278,33 @@ def _widen(pool: list[FeedItem], capped: list[FeedItem], new_ids: set[str], turn
     return [it for pair in zip_longest(explore, trial) for it in pair if it]
 
 
+def _revisit(capped: list[FeedItem], drift: Drift, cfg: Config) -> list[FeedItem]:
+    """Mark up to drift.revisit_slots stories from interests (or categories) the reader has drifted away
+    from, so view_feed places them early: without this a faded interest sits low in the feed and a return
+    to it would go unnoticed. Only stories already in the feed (above the threshold), past the first
+    explore_every × 2, not top stories, one per interest, and none for an interest 👎'd in the last week.
+    They stay in `capped`, so chip counts and category views don't change."""
+    slots = cfg.drift.revisit_slots
+    if not drift.active or slots <= 0:
+        return []
+    eligible = drift.faded() - drift.recent_dislikes
+    if not eligible:
+        return []
+    picked: list[FeedItem] = []
+    keys: set[str] = set()
+    for it in sorted(capped[cfg.feed.explore_every * 2:], key=lambda it: it.rank, reverse=True):
+        if len(picked) >= slots:
+            break
+        if it.top or it.extra:
+            continue
+        key = drift.key_of(it.card)
+        if key in eligible and key not in keys:
+            it.extra = "revisit"
+            keys.add(key)
+            picked.append(it)
+    return picked
+
+
 def _weave(stream: list[FeedItem], extras: list[FeedItem], every: int) -> list[FeedItem]:
     """Spread the extra stories through the stream: the first after a few cards, then one every `every`."""
     out = list(stream)
@@ -322,7 +351,8 @@ def rank_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now:
     discovered_ids = {s.id for s in sources if s.params.get("discovered")}
     cutoff = iso(now - timedelta(hours=f.window_hours))
     cards = make_cards(window_rows(conn, cutoff), cfg, names)
-    weights = load_weights(conn)
+    drift = current_drift(conn, cfg, now)
+    weights = load_weights(conn, skip_old_boosts=drift.active)
     profile = profile_exists()
     calibration = cfg.scoring.calibration_mode
     top_at = cfg.scoring.top_story_importance
@@ -393,8 +423,17 @@ def rank_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now:
         source_w = weights.get(("source", card.lead.row["source_id"]), 1.0)
         category_w = weights.get(("category", _category(card)), 1.0)
         rank *= source_w * category_w
-        why += _taste(source_w, card.lead.source_name)
-        why += _taste(category_w, _category(card))
+        why += _taste(source_w, card.lead.source_name, asked=drift.active)
+        why += _taste(category_w, _category(card), asked=drift.active)
+        if drift.active:
+            # What you've read lately; big news and watches can be lifted, never lowered
+            m = drift.multiplier(card)
+            protected = top or card.must_show
+            rank *= max(m, 1.0) if protected else m
+            key = drift.key_of(card)
+            lately = (_lately(drift.weight(key), drift.label(key)) if key else []) + \
+                _lately(drift.source_weight(card.lead.row["source_id"]), card.lead.source_name, outlet=True)
+            why += [w for w in lately if w[0] > 0] if protected else lately
         (pool if below else candidates).append(
             FeedItem(card, round(rank, 3), block_of(card.lead.row["category"], card.lead.row["ai_category"]),
                      _category(card), top, updated,
@@ -422,6 +461,7 @@ def rank_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now:
     extras = _widen(pool, capped, new_ids, _turned_down(conn), weights, f)
     rest = [it for it in pool if not it.extra]
     dropped += cap_into(rest) if calibration else len(rest)
+    _revisit(capped, drift, cfg)
 
     return Ranking(items=capped, extras=extras, affinity=_affinity(conn), profile=profile, calibration=calibration,
                    read_count=read_count, dropped=dropped, cutoff=cutoff)
@@ -544,10 +584,15 @@ def view_feed(ranking: Ranking, cfg: Config, active: str = "all") -> Feed:
         selected = in_scope(parent)
     else:
         selected = capped
+    # A revisit story (newsnest.feed._revisit) moves up front in For you and section streams; a single
+    # category's stream keeps it in its place
+    revisit = [] if category else [it for it in selected if it.extra == "revisit"]
+    if revisit:
+        selected = [it for it in selected if it.extra != "revisit"]
     stream = _diversify(selected) if not category else selected
     # The extra stories join the For you and section streams, not a single category's
     if not category:
-        stream = _weave(stream, [it for it in extras if parent == "all" or it.block in scope_blocks(parent)],
+        stream = _weave(stream, revisit + [it for it in extras if parent == "all" or it.block in scope_blocks(parent)],
                         f.explore_every)
     if stream:
         stream[0].first = True
