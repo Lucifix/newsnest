@@ -235,7 +235,7 @@ MIGRATIONS: list[str] = [
     ALTER TABLE ai_calls ADD COLUMN provider TEXT;
     UPDATE ai_calls SET provider = 'Anthropic'
     """,
-    # how the reader really reads, for following changing interests (docs/interest-drift-plan.md):
+    # how the reader really reads, for following changing interests (docs/design/interest-drift-plan.md):
     # interest is the Want line a story matches (normalized, NULL: none or not scored with it),
     # view_ms how long the card was on screen while the reader was active, expanded_at when its key
     # points were first opened. last_seen_at is indexed so recent impressions are found without a scan

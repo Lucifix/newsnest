@@ -58,7 +58,7 @@ def ensure_dirs() -> None:
         if not os.access(d, os.W_OK):
             # Bind-mounted host folders created by Docker are owned by root
             sys.exit(f"{d} is not writable by uid {os.getuid()}: chown it on the host "
-                     f"(see the README, 'Quick start')")
+                     f"(see docs/install.md, 'With host folders')")
     adopt_legacy_database(data)
     if not any(cfg.iterdir()):
         shutil.copytree(EXAMPLE_DIR, cfg, dirs_exist_ok=True)

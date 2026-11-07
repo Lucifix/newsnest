@@ -205,7 +205,7 @@ class HomeFeedCfg(_Strict):
 
 
 class DriftCfg(_Strict):
-    """Following what you read lately (newsnest.drift, docs/interest-drift-plan.md)."""
+    """Following what you read lately (newsnest.drift, docs/design/interest-drift-plan.md)."""
     # Off: the feed keeps today's order rules (the older learned boosts stay as they were)
     enabled: bool = True
     # A sign of interest counts half after this many days, a quarter after twice that
