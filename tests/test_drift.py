@@ -354,3 +354,75 @@ def test_settings_switch_turns_drift_off_and_back_on(db, cfg, env, monkeypatch):
         client.post("/settings/general", data={**form, "follow_lately": "on"})
         text = (env.config / "config.yaml").read_text(encoding="utf-8")
         assert "\ndrift:" not in text  # back to the default, nothing written
+
+
+# ---------- what your reading changes (/profile/reading) ----------
+
+def reading_cards(db, cfg):
+    """Three stories shown in the feed: Sports opened and liked, Sports saved with its key points opened,
+    Weather dismissed. Plus one rated in the swipe deck only, which doesn't count."""
+    a = add(db, cfg, "a", "Dončić dal 40 točk proti Bostonu", "https://a.si/1", cat="Sports")
+    b = add(db, cfg, "b", "Pogačar zmagal na kraljevski etapi", "https://b.si/2", cat="Sports")
+    c = add(db, cfg, "a", "Jutri spet dež po vsej državi", "https://a.si/3", cat="Weather")
+    d = add(db, cfg, "c", "Novi davki na nepremičnine", "https://c.si/4", cat="Economy")
+    shown(db, a, view_ms=2000, opened_at=iso(NOW), rating=1, rated_at=iso(NOW))
+    shown(db, b, view_ms=9000, saved_at=iso(NOW), expanded_at=iso(NOW))
+    shown(db, c, rating=-1, rated_at=iso(NOW))
+    db.execute("UPDATE items SET rating = 1, rated_at = ? WHERE id = ?", (iso(NOW), d))
+    set_meta(db, "attention_since", iso(NOW - timedelta(days=3)))
+
+
+def test_the_reading_report_counts_cards(db, cfg):
+    from newsnest.drift import reading_report
+    assert reading_report(db, cfg, NOW, {}).since is None  # nothing recorded yet
+    reading_cards(db, cfg)
+    r = reading_report(db, cfg, NOW, {})
+    assert (r.shown, r.opened, r.liked, r.saved, r.expanded, r.disliked, r.timed) == (3, 1, 1, 1, 1, 1, 2)
+    assert r.threshold is None and r.lingered == 0  # too few timed cards to know the reader's usual
+    assert {k: (c.shown, c.read) for k, c in r.keys.items()} == {
+        "category:Sports": (2, 2), "category:Weather": (1, 0), "source:a": (2, 1), "source:b": (1, 1)}
+
+
+def test_effect_text():
+    from newsnest.web import effect_text
+    assert [effect_text(w) for w in (None, 1.0, 1.004, 1.25, 0.6)] == [None, "As usual", "As usual", "25% more", "40% less"]
+
+
+def test_the_reading_page_shows_what_was_counted_and_its_effect(db, cfg, env, monkeypatch):
+    monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
+    from newsnest.web import app
+    with TestClient(app) as client:
+        page = client.get("/profile/reading").text
+        assert "Nothing counted yet" in page and "Learning · about 14 days left" in page
+        assert 'href="/profile/reading"' in client.get("/profile").text
+
+        reading_cards(db, cfg)
+        page = client.get("/profile/reading").text
+        assert "Stories shown" in page and "Sports" in page and "2 shown · 2 read" in page
+        assert "Counts once 200 stories have a reading time. Now 2." in page
+        assert "% more" not in page and "Set aside" not in page  # no effect while learning
+
+        db.execute("INSERT INTO weights (kind, key, weight, updated_at) VALUES ('category', 'Weather', 1.3, ?)",
+                   (iso(NOW),))  # an old boost: no menu choice behind it
+        d = Drift(active=True, weights={"category:Sports": 1.25, "category:Weather": 0.62, "source:a": 1.0})
+        monkeypatch.setattr("newsnest.web.current_drift", lambda conn, cfg: d)
+        page = client.get("/profile/reading").text
+        assert ">On<" in page and "25% more" in page and "38% less" in page and "As usual" in page
+        aside = page.split("Set aside", 1)[1]
+        assert "Weather" in aside and "30% more" in aside
+        # ⋮ makes the card menu's own choices
+        assert 'value="more_category"' in page and 'value="less_source"' in page
+        client.post("/api/feedback", data={"action": "more_category", "target": "Sports"},
+                    headers={"referer": "/profile/reading"})
+        assert db.execute("SELECT weight FROM weights WHERE kind = 'category' AND key = 'Sports'").fetchone()[0] == 1.25
+
+
+def test_the_reading_page_when_turned_off(db, cfg, env, monkeypatch):
+    monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
+    from newsnest.web import app
+    with TestClient(app) as client:
+        client.post("/settings/general", data={"min_final": "5", "daily_usd": "0.5", "summary_language": "English"})
+        reading_cards(db, cfg)
+        page = client.get("/profile/reading").text
+        assert ">Off<" in page and "Stories shown" in page and "Last worked out" not in page
+        assert "Not following your reading" in client.get("/profile").text

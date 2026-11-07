@@ -260,6 +260,56 @@ def current_drift(conn: sqlite3.Connection, cfg: Config, now: datetime | None = 
     return refresh_drift(conn, cfg, now, force=True)
 
 
+@dataclass
+class KeyCount:
+    shown: int = 0
+    read: int = 0             # engagement above 0: opened, liked, saved, key points or lingered
+
+
+@dataclass
+class ReadingReport:
+    """What the weights are worked out from, as plain counts of cards (no fading), for the reader to check.
+    Same cards and window as compute_drift."""
+    since: datetime | None = None         # attention start; None: nothing recorded yet
+    shown: int = 0
+    opened: int = 0
+    expanded: int = 0
+    lingered: int = 0
+    saved: int = 0
+    liked: int = 0
+    disliked: int = 0
+    timed: int = 0                        # shown cards with any attention time
+    threshold: int | None = None          # ms from which a card counts as lingered
+    keys: dict[str, KeyCount] = field(default_factory=dict)   # interest/category keys and "source:" keys
+
+
+def reading_report(conn: sqlite3.Connection, cfg: Config, now: datetime | None = None,
+                   lines: dict[str, str] | None = None) -> ReadingReport:
+    started = get_meta(conn, "attention_since")
+    if not started:
+        return ReadingReport()
+    now = now or utcnow()
+    since = parse_iso(started)
+    lines = current_lines() if lines is None else lines
+    signals = load_signals(conn, cfg, max(now - timedelta(days=cfg.drift.window_days), since), lines)
+    threshold = linger_threshold(signals)
+    report = ReadingReport(since=since, shown=len(signals), threshold=threshold,
+                           timed=sum(s.view_ms > 0 for s in signals))
+    for s in signals:
+        report.opened += s.tapped
+        report.expanded += s.expanded
+        report.lingered += threshold is not None and s.view_ms >= threshold
+        report.saved += s.saved
+        report.liked += s.liked
+        report.disliked += s.disliked
+        read = engagement(s, threshold) > 0
+        for key in (s.key, f"source:{s.source}"):
+            count = report.keys.setdefault(key, KeyCount())
+            count.shown += 1
+            count.read += read
+    return report
+
+
 def current_lines() -> dict[str, str]:
     from newsnest.scoring import want_lines  # scoring pulls in the AI client; only needed here
     return {norm(line): line for line in want_lines()}
