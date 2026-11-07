@@ -33,7 +33,7 @@ Tell the user the version and why before going on.
 
 ## 3. Bump PR
 
-Branch from `origin/main` as `claude/release-X.Y.Z` and change the old version to the new one in:
+Branch from `origin/main` as `release/X.Y.Z` and change the old version to the new one in:
 - `newsnest/__init__.py`: `__version__`, the one the app reads
 - `README.md`: "pin a release such as `X.Y.Z`"
 - `.env.example`: the comment above `NEWSNEST_IMAGE_TAG`
