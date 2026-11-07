@@ -31,7 +31,7 @@ from newsnest.calibration import calibration_data, subscore_labels
 from newsnest.config import ICONS, MAX_TABS, NEWS, WORLD, Config, LoadedConfig, load_config, slugify
 from newsnest.config_edit import (ConfigEditError, edit_config, ensure_section, free_section_key, keys_in,
                                   materialize_sections, remove_where, section_entry, section_list, section_map, tab_room)
-from newsnest.db import iso, loads, migrate, parse_iso, session, utcnow
+from newsnest.db import get_meta, iso, loads, migrate, parse_iso, session, set_meta, utcnow
 from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_sources, parse_opml, promotion_suggestions,
                              region_words, start_check_thread, _signals)
@@ -45,6 +45,7 @@ from newsnest.missed import handle_missed
 from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
 from newsnest.packs import LIFESTYLE_INTEREST, LIFESTYLE_PACK, LOCAL_PACKS, add_interest, add_pack, missing_from, pack_for
 from newsnest.profile_ai import draft_profile
+from newsnest.scoring import carry_interest_labels
 from newsnest.sections import Tab, dock_tabs, foreign_local, move_section, refile_items, section_keys, section_labels
 from newsnest.status import collect_status
 from newsnest.summaries import key_points, summarize_on_demand
@@ -496,6 +497,33 @@ def _mark_story_read(conn, item_ids: list[int]) -> None:
         (now, now, now, *item_ids, *item_ids))
 
 
+CARD_HOPS = 4
+
+
+def _card_items(conn, item_id: int) -> list[int]:
+    """Every item on the same card as this one. A card joins items that share a story or an event
+    (digest.make_cards), and those links can chain (story A ↔ event ↔ story B), so follow them a few hops."""
+    ids = {item_id}
+    for _ in range(CARD_HOPS):
+        m = ",".join("?" * len(ids))
+        found = {r[0] for r in conn.execute(
+            f"""SELECT id FROM items
+                WHERE story_id IN (SELECT story_id FROM items WHERE id IN ({m}))
+                   OR event IN (SELECT event FROM items WHERE id IN ({m}) AND event IS NOT NULL)""",
+            (*ids, *ids))}
+        if found <= ids:
+            break
+        ids |= found
+    return sorted(ids)
+
+
+def _mark_expanded(conn, item_id: int) -> None:
+    """The reader opened the card's key points: a sign of interest that needs no tap (newsnest.drift)."""
+    ids = _card_items(conn, item_id)
+    conn.execute(f"UPDATE items SET expanded_at = COALESCE(expanded_at, ?) WHERE id IN ({','.join('?' * len(ids))})",
+                 (iso(utcnow()), *ids))
+
+
 @app.get("/go/{item_id}")
 def go(request: Request, item_id: int, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     row = conn.execute("SELECT url, source_id, ai_category, opened_at FROM items WHERE id = ?", (item_id,)).fetchone()
@@ -546,6 +574,8 @@ def summarize(item_id: int, request: Request, lines: int = Form(3), conn=Depends
         status = "unavailable"
     if status == "missing":
         raise HTTPException(404)
+    if status == "done":
+        _mark_expanded(conn, item_id)
     html = None
     if status == "done":
         row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
@@ -626,6 +656,49 @@ def set_seen(request: Request, ids: str = Form(...), conn=Depends(get_conn), loa
                 WHERE id IN ({','.join('?' * len(id_list))})""",
             (iso(now), iso(now - SEEN_THROTTLE), iso(now - SEEN_THROTTLE), iso(now), *id_list))
     return JSONResponse({"seen": len(id_list)})
+
+
+# Attention time (newsnest.drift): one report adds at most ATTENTION_REPORT_MAX ms to a card, and a card
+# collects at most ATTENTION_CARD_MAX ms in total, so a phone left open on one story can't dominate
+ATTENTION_REPORT_MAX = 60_000
+ATTENTION_CARD_MAX = 300_000
+ATTENTION_PAIRS_MAX = 200
+
+
+def _attention_pairs(raw: str) -> list[tuple[int, int]]:
+    """'<lead id>:<ms>,…' from the feed page; malformed pairs are skipped, ms clamped."""
+    out = []
+    for part in raw.split(",")[:ATTENTION_PAIRS_MAX]:
+        item_id, _, ms = part.strip().partition(":")
+        try:
+            out.append((int(item_id), max(0, min(ATTENTION_REPORT_MAX, int(float(ms))))))
+        except ValueError:
+            continue
+    return [(i, ms) for i, ms in out if ms > 0]
+
+
+@app.post("/api/attention")
+def set_attention(request: Request, ms: str = Form(""), conn=Depends(get_conn),
+                  loaded: LoadedConfig = Depends(get_loaded)):
+    """How long each card on the home feed was in view while the reader was active, split between the cards
+    on screen at once (app.js). Counts for every copy of the story; no throttle, the caps are the guard."""
+    if loaded.config:
+        feedsession.touch(conn, loaded.config, request.cookies.get(feedsession.COOKIE))
+    pairs = _attention_pairs(ms)
+    for item_id, add in pairs:
+        ids = _card_items(conn, item_id)
+        conn.execute(f"UPDATE items SET view_ms = MIN(view_ms + ?, ?) WHERE id IN ({','.join('?' * len(ids))})",
+                     (add, ATTENTION_CARD_MAX, *ids))
+    if pairs and get_meta(conn, "attention_since") is None:
+        set_meta(conn, "attention_since", iso(utcnow()))
+    return JSONResponse({"ok": len(pairs)})
+
+
+@app.post("/api/items/{item_id}/expanded")
+def set_expanded(item_id: int, conn=Depends(get_conn)):
+    """The reader opened a card's key points (a click, not a page opening them by itself)."""
+    _mark_expanded(conn, item_id)
+    return JSONResponse({"ok": True})
 
 
 FEEDBACK_ACTIONS = {"not_interested", "undo_not_interested", "less_source", "more_source", "less_category", "more_category"}
@@ -791,6 +864,9 @@ def profile_save(name: str, text: str = Form(""), proposal_id: int | None = Form
     write_profile(name, text)
     if proposal_id:
         conn.execute("UPDATE proposals SET status = 'accepted', decided_at = ? WHERE id = ?", (iso(utcnow()), proposal_id))
+        p = conn.execute("SELECT changes FROM proposals WHERE id = ?", (proposal_id,)).fetchone()
+        if name == "interests.md" and p:
+            carry_interest_labels(conn, (loads(p["changes"], None) or {}).get("items") or [], text)
     return RedirectResponse("/profile?saved=" + name, status_code=303)
 
 
@@ -846,6 +922,7 @@ def proposal_apply(pid: int, accept: list[str] = Form([]), conn=Depends(get_conn
     if not applied:
         return RedirectResponse(f"{back}?error={quote('None of these fit your interests as they are now')}", status_code=303)
     write_profile("interests.md", text)
+    carry_interest_labels(conn, applied, text)
     conn.execute("UPDATE proposals SET status = 'accepted', decided_at = ? WHERE id = ?", (iso(utcnow()), pid))
     return RedirectResponse(f"/profile?saved=applied&skipped={len(skipped)}", status_code=303)
 

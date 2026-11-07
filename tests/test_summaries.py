@@ -162,6 +162,10 @@ def test_cards_offer_the_button_then_show_key_points(client):
     assert 'class="summary lede"' not in body["html"]
     page = client.get("/?f=all").text  # stored: the next load shows it without another call
     assert page.count("Get key points") == 1 and "Reopens in spring" in page
+    # asking for key points is a sign of interest, like opening them (newsnest.drift)
+    conn = connect()
+    assert conn.execute("SELECT expanded_at FROM items WHERE id = 1").fetchone()[0] is not None
+    assert conn.execute("SELECT expanded_at FROM items WHERE id = 2").fetchone()[0] is None
     card = page[page.index('id="item-1"'):]
     assert card.index('class="snippet') < card.index('class="tldr"')  # the snippet is kept, above the key points
     log = connect().execute("SELECT purpose, COUNT(*) FROM ai_calls GROUP BY purpose").fetchall()
