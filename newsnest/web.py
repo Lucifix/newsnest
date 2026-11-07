@@ -37,7 +37,7 @@ from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_so
                              region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
 from newsnest import feedsession
-from newsnest.drift import FADED, LIFTED, current_drift
+from newsnest.drift import FADED, LIFTED, LINGER_MIN_CARDS, Drift, current_drift, current_lines, reading_report
 from newsnest.feed import (SEARCH_DAYS, TOP_STORIES, adjust_weight, front_page, load_weights, read_stories,
                         saved_stories, search_stories, story_hidden, swipe_deck, view_feed, weight_strength)
 from newsnest.interests import apply_changes, bullet_diff, word_diff
@@ -864,6 +864,59 @@ def tuning_rows(conn, loaded: LoadedConfig) -> dict:
             "small": sorted(small, key=lambda r: r["name"].lower()),
             "lately_more": lately_more, "lately_less": lately_less,
             "warmup_days_left": drift.warmup_days_left if drift else None}
+
+
+@app.get("/profile/reading", response_class=HTMLResponse)
+def reading_page(request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
+    """Everything following the reader's reading is based on, and what it changes: read-only, with the card
+    menu's own more/less choices as the only actions."""
+    return render(request, "profile_reading.html", conn, loaded, page="profile",
+                  reading=reading_context(conn, loaded) if loaded.config else None,
+                  **settings_context("profile", conn, loaded))
+
+
+def effect_text(weight: float | None) -> str | None:
+    """A drift weight as words: '25% more', '18% less', 'As usual'; None while it isn't in use."""
+    if weight is None:
+        return None
+    pct = round((weight - 1) * 100)
+    return "As usual" if pct == 0 else f"{pct}% more" if pct > 0 else f"{-pct}% less"
+
+
+def reading_context(conn, loaded: LoadedConfig) -> dict:
+    cfg = loaded.config
+    names = {s.id: s.name for s in named_sources(conn, cfg, loaded.sources)}
+    lines = current_lines()
+    report = reading_report(conn, cfg, lines=lines)
+    drift = current_drift(conn, cfg)
+    label = Drift(lines=lines).label
+
+    def row(key: str, count) -> dict:
+        kind, _, name = key.partition(":")
+        weight = drift.weights.get(key, 1.0) if drift.active else None
+        return {"kind": kind, "target": name, "name": names.get(name, name) if kind == "source" else label(key),
+                "line": lines.get(name) if kind == "interest" else None, "shown": count.shown, "read": count.read,
+                "effect": effect_text(weight)}
+
+    rows = sorted((row(k, c) for k, c in report.keys.items()), key=lambda r: (-r["shown"], r["name"].lower()))
+    set_aside = []
+    if drift.active:
+        kept = load_weights(conn, skip_old_boosts=True)
+        set_aside = sorted(({"key": key, "name": names.get(key, key) if kind == "source" else key, "weight": w,
+                             "outlet": kind == "source", "effect": effect_text(w)} for (kind, key), w in load_weights(conn).items()
+                            if (kind, key) not in kept), key=lambda r: (-r["weight"], r["name"].lower()))
+    stored = loads(get_meta(conn, "drift"), None) if cfg.drift.enabled else None
+    if not cfg.drift.enabled:
+        status = "Off"
+    elif drift.active:
+        status = "On"
+    elif drift.warmup_days_left:
+        status = f"Learning · about {drift.warmup_days_left} day{'s' if drift.warmup_days_left != 1 else ''} left"
+    else:
+        status = "Learning · needs a bit more reading"
+    return {"report": report, "status": status, "active": drift.active, "worked_out": stored["at"] if stored else None,
+            "topics": [r for r in rows if r["kind"] != "source"], "outlets": [r for r in rows if r["kind"] == "source"],
+            "set_aside": set_aside, "drift": cfg.drift, "linger_min": LINGER_MIN_CARDS}
 
 
 @app.post("/profile/save/{name}")

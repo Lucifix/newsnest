@@ -121,6 +121,7 @@
   {% if icon == 'pause' %}<path d="M9 5v14M15 5v14"/>{% elif icon == 'play' %}<path d="M8 5l11 7-11 7z"/>
   {% elif icon == 'badge' %}<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 15V9l3 4 3-4v6"/>
   {% elif icon == 'check' %}<path d="m5 12.5 4.5 4.5L19 7.5"/>{% elif icon == 'undo' %}<path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/>
+  {% elif icon == 'plus' %}<path d="M12 5v14M5 12h14"/>{% elif icon == 'minus' %}<path d="M5 12h14"/>
   {% else %}<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>{% endif %}</svg><span>{{ label }}</span></button>
 </form>
 {% endmacro %}

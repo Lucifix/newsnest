@@ -1,0 +1,105 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, link_row, avatar, menu, menu_item with context %}
+{% block back %}<a class="sback" href="/profile#tuning"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>Profile</a>{% endblock %}
+{% block stitle %}What your reading changes{% endblock %}
+{% block sintro %}<p class="sub">Everything NewsNest counts to follow what you've been reading lately, and what it does with it. It stays in the NewsNest database on your server.</p>{% endblock %}
+
+{% macro pct(weight) %}{{ ((weight - 1)|abs * 100)|round|int }}%{% endmacro %}
+
+{# One interest, category or outlet: how many of its stories were shown and read, and the effect on the feed #}
+{% macro reading_row(r) %}
+<div class="srow">
+  {% if r.kind == 'source' %}{{ avatar(r.name, r.target) }}{% else %}<span class="savatar topic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12.5V5h7.5L20 13.5 13.5 20 4 12.5Z"/><circle cx="8.5" cy="9" r="1.2"/></svg></span>{% endif %}
+  <span class="srow-main"><span class="srow-title"{% if r.line %} title="{{ r.line }}"{% endif %}>{{ r.name }}</span>
+    <span class="srow-sub wrap">{{ {'interest': 'Interest', 'category': 'Category', 'source': 'Outlet'}[r.kind] }} · {{ r.shown }} shown · {{ r.read }} read</span></span>
+  <span class="srow-end">
+    {% if r.effect %}<span class="srow-value">{{ r.effect }}</span>{% endif %}
+    {% if r.kind == 'category' %}{% call menu(r.name) %}
+      {{ menu_item('/api/feedback', 'More about ' ~ r.name, 'plus', {'action': 'more_category', 'target': r.target}) }}
+      {{ menu_item('/api/feedback', 'Less about ' ~ r.name, 'minus', {'action': 'less_category', 'target': r.target}) }}
+    {% endcall %}{% elif r.kind == 'source' %}{% call menu(r.name) %}
+      {{ menu_item('/api/feedback', 'Less from ' ~ r.name, 'minus', {'action': 'less_source', 'target': r.target}) }}
+    {% endcall %}{% endif %}
+  </span>
+</div>
+{% endmacro %}
+
+{% macro reading_rows(rows, shown=10) %}
+{% for r in rows[:shown] %}{{ reading_row(r) }}{% endfor %}
+{% if rows|length > shown %}
+<details class="srow-more">
+  <summary class="srow"><span class="srow-main"><span class="srow-title srow-accent">Show {{ rows|length - shown }} more</span></span>
+    <svg class="chev expand-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+  {% for r in rows[shown:] %}{{ reading_row(r) }}{% endfor %}
+</details>
+{% endif %}
+{% endmacro %}
+
+{% block page %}
+{% set d = reading.drift %}
+{% set rep = reading.report %}
+{% call group(footnote='Worked out again every 30 minutes from the counts below. Only the last ' ~ d.window_days ~ ' days count, and older reading counts less: half as much after ' ~ d.half_life_days ~ ' days.') %}
+  {{ link_row('/settings/general', 'Following your reading', value=reading.status) }}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Counting since</span></span>
+    <span class="srow-end"><span class="srow-value">{{ localtime(rep.since, '%d.%m.%Y') if rep.since else 'Not started' }}</span></span></div>
+  {% if reading.worked_out %}<div class="srow"><span class="srow-main"><span class="srow-title">Last worked out</span></span>
+    <span class="srow-end"><span class="srow-value">{{ localtime(reading.worked_out, '%d.%m. %H:%M') }}</span></span></div>{% endif %}
+{% endcall %}
+
+{% if not rep.since %}
+{% call group() %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">Nothing counted yet</span>
+    <span class="srow-sub wrap">Counting starts the first time you scroll through the feed.</span></span></div>
+{% endcall %}
+{% else %}
+{% call group('Counted', footnote='Each story counts once, however many outlets carried it. A story counts as read when you opened it, liked it, saved it, opened its key points or read it on screen.') %}
+  {% for title, n, sub in [
+       ('Stories shown', rep.shown, none),
+       ('Opened', rep.opened, none),
+       ('Key points opened', rep.expanded, none),
+       ('Read on screen', rep.lingered,
+         ('On screen at least ' ~ '%.1f'|format(rep.threshold / 1000) ~ ' s while you were reading: your longest quarter') if rep.threshold
+         else ('Counts once ' ~ reading.linger_min ~ ' stories have a reading time. Now ' ~ rep.timed ~ '.')),
+       ('Saved', rep.saved, none),
+       ('Liked 👍', rep.liked, none),
+       ('Not interested 👎', rep.disliked, none)] %}
+  <div class="srow"><span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub wrap">{{ sub }}</span>{% endif %}</span>
+    <span class="srow-end"><span class="srow-value">{{ n }}</span></span></div>
+  {% endfor %}
+{% endcall %}
+
+{% if reading.topics %}
+{% call group('Interests and categories', footnote=('Compared with how much you read overall: from ' ~ pct(d.min_weight) ~ ' less to ' ~ pct(d.max_weight) ~ ' more. ' if reading.active else 'The effect shows here once NewsNest has learned enough. ') ~ 'A story that matches none of your interests counts for its category. ⋮ makes the same choices as a story\'s ⋯ menu.') %}
+  {{ reading_rows(reading.topics) }}
+{% endcall %}
+{% endif %}
+
+{% if reading.outlets %}
+{% call group('Outlets', footnote=('From ' ~ pct(d.source_min_weight) ~ ' less to ' ~ pct(d.source_max_weight) ~ ' more. ' if reading.active else '') ~ 'A story with several outlets counts for the one the feed shows.') %}
+  {{ reading_rows(reading.outlets) }}
+{% endcall %}
+{% endif %}
+{% endif %}
+
+{# A lift from older versions that isn't used while NewsNest follows your reading #}
+{% macro aside_row(r) %}
+<div class="srow">
+  {% if r.outlet %}{{ avatar(r.name, r.key) }}{% else %}<span class="savatar topic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12.5V5h7.5L20 13.5 13.5 20 4 12.5Z"/><circle cx="8.5" cy="9" r="1.2"/></svg></span>{% endif %}
+  <span class="srow-main"><span class="srow-title">{{ r.name }}</span><span class="srow-sub">{{ 'Outlet' if r.outlet else 'Category' }}</span></span>
+  <span class="srow-end"><span class="srow-value">{{ r.effect }}</span></span>
+</div>
+{% endmacro %}
+
+{% if reading.set_aside %}
+{% call group('Set aside', footnote='Small lifts from opens and likes in older versions, before NewsNest followed your reading. Not used while it does; used again if you turn it off.') %}
+  {% for r in reading.set_aside[:5] %}{{ aside_row(r) }}{% endfor %}
+  {% if reading.set_aside|length > 5 %}
+  <details class="srow-more">
+    <summary class="srow"><span class="srow-main"><span class="srow-title srow-accent">Show {{ reading.set_aside|length - 5 }} more</span></span>
+      <svg class="chev expand-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+    {% for r in reading.set_aside[5:] %}{{ aside_row(r) }}{% endfor %}
+  </details>
+  {% endif %}
+{% endcall %}
+{% endif %}
+{% endblock %}
