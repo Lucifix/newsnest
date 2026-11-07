@@ -204,6 +204,29 @@ class HomeFeedCfg(_Strict):
     session_idle_minutes: float = Field(default=45, gt=0)
 
 
+class DriftCfg(_Strict):
+    """Following what you read lately (newsnest.drift, docs/interest-drift-plan.md)."""
+    # Off: the feed keeps today's order rules (the older learned boosts stay as they were)
+    enabled: bool = True
+    # A sign of interest counts half after this many days, a quarter after twice that
+    half_life_days: float = Field(default=14, gt=0)
+    # Anything older than this is not looked at
+    window_days: int = Field(default=90, gt=0)
+    # How many stories' worth of "your usual" every interest starts with, so a few skips change little
+    prior: float = Field(default=40, gt=0)
+    # Nothing changes until reading time has been recorded this long and on this many stories
+    warmup_days: float = Field(default=14, ge=0)
+    warmup_stories: int = Field(default=500, ge=0)
+    # How far an interest or category can move (a faded one sinks to min_weight, never out)...
+    min_weight: float = Field(default=0.6, gt=0, le=1)
+    max_weight: float = Field(default=1.4, ge=1)
+    # ...and an outlet
+    source_min_weight: float = Field(default=0.8, gt=0, le=1)
+    source_max_weight: float = Field(default=1.25, ge=1)
+    # Stories per feed visit from an interest you've drifted away from, shown early (0 turns it off)
+    revisit_slots: int = Field(default=1, ge=0)
+
+
 class DiscoveryCfg(_Strict):
     # Candidate sources from OPML imports / the feed catalog (managed in Settings)
     enabled: bool = True
@@ -350,6 +373,7 @@ class Config(_Strict):
     scoring: ScoringCfg = Field(default_factory=ScoringCfg)
     digest: DigestCfg = Field(default_factory=DigestCfg)
     feed: HomeFeedCfg = Field(default_factory=HomeFeedCfg)
+    drift: DriftCfg = Field(default_factory=DriftCfg)
     discovery: DiscoveryCfg = Field(default_factory=DiscoveryCfg)
     budget: BudgetCfg = Field(default_factory=BudgetCfg)
     ai: AICfg = Field(default_factory=AICfg)

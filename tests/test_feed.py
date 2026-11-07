@@ -229,26 +229,37 @@ def test_feed_pages_load_incrementally_without_repeats(db, cfg, monkeypatch):
         assert len(seen) == 45 and pages == 3 and "That's everything" in frag
 
 
-def test_opens_and_likes_nudge_weights(db, cfg, monkeypatch):
+def test_opens_and_likes_leave_the_weights_alone(db, cfg, monkeypatch):
+    """Opens and likes used to lift the outlet and category for good; drift (newsnest.drift) follows them now,
+    and the card menu's choices stay exactly as the reader set them."""
     monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
     i = add(db, cfg, "a", "Nova bolnišnica v Ljubljani", "https://a.si/h", cat="Health", topic=7, importance=5, personal=7)
     from newsnest.feed import load_weights
     from newsnest.web import app
     with TestClient(app) as client:
+        client.post("/api/feedback", data={"action": "less_category", "target": "Health"})
+        before = load_weights(db)
+        assert before == {("category", "Health"): 0.75}
         client.get(f"/go/{i}", follow_redirects=False)
-        client.get(f"/go/{i}", follow_redirects=False)  # reopening doesn't count twice
-        w = load_weights(db)
-        assert w[("source", "a")] == pytest.approx(1.03) and w[("category", "Health")] == pytest.approx(1.02)
         client.post(f"/api/items/{i}/rate", data={"value": "1"})
-        assert load_weights(db)[("source", "a")] == pytest.approx(1.03 * 1.06, abs=1e-3)
-        client.post(f"/api/items/{i}/rate", data={"value": "0"})  # undo the like
-        assert load_weights(db)[("source", "a")] == pytest.approx(1.03, abs=1e-3)
-        client.post("/api/read", data={"ids": str(i), "value": "1"})  # auto-read style: no change
-        assert load_weights(db)[("source", "a")] == pytest.approx(1.03, abs=1e-3)
-    from newsnest.feed import IMPLICIT_MAX, LIKE_NUDGE, nudge
-    for _ in range(50):
-        nudge(db, "a", "Health", LIKE_NUDGE)
-    assert load_weights(db)[("source", "a")] == IMPLICIT_MAX
+        client.post(f"/api/items/{i}/rate", data={"value": "0"})
+        client.post("/api/feedback", data={"action": "not_interested", "ids": str(i)})
+        assert load_weights(db) == before
+    assert db.execute("SELECT opened_at IS NOT NULL FROM items WHERE id = ?", (i,)).fetchone()[0]  # still drift's input
+
+
+def test_old_boosts_are_skipped_only_when_asked(db):
+    from newsnest.feed import load_weights
+    rows = [("source", "a", 1.12), ("category", "a", 1.3),     # boosts from opens; a source named like a category
+            ("source", "b", 1.25), ("category", "AI", 0.75),   # chosen in the menu
+            ("source", "c", 1.8)]                              # explicit, beyond what opens could do
+    for kind, key, w in rows:
+        db.execute("INSERT INTO weights (kind, key, weight, updated_at) VALUES (?, ?, ?, ?)", (kind, key, w, iso(NOW)))
+    db.execute("INSERT INTO feedback (at, kind, target) VALUES (?, 'more_source', 'b')", (iso(NOW),))
+    db.execute("INSERT INTO feedback (at, kind, target) VALUES (?, 'less_category', 'AI')", (iso(NOW),))
+    db.execute("INSERT INTO feedback (at, kind, target) VALUES (?, 'more_category', 'b')", (iso(NOW),))  # not source b's
+    assert len(load_weights(db)) == 5
+    assert load_weights(db, skip_old_boosts=True) == {("source", "b"): 1.25, ("category", "AI"): 0.75, ("source", "c"): 1.8}
 
 
 def test_world_block_gets_its_own_chip(db, cfg):
@@ -326,7 +337,7 @@ def test_a_config_without_a_sections_list_keeps_the_four_tabs(db, cfg):
 
 def test_weight_strength_buckets():
     from newsnest.feed import WEIGHT_MAX, WEIGHT_MIN, weight_strength
-    assert weight_strength(1.03) == ("more", 0)  # one open: a nudge, folded away on the profile page
+    assert weight_strength(1.03) == ("more", 0)  # a tiny old boost, folded away on the profile page
     assert weight_strength(0.97) == ("less", 0)
     assert weight_strength(1.1) == ("more", 1) and weight_strength(1.25) == ("more", 2)  # one "More about"
     assert weight_strength(0.75) == ("less", 2)  # one "Less from"
