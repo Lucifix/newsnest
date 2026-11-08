@@ -514,10 +514,19 @@ form.inline label { flex: 1 1 260px; }
 .filter-empty { text-align: center; color: var(--muted); padding: 48px 16px; font: 600 1.1rem var(--display); }
 
 /* ---------- read / seen ---------- */
-.story.read { background: transparent; box-shadow: none; }
-.story.read h3 a { color: var(--muted); }
-.story.read .thumb-img, .story.read .hero-media { opacity: 0.55; filter: grayscale(0.5); }
-.story.read .summary, .story.read .snippet { color: var(--muted); }
+/* A read story keeps its card, like a read email keeps its row: only what's inside goes quiet (a gray,
+   regular-weight title, gray source and text, a faded picture, a plain check instead of the filled one).
+   An unread story carries a small accent dot after its time. */
+.story.read h3 a { color: var(--muted); font-weight: 500; }
+.story.read .meta .src { color: var(--muted); font-weight: 500; }
+.story.read .meta .badge { opacity: 0.55; filter: grayscale(1); }
+.story.read .thumb-img, .story.read .hero-media, .story.read .big-media { opacity: 0.55; filter: grayscale(0.5); }
+.story.read .summary, .story.read .snippet, .story.read .whatsnew { color: var(--muted); }
+.story.read .act.readtoggle[aria-pressed="true"], .story.read .acts.slim .act.readtoggle[aria-pressed="true"] { background: transparent; color: var(--muted); }
+.story:not(.read) .meta > .sep + *::after {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-radius: 50%;
+  background: var(--accent); vertical-align: middle; transform: translateY(-1px);
+}
 .pill.readmark { display: none; }
 .story.read .pill.readmark { display: inline-block; }
 .story.read .pill.new { display: none; }
