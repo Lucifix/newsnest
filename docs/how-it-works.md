@@ -138,6 +138,10 @@ Some things keep the feed from becoming an echo chamber:
 story and coming back doesn't reshuffle the page. A fresh ranking starts after 45 minutes away, or when
 you pull down to refresh.
 
+**Each tab keeps your place.** Switch to another tab and back (or press Back) and you're at the story you
+left, with everything you'd scrolled through still loaded. Tap the tab you're on to go to the top, and tap
+it again at the top to refresh. Once a fresh ranking starts, every tab starts at the top again.
+
 Every card has a **"why" panel** listing exactly what moved it: *Top story*, *Matches one of your
 watches*, *You've been reading about Sports lately*, *Already shown to you 2×*, and so on.
 
