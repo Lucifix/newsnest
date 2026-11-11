@@ -32,6 +32,7 @@ function setStoryRead(story, read) {
   for (const copy of copies) {
     copy.dataset.read = read ? "1" : "0";
     copy.classList.toggle("read", read);
+    if (read) copy.classList.remove("unseen");  // as the server renders it: a read story is no longer new
     const button = copy.querySelector(".readtoggle");
     if (button) {
       button.setAttribute("aria-pressed", String(read));
@@ -448,6 +449,12 @@ function openSheet(button) {
   const d = button.dataset;
   sheet.querySelectorAll("[data-fill]").forEach((el) => { el.textContent = d[el.dataset.fill] || ""; });
   sheet.querySelectorAll("[data-needs-cat]").forEach((el) => { el.hidden = !d.cat; });
+  const readItem = sheet.querySelector('[data-action="read"]');
+  if (readItem) {
+    const read = button.closest(".story")?.dataset.read === "1";
+    readItem.dataset.value = read ? "0" : "1";
+    readItem.querySelector("span").textContent = read ? "Mark as unread" : "I've already read this";
+  }
   sheet.hidden = false;
   backdrop.hidden = false;
   button.setAttribute("aria-expanded", "true");
@@ -470,7 +477,18 @@ document.addEventListener("click", async (event) => {
   if (!item || !menuButton) return;
   const d = menuButton.dataset;
   const action = item.dataset.action;
+  const story = menuButton.closest(".story");
   closeSheet();
+  if (action === "read") {
+    const read = item.dataset.value === "1";
+    try {
+      await postForm("/api/read", { ids: d.ids, value: item.dataset.value });
+      setStoryRead(story, read);
+      applyFilters();
+      toast(read ? "Marked as read" : "Marked as unread");
+    } catch { toast("That did not work; try again"); }
+    return;
+  }
   try {
     const target = action.endsWith("_source") ? d.src : d.cat;
     await postForm("/api/feedback", { action, target });

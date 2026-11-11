@@ -7,7 +7,7 @@ showed a reshuffled page.
 
 A session stores the ranking for every tab (newsnest.feed.Ranking) as story positions. Each view loads
 the stories' current rows again, so read, saved and rating show as they are now; hidden and "not
-interested" stories drop out, read ones stay in place, dimmed. A new session (fresh ranking, with all
+interested" stories drop out, read ones stay in place, marked Read. A new session (fresh ranking, with all
 the signals of the last one) starts when the device has none, after feed.session_idle_minutes away,
 on Refresh or Mark all read, when the config or the source list changes, or when a release changed
 the stored format. One session per device: the id lives in a cookie.
