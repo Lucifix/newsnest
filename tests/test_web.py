@@ -707,6 +707,19 @@ def test_the_feed_names_its_own_view_for_in_place_tab_switches(client):
     assert 'data-href="/?f=cat%3Aheadlines%3AWorld"' in client.get("/?f=cat:headlines:World").text
 
 
+def test_the_feed_names_its_session_so_a_tab_keeps_its_place_only_within_it(client):
+    """app.js puts a tab you come back to where you left it, but only while the feed session (the frozen order)
+    is the same: every view of one session carries the same data-session, a Refresh brings a new one, and n=
+    (how many stories to load back) loads more without becoming part of the view's address."""
+    session = re.search(r'class="feedwrap home" data-href="[^"]*" data-session="([^"]+)"', client.get("/?f=all").text).group(1)
+    assert session == client.cookies.get("newsnest_feed")
+    assert f'data-session="{session}"' in client.get("/?f=tech").text
+    assert f'data-session="{session}"' in client.get("/?f=headlines&view=list").text
+    client.get("/?f=all&refresh=1")
+    assert f'data-session="{session}"' not in client.get("/?f=tech").text
+    assert 'data-href="/?f=all"' in client.get("/?f=all&n=60").text
+
+
 def test_home_has_a_front_page_for_wide_screens_beside_the_feed(client):
     """The front page repeats stories from the feed: its copies share data-ids (read state follows both) but
     not the feed card's id, and they are not seen-tracked (only the feed's [data-track-seen] counts)."""

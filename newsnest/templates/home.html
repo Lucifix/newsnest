@@ -7,11 +7,12 @@
 {% set live_sources = status.sources|rejectattr('health.level', 'equalto', 'disabled')|list %}
 {% set ok_sources = live_sources|rejectattr('health.level', 'equalto', 'failing')|list %}
 {% set hour = now_local.hour %}
-{# data-href: this view's own address, for Back and in-place tab switches (app.js showFeed) #}
+{# data-href: this view's own address, for Back and in-place tab switches (app.js showFeed). data-session: the
+   feed session it was ranked in; a tab you come back to keeps its place only within the same one (app.js) #}
 {# home: the desktop layout (front page beside the feed) is scoped to it. vq: the list view (More stories)
    stays the list view across chips and tabs #}
 {% set vq = '&view=list' if list_view else '' %}
-<div class="feedwrap home" data-href="/?f={{ feed.active|urlencode }}{{ vq }}{% if start %}&amp;at={{ feed.items[start].card.lead.id }}{% endif %}">
+<div class="feedwrap home" data-href="/?f={{ feed.active|urlencode }}{{ vq }}{% if start %}&amp;at={{ feed.items[start].card.lead.id }}{% endif %}" data-session="{{ token }}">
 {{ banner_box(banner) }}
 <header class="masthead">
   <p class="dateline">{{ now_local.strftime('%A, %d %B') }}</p>

@@ -722,12 +722,98 @@ function syncDock(doc) {
   if (icon) document.querySelector(".tabcurrent")?.replaceChildren(...[...icon.childNodes].map((n) => document.importNode(n, true)));
 }
 
+// ---------- each view keeps its place: back on a tab (or Back to a view), you are where you left it ----------
+// As tab bars do on iOS, and as Material 3 asks of apps people switch around in. A view (a tab, a chip, the
+// list view) remembers the story at the top of the screen, how far down it sat, and how many stories had
+// loaded; coming back loads that many again and puts that story where it was. Only within the same feed
+// session (newsnest.feedsession): there the order is frozen, so the same stories come back in the same
+// places. A new session (Refresh, Mark all read, away for the idle time) is a new feed and starts at the top.
+// Tapping the tab you are on still goes to the top. Kept per browser tab (sessionStorage), so it also
+// covers a tab tapped on another page and Back after the browser dropped the page; the browser's own
+// scroll restoration is off on the feed, since it only knows pixels, not which story was there.
+const PLACES = "newsnest.places";
+function viewKey(href) {
+  const url = new URL(href, location.href);
+  url.searchParams.delete("refresh");
+  url.searchParams.delete("n");
+  url.searchParams.sort();
+  return url.pathname + url.search;
+}
+function readPlaces() {
+  try { return JSON.parse(sessionStorage.getItem(PLACES) || "{}") || {}; } catch { return {}; }
+}
+// Only a place from that feed session counts
+function placeFor(href, session) {
+  const place = readPlaces()[viewKey(href)];
+  return place && place.session === session ? place : null;
+}
+function savePlace() {
+  const wrap = document.querySelector(".feedwrap[data-href][data-session]");
+  // Mid-swap the page shows the old view dimmed or placeholders: its place was saved when the swap began
+  if (!wrap || !swapsInPlace() || wrap.classList.contains("swapping")) return;
+  const session = wrap.dataset.session;
+  const stories = [...wrap.querySelectorAll("#stream .story[id]")].filter((s) => !s.hidden && s.getClientRects().length);
+  // The first story starting on screen; scrolled past the last one (beside the desktop front page, the lane
+  // ends first), the last one, above the screen
+  const story = scrollY > AT_TOP ? stories.find((s) => s.getBoundingClientRect().top >= 0) ?? stories.at(-1) : null;
+  const place = { session, y: Math.round(scrollY), count: stories.length, story: story?.id ?? null,
+                  offset: story ? Math.round(story.getBoundingClientRect().top) : 0 };
+  // Places from an earlier session can never be used again: drop them
+  const places = Object.fromEntries(Object.entries(readPlaces()).filter(([, p]) => p.session === session));
+  places[viewKey(wrap.dataset.href)] = place;
+  try { sessionStorage.setItem(PLACES, JSON.stringify(places)); } catch { /* storage blocked: no memory */ }
+}
+// Things still move just after the jump: cards are content-visibility: auto (app.css), so the ones that come
+// into view only then take their real height instead of the estimate, and web fonts can land late. The
+// story is put back where it was each frame until it stays put, unless you start scrolling first.
+let settling = null;
+function goToPlace(place) {
+  // true once there
+  const go = () => {
+    const story = place.story && document.getElementById(place.story);
+    const target = story && story.getClientRects().length
+      ? scrollY + story.getBoundingClientRect().top - place.offset
+      : place.y;  // that story has gone (hidden meanwhile): about the same depth
+    if (Math.abs(scrollY - target) <= 1) return true;
+    scrollTo({ top: Math.max(0, target), behavior: "instant" });
+    return false;
+  };
+  settling = go;
+  const stop = () => { if (settling === go) settling = null; };
+  for (const type of ["wheel", "touchstart", "keydown", "pointerdown"]) addEventListener(type, stop, { once: true, passive: true });
+  let still = 0;
+  let frames = 0;
+  // Three quiet frames in a row, or about a second (a page still too short by then stays as close as it got)
+  const step = () => {
+    if (settling !== go) return;
+    still = go() ? still + 1 : 0;
+    if (still < 3 && ++frames < 60) requestAnimationFrame(step);
+  };
+  step();
+  document.fonts?.ready.then(() => settling?.());
+  if (document.readyState !== "complete") addEventListener("load", () => settling?.(), { once: true });
+  setTimeout(stop, 3000);
+}
+addEventListener("pagehide", savePlace);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") savePlace(); });
+
 let feedLoad = null;
 // push: a new history entry (a tap); otherwise the current one is updated (Back, or a refresh).
 // now: the placeholders go up at once instead of after SKELETON_DELAY (a dock tab)
-async function showFeed(href, { push = false, tab = false, now = false } = {}) {
+// restore: arrive where this view was left (else at the top), loading as many stories as it had
+async function showFeed(href, { push = false, tab = false, now = false, restore = false } = {}) {
   const wrap = document.querySelector(".feedwrap");
   const scrollLeft = tab ? 0 : wrap.querySelector(".cats")?.scrollLeft ?? 0;
+  if (viewKey(href) !== viewKey(wrap.dataset.href || location.href)) savePlace();  // the view being left
+  if (restore) {
+    // One session per device: a place from another one will not be used, so it needs no extra stories
+    const count = placeFor(href, wrap.dataset.session)?.count;
+    if (count) {
+      const url = new URL(href, location.href);
+      url.searchParams.set("n", String(count));
+      href = url.href;
+    }
+  }
   feedLoad?.abort();  // a later tap wins
   const load = feedLoad = new AbortController();
   wrap.classList.remove("swapped");
@@ -754,9 +840,11 @@ async function showFeed(href, { push = false, tab = false, now = false } = {}) {
     wrap.replaceChildren(...fresh.childNodes);
     wrap.classList.add("swapped");  // the new stories fade in
     wrap.dataset.href = fresh.dataset.href;
+    wrap.dataset.session = fresh.dataset.session;
     document.title = doc.title;
     syncDock(doc);
     const state = { feed: true, href: fresh.dataset.href };
+    landed.searchParams.delete("n");  // how many to load back is not part of the view's address
     const address = landed.pathname + landed.search;
     if (push) history.pushState(state, "", address);
     else history.replaceState(state, "", address);
@@ -767,6 +855,11 @@ async function showFeed(href, { push = false, tab = false, now = false } = {}) {
     rememberNewsChip();
     trackStories(wrap.querySelectorAll("[data-track-seen] .story"));
     watchLoadMore();
+    if (restore) {
+      const place = placeFor(fresh.dataset.href, fresh.dataset.session);
+      if (place) goToPlace(place);
+      else scrollTo({ top: 0, behavior: "instant" });
+    }
   } catch (error) {
     if (error.name !== "AbortError" && load === feedLoad) location.href = href;
   } finally {
@@ -778,9 +871,11 @@ async function showFeed(href, { push = false, tab = false, now = false } = {}) {
   }
 }
 
-// A dock tab: lit at once, its placeholders at once, back to the top behind them, its stories follow. Tapping the tab you are on takes two
+// A dock tab: lit at once, its placeholders at once, back to the top behind them, its stories follow, and
+// another tab opens where you left it (its place, above). Tapping the tab you are on takes two
 // steps, as in most feed apps: scrolled down, the tap only goes back to the top (the feed keeps its order);
 // at the top it refreshes (its link carries refresh=1), with the same placeholders instead of a blank reload.
+// From a chip inside the tab, the tap goes to the tab's All at the top: the tab you are on always means the top.
 const AT_TOP = 8;  // px: this close to the top counts as there
 document.addEventListener("click", (event) => {
   const tab = event.target.closest(".sections a[data-tab], .tabbar a[data-tab]");
@@ -806,8 +901,10 @@ document.addEventListener("click", (event) => {
     }
   }
   const refresh = new URL(href).searchParams.has("refresh");
+  const another = tab.dataset.tab !== document.body.dataset.tab;
   lightTab(tab.dataset.tab);
-  showFeed(href, { push: !refresh, tab: true, now: true });  // puts the placeholders up before it waits
+  // puts the placeholders up before it waits
+  showFeed(href, { push: !refresh, tab: true, now: true, restore: another && !refresh });
   scrollTo({ top: 0, behavior: "instant" });
 });
 
@@ -830,7 +927,7 @@ addEventListener("popstate", (event) => {
   if (!event.state?.feed || !swapsInPlace()) return;
   // Closing search goes Back to the view already on screen: nothing to load
   if (event.state.href === document.querySelector(".feedwrap").dataset.href) return;
-  showFeed(event.state.href || location.href, { tab: true });
+  showFeed(event.state.href || location.href, { tab: true, restore: true });
 });
 document.addEventListener("DOMContentLoaded", () => {
   rememberNewsChip();
@@ -841,6 +938,18 @@ document.addEventListener("DOMContentLoaded", () => {
   setupCats();
   closeLaneLead();
   fitLane();
+  if (!wrap || !swapsInPlace()) return;
+  // The feed puts each view back in its place itself (above), Back and reloads included
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  // Opened anew (a tab tapped on another page, Back after the browser dropped the page, a reload): its place
+  const place = placeFor(wrap.dataset.href, wrap.dataset.session);
+  if (!place) return;
+  const stories = wrap.querySelectorAll("#stream .story[id]").length;
+  if (place.story && !document.getElementById(place.story) && place.count > stories) {
+    showFeed(wrap.dataset.href, { restore: true });  // it was past the first page: load as many as then
+  } else {
+    goToPlace(place);
+  }
 });
 // Backup for browsers where the observer does not fire: check on scroll, at most once per frame
 let scrollCheck = false;
