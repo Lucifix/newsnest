@@ -514,15 +514,11 @@ form.inline label { flex: 1 1 260px; }
 .filter-empty { text-align: center; color: var(--muted); padding: 48px 16px; font: 600 1.1rem var(--display); }
 
 /* ---------- read / seen ---------- */
-/* A read story keeps its card, like a read email keeps its row: only what's inside goes quiet (a gray,
-   regular-weight title, gray source and text, a faded picture, a plain check instead of the filled one).
+/* A read story looks like a visited link: only its title turns gray (regular weight), and the Read label
+   says it in words. The picture, logo and text stay as they are: a faded photo reads as "disabled" or
+   "still loading", not "done". The big photo card's title rule is as specific, hence .fcard.big here.
    An unread story carries a small accent dot after its time. */
-.story.read h3 a { color: var(--muted); font-weight: 500; }
-.story.read .meta .src { color: var(--muted); font-weight: 500; }
-.story.read .meta .badge { opacity: 0.55; filter: grayscale(1); }
-.story.read .thumb-img, .story.read .hero-media, .story.read .big-media { opacity: 0.55; filter: grayscale(0.5); }
-.story.read .summary, .story.read .snippet, .story.read .whatsnew { color: var(--muted); }
-.story.read .act.readtoggle[aria-pressed="true"], .story.read .acts.slim .act.readtoggle[aria-pressed="true"] { background: transparent; color: var(--muted); }
+.story.read h3 a, .fcard.big.read h3 a { color: var(--muted); font-weight: 500; }
 .story:not(.read) .meta > .sep + *::after {
   content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-radius: 50%;
   background: var(--accent); vertical-align: middle; transform: translateY(-1px);
@@ -754,7 +750,6 @@ a.chip { text-decoration: none; }
 .acts.slim .act { width: 34px; height: 34px; background: transparent; }
 .acts.slim .act:hover { background: var(--surface-2); }
 .acts.slim .act svg { width: 17px; height: 17px; }
-.acts.slim .act.readtoggle[aria-pressed="true"] { background: var(--text); color: var(--bg); }
 .kebab[open] > summary.act { background: var(--surface-2); color: var(--text); }
 .fcard .coverage { margin-top: 4px; }
 
@@ -1141,9 +1136,6 @@ a.chip { text-decoration: none; }
   .searchlayer, body.searching .searchlayer { transform: none; transition: opacity 0.2s ease, visibility 0s linear 0.2s; }
   body.searching .searchlayer { transition: opacity 0.2s ease, visibility 0s; }
 }
-.story.read .summary.lede, .story.read .tldr-lede, .story.read .points li, .story.read .tldr-why, .story.read .tldr-label { color: var(--muted); }
-.story.read .tldr-label b { background: var(--muted); }
-.story.read .sumbtn { color: var(--muted); }
 .hero .points li { font-size: 0.98rem; }
 
 /* swipe deck: everything shown at once, no toggles to fight the drag */
@@ -1519,8 +1511,7 @@ input.chipinput:focus { outline: none; }
   .fscore b { font: 800 2.15rem/1 var(--display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
   .fscore small { margin-top: 3px; font: 700 0.6rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
   .fscore.high { background: var(--accent); color: var(--accent-ink); }
-  .front .story.read :is(h2, h3) a, .front .story.read .fdek, .front .story.read .fpoints li { color: var(--muted); }
-  .front .story.read img, .front .story.read .fscore { opacity: 0.55; filter: grayscale(0.5); }
+  .front .story.read :is(h2, h3) a { color: var(--muted); }
 
   /* --- the lead --- */
   .flead { margin: 0 0 52px; }

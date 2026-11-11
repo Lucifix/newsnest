@@ -84,7 +84,8 @@ def test_updated_card_can_be_marked_read(db, cfg, monkeypatch):
     with TestClient(app) as client:
         page = client.get("/").text
         assert 'data-read="0"' in page
-        assert 'aria-label="Mark as read"' in page
+        assert 'data-action="read"' in page  # in the card's ⋯ menu, not a button in the row
+        assert 'class="act readtoggle"' not in page
         assert ">Updated<" in page
         assert re.search(r'class="whatsnew[^"]*"><span class="src">d</span>', page, re.I)
         ids = build_feed(db, cfg, SOURCES).items[0].card.ids
