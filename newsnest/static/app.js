@@ -1475,9 +1475,9 @@ if (feedPage && "ontouchstart" in window) {
 }
 
 // ---------- About: the logo's dot is an egg ----------
-// Tap the logo seven times: the last taps before the seventh crack the shell a bit more each, then the dot
-// hatches into a bird that chirps the logo's arcs, and chirps again on every tap after. Nothing is stored:
-// leave the page and it is an egg again. With reduced motion the steps still happen, without the movement.
+// Tap the logo seven times. Taps 4 to 6 each bring the view closer and crack the shell a bit more; the seventh
+// hatches a chick, which chirps the logo's arcs, and chirps again on every tap after. Nothing is stored: leave
+// the page and it is a dot again. With reduced motion the steps still happen, without the movement.
 const egg = document.querySelector("[data-egg]");
 if (egg) {
   const TAPS = 7;
@@ -1485,22 +1485,30 @@ if (egg) {
   const FORGET = 2500;     // ms: stray taps before the first crack don't add up over a visit
   const LINE = "The dot was an egg all along.";
   const still = matchMedia("(prefers-reduced-motion: reduce)");
-  const bird = egg.querySelector(".egg-bird");
-  const arcs = [...egg.querySelectorAll(".egg-arc")];
+  const all = (selector) => [...egg.querySelectorAll(selector)];
   const line = document.querySelector("[data-egg-line]");
   let taps = 0;
   let forget = null;
-  // one-off moves on top of whatever state the CSS holds (scale, rotate and translate, so they add to it)
-  const play = (el, frames, options) => { if (!still.matches) el?.animate?.(frames, options); };
+  // one-off moves on top of whatever state the CSS holds: they use translate, rotate and scale, which add to
+  // an element's transform instead of replacing it
+  const play = (els, frames, options) => {
+    if (!still.matches) for (const el of [].concat(els)) el.animate?.(frames, options);
+  };
 
+  // A hop, the beak opens twice, the hat lags a beat behind, the arcs ring and two notes float off
   function chirp(delay = 0) {
     const ease = "cubic-bezier(0.3, 0.7, 0.2, 1)";
-    play(bird, { translate: ["0 0", "0 -2.6px", "0 0", "0 -1.1px", "0 0"], offset: [0, 0.3, 0.62, 0.8, 1] },
-         { duration: 520, delay, easing: ease });
-    play(egg.querySelector(".egg-beak-up"), { rotate: ["0deg", "-24deg", "0deg", "-16deg", "0deg"] }, { duration: 520, delay });
-    play(egg.querySelector(".egg-beak-down"), { rotate: ["0deg", "20deg", "0deg", "14deg", "0deg"] }, { duration: 520, delay });
-    arcs.forEach((arc, i) => play(arc, { scale: [1, 0.93, 1.08, 1], opacity: [1, 0.5, 1, 1] },
-                                  { duration: 460, delay: delay + 90 + i * 110, easing: ease }));
+    const hop = (rise) => ({ translate: ["0 0", `0 ${-rise}px`, "0 0", `0 ${-rise * 0.4}px`, "0 0"], offset: [0, 0.3, 0.62, 0.8, 1] });
+    play(all(".egg-chick, .egg-wings"), hop(7), { duration: 520, delay, easing: ease });
+    play(all(".egg-cap"), hop(11), { duration: 560, delay: delay + 45, easing: ease });
+    play(all(".egg-beak-low"), { translate: ["0 0", "0 3px", "0 0", "0 2.2px", "0 0"] }, { duration: 520, delay });
+    all(".egg-arc").forEach((arc, i) => play(arc, { scale: [1, 0.94, 1.07, 1], opacity: [1, 0.5, 1, 1] },
+                                             { duration: 460, delay: delay + 90 + i * 110, easing: ease }));
+    all(".egg-note").forEach((note, i) => play(note, {
+      opacity: [0, 1, 1, 0], offset: [0, 0.15, 0.6, 1],
+      translate: ["0 0", i ? "-2.2px -4px" : "3px -3.4px", i ? "-3px -6.6px" : "5.4px -6px", i ? "-3.4px -8.4px" : "6.6px -8px"],
+      rotate: ["0deg", i ? "-10deg" : "12deg", i ? "6deg" : "-6deg", i ? "-8deg" : "10deg"],
+    }, { duration: 1100, delay: delay + 60 + i * 190, easing: "ease-out" }));
   }
 
   egg.addEventListener("click", () => {
@@ -1516,17 +1524,17 @@ if (egg) {
     if (taps < TAPS) {
       egg.dataset.stage = String(crack);
       navigator.vibrate?.(6 + 4 * crack);
-      const lean = 6 + 5 * crack;  // it rocks harder as it cracks
-      play(bird, { rotate: ["0deg", `${-lean}deg`, `${lean * 0.8}deg`, `${-lean * 0.45}deg`, `${lean * 0.2}deg`, "0deg"] },
-           { duration: 460, easing: "ease-out" });
+      const lean = 5 + 4 * crack;  // it rocks harder as it cracks
+      play(all(".egg-rock"), { rotate: ["0deg", `${-lean}deg`, `${lean * 0.8}deg`, `${-lean * 0.45}deg`, `${lean * 0.2}deg`, "0deg"] },
+           { duration: 520, delay: 120, easing: "ease-out" });
       return;
     }
     delete egg.dataset.stage;
     egg.classList.add("hatched");
     navigator.vibrate?.([14, 60, 10, 40, 10]);
-    chirp(650);
+    chirp(1250);
     if (line) {
-      setTimeout(() => { line.textContent = LINE; line.classList.add("on"); }, still.matches ? 0 : 900);
+      setTimeout(() => { line.textContent = LINE; line.classList.add("on"); }, still.matches ? 0 : 1500);
     }
   });
 }

@@ -3,30 +3,79 @@
 {% block stitle %}About NewsNest{% endblock %}
 {% block page %}
 <div class="about-hero">
-  {# The app icon, drawn here so its parts can move: tap it a few times (app.js) #}
+  {# The app icon, drawn here so its parts can move: tap it a few times (app.js). Everything sits around the
+     dot's centre, and each part that moves has its pivot at its own origin, so no transform-origin is needed.
+     The egg and the chick are drawn 30 units to the dot's radius and scaled down to it. #}
   <button class="egg" type="button" data-egg aria-label="NewsNest logo">
     <svg viewBox="0 0 32 32" aria-hidden="true">
-      <path class="egg-arc" d="M8.8 13.6A9.6 9.6 0 0 1 18.4 23.2"/>
-      <path class="egg-arc" d="M8.8 6.4A16.8 16.8 0 0 1 25.6 23.2"/>
-      <g class="egg-shell">
-        <path style="--dx: -5.6px; --dy: -4.4px; --turn: -150deg" d="M7.2 21.2l1.9-.5-.6 1.9z"/>
-        <path style="--dx: 5.2px; --dy: -5.8px; --turn: 170deg" d="M9.4 20.6l1.8.9-1.7.8z"/>
-        <path style="--dx: -6.8px; --dy: 1.2px; --turn: -90deg" d="M6.4 23l1.6-.7.2 1.8z"/>
-        <path style="--dx: 6.6px; --dy: 1.6px; --turn: 120deg" d="M10.2 22.8l1.7.5-1.4 1.2z"/>
-        <path style="--dx: -3.2px; --dy: 5.4px; --turn: 200deg" d="M7.6 24.6l1.5-.9.3 1.8z"/>
-        <path style="--dx: 3.4px; --dy: 5px; --turn: -140deg" d="M9.6 24.4l1.5.6-1.6 1z"/>
-      </g>
-      <g class="egg-bird">
-        <path class="egg-part egg-legs" d="M7.7 26.6v2.1M10 26.6v2.1"/>
-        <path class="egg-part egg-tail" d="M5.6 21.4 2.7 20.2l.9 3.6 2-.1z"/>
-        <path class="egg-part egg-beak egg-beak-up" d="M12 21.7l2.6.7-2.5.4z"/>
-        <path class="egg-part egg-beak egg-beak-down" d="M12.1 22.7l2.5-.3-2.3 1.4z"/>
-        <circle class="egg-dot" cx="8.8" cy="23.2" r="4.2"/>
-        <path class="egg-crack" pathLength="100" d="M4.9 22.2l1.5 1.4 1.2-1.7 1.4 1.9 1.3-1.8 1.2 1.6 1.2-1.1"/>
-        <path class="egg-crack egg-crack-2" pathLength="100" d="M7.6 21.9 7 20.4l1 -.8"/>
-        <path class="egg-crack egg-crack-3" pathLength="100" d="M10.3 22l.9 1.9-.7 1.5"/>
-        <g class="egg-part egg-wing"><ellipse cx="8" cy="24.3" rx="1.9" ry="1.25" transform="rotate(-18 8 24.3)"/></g>
-        <circle class="egg-part egg-eye" cx="10.5" cy="21.9" r="0.72"/>
+      <defs>
+        <radialGradient id="egg-g-shell" cx="0.36" cy="0.24" r="0.9">
+          <stop offset="0" stop-color="#f6ffcc"/><stop offset="0.36" stop-color="#c6ff3d"/><stop offset="1" stop-color="#86c200"/>
+        </radialGradient>
+        <radialGradient id="egg-g-down" cx="0.38" cy="0.24" r="0.82">
+          <stop offset="0" stop-color="#fff8bf"/><stop offset="0.42" stop-color="#ffe14d"/><stop offset="1" stop-color="#f2a500"/>
+        </radialGradient>
+        <radialGradient id="egg-g-wing" cx="0.4" cy="0.3" r="0.8">
+          <stop offset="0" stop-color="#ffec80"/><stop offset="1" stop-color="#f5ae0a"/>
+        </radialGradient>
+        <linearGradient id="egg-g-inside" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4f7000"/><stop offset="1" stop-color="#7fae00"/>
+        </linearGradient>
+        <clipPath id="egg-c-top"><path d="M-44 -90H44V-6H28L19 -3 11 -10 3 -2 -5 -11 -13 -3 -20 -12 -28 -5H-44Z"/></clipPath>
+        <clipPath id="egg-c-low"><path d="M-44 44H44V-6H28L19 -3 11 -10 3 -2 -5 -11 -13 -3 -20 -12 -28 -5H-44Z"/></clipPath>
+        <clipPath id="egg-c-nest"><path d="M-60 -120H60V-2H-60Z"/><path d="M0 -36C16 -36 29 -14 29 4C29 20 16 30 0 30C-16 30 -29 20 -29 4C-29 -14 -16 -36 0 -36Z"/></clipPath>
+        <clipPath id="egg-c-egg"><path d="M0 -36C16 -36 29 -14 29 4C29 20 16 30 0 30C-16 30 -29 20 -29 4C-29 -14 -16 -36 0 -36Z"/></clipPath>
+      </defs>
+      <g transform="translate(8.8 23.2)">
+        <g class="egg-cam">
+          <path class="egg-arc" d="M0 -9.6A9.6 9.6 0 0 1 9.6 0"/>
+          <path class="egg-arc" d="M0 -16.8A16.8 16.8 0 0 1 16.8 0"/>
+          <g transform="scale(0.14)">
+            <g class="egg-scene">
+              <g transform="translate(0 30)"><g class="egg-rock"><g transform="translate(0 -30)">
+                <ellipse cx="0" cy="-6" rx="27.6" ry="7.5" fill="url(#egg-g-inside)"/>
+                <g clip-path="url(#egg-c-nest)"><g class="egg-chick egg-hop">
+                  <path fill="#ffd633" d="M5 -46C5.5 -52.5 9.5 -56 13.5 -55.2C11.4 -53 11 -50.4 11.8 -47.2C13 -51 16 -52.6 18.8 -51.4C16.4 -49.6 15.6 -47 15.8 -43.6Z"/>
+                  <path fill="url(#egg-g-down)" d="M0 -50C13.5 -50 24 -40.5 24 -28.5C24 -22.5 22 -18 19.5 -14.5C23.5 -9.5 25 -3 25 3C25 15 14 24 0 24C-14 24 -25 15 -25 3C-25 -3 -23.5 -9.5 -19.5 -14.5C-22 -18 -24 -22.5 -24 -28.5C-24 -40.5 -13.5 -50 0 -50Z"/>
+                  <ellipse cx="-15.6" cy="-20.5" rx="5.4" ry="3.7" fill="#ff4fae" opacity="0.42"/>
+                  <ellipse cx="15.6" cy="-20.5" rx="5.4" ry="3.7" fill="#ff4fae" opacity="0.42"/>
+                  <g transform="translate(-9.2 -29.5)"><g class="egg-eye"><ellipse rx="4.4" ry="5.3" fill="#1b1408"/><circle cx="-1.5" cy="-2.1" r="1.75" fill="#fff"/><circle cx="1.5" cy="2.3" r="0.85" fill="#fff" opacity="0.85"/></g></g>
+                  <g transform="translate(9.2 -29.5)"><g class="egg-eye"><ellipse rx="4.4" ry="5.3" fill="#1b1408"/><circle cx="-1.5" cy="-2.1" r="1.75" fill="#fff"/><circle cx="1.5" cy="2.3" r="0.85" fill="#fff" opacity="0.85"/></g></g>
+                  <path fill="#8a1f14" d="M-3.4 -20.6Q0 -15.4 3.4 -20.6Z"/>
+                  <path class="egg-beak-low" fill="#e27c00" d="M-3.8 -20.8Q0 -15.6 3.8 -20.8Q0 -19.6 -3.8 -20.8Z"/>
+                  <path fill="#ff9d1c" d="M-5.4 -22.6Q0 -26 5.4 -22.6Q3 -18.6 0 -18.2Q-3 -18.6 -5.4 -22.6Z"/>
+                  <path fill="#ffc86a" d="M-3.6 -22.9Q0 -24.9 3.6 -22.9Q0 -22.1 -3.6 -22.9Z"/>
+                </g></g>
+                <g clip-path="url(#egg-c-low)">
+                  <path fill="url(#egg-g-shell)" d="M0 -36C16 -36 29 -14 29 4C29 20 16 30 0 30C-16 30 -29 20 -29 4C-29 -14 -16 -36 0 -36Z"/>
+                  <circle cx="-14" cy="11" r="2.3" fill="#9cd900"/><circle cx="9" cy="17" r="1.8" fill="#9cd900"/><circle cx="16" cy="5" r="1.4" fill="#9cd900"/><circle cx="-5" cy="21" r="1.5" fill="#9cd900"/><circle cx="-21" cy="3" r="1.2" fill="#9cd900"/>
+                </g>
+                <path class="egg-rim" clip-path="url(#egg-c-egg)" d="M-29 -5H-28L-20 -12 -13 -3 -5 -11 3 -2 11 -10 19 -3 28 -6H29"/>
+                <g class="egg-wings egg-hop">
+                  <g transform="translate(-22.5 -10)"><path class="egg-wing" fill="url(#egg-g-wing)" d="M-6 1.5C-7.5 -4.5 -2 -8.5 2.5 -5.5C6 -3.2 5.7 2.4 2.5 4.8C-.9 7.2 -5.1 5.4 -6 1.5Z"/></g>
+                  <g transform="translate(22.5 -10)"><path class="egg-wing" fill="url(#egg-g-wing)" d="M6 1.5C7.5 -4.5 2 -8.5 -2.5 -5.5C-6 -3.2 -5.7 2.4 -2.5 4.8C.9 7.2 5.1 5.4 6 1.5Z"/></g>
+                </g>
+                <g transform="translate(-21 -9)"><path class="egg-shard" style="--dx: -26px; --dy: -22px; --turn: -200deg" d="M-3 2 1 -3 3 2Z"/></g>
+                <g transform="translate(-6 -8)"><path class="egg-shard" style="--dx: -12px; --dy: -40px; --turn: 160deg" d="M-2.5 1.5 0 -3 2.5 2Z"/></g>
+                <g transform="translate(8 -7)"><path class="egg-shard" style="--dx: 16px; --dy: -36px; --turn: 220deg" d="M-3 1 .5 -2.5 3 2Z"/></g>
+                <g transform="translate(22 -6)"><path class="egg-shard" style="--dx: 30px; --dy: -16px; --turn: -170deg" d="M-2 2 0 -2.5 2.5 1.5Z"/></g>
+                <g transform="translate(0 -6)"><path class="egg-shard" style="--dx: 34px; --dy: 4px; --turn: 260deg" d="M-2 1.5 .5 -2 2 1.5Z"/></g>
+                <g transform="translate(-10 -6)"><path class="egg-shard" style="--dx: -34px; --dy: 2px; --turn: -240deg" d="M-2 1.5 0 -2 2.5 1Z"/></g>
+                <g transform="translate(0 -12)"><g class="egg-cap egg-hop"><g transform="translate(0 12)" clip-path="url(#egg-c-top)">
+                  <path fill="url(#egg-g-shell)" d="M0 -36C16 -36 29 -14 29 4C29 20 16 30 0 30C-16 30 -29 20 -29 4C-29 -14 -16 -36 0 -36Z"/>
+                  <ellipse cx="-10" cy="-22" rx="5.5" ry="9.5" transform="rotate(32 -10 -22)" fill="#fff" opacity="0.38"/>
+                  <circle cx="11" cy="-23" r="1.7" fill="#9cd900"/><circle cx="17" cy="-13" r="1.3" fill="#9cd900"/><circle cx="2" cy="-29" r="1.1" fill="#9cd900"/>
+                </g></g></g>
+                <path class="egg-crack" pathLength="100" d="M-28 -5 -20 -12 -13 -3 -5 -11 3 -2 11 -10 19 -3 28 -6"/>
+                <path class="egg-crack egg-crack-2" pathLength="100" d="M-13 -3l-3.5 7.5 4 5.5"/>
+                <path class="egg-crack egg-crack-3" pathLength="100" d="M11 -10l2.5 -8.5 -4.5 -5.5"/>
+              </g></g></g>
+            </g>
+          </g>
+          <circle class="egg-dot" r="4.2"/>
+          <g transform="translate(1.3 -4.2) scale(0.6)"><g class="egg-note"><ellipse rx="0.95" ry="0.7" transform="rotate(-20)"/><path d="M.82 -.3V-3.5l1.9 -.6"/></g></g>
+          <g transform="translate(-.3 -4.8) scale(0.45)"><g class="egg-note"><ellipse rx="0.95" ry="0.7" transform="rotate(-20)"/><path d="M.82 -.3V-3.5l1.9 -.6"/></g></g>
+        </g>
       </g>
     </svg>
   </button>
