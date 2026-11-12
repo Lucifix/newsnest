@@ -680,6 +680,11 @@ a.chip { text-decoration: none; }
 .caughtup svg { width: 44px; height: 44px; fill: none; stroke: var(--ok); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .caughtup h2 { margin: 6px 0 4px; font: 700 1.3rem var(--display); color: var(--text); }
 .caughtup p { margin: 4px 0; }
+/* now and then one more line under the heading (newsnest/eggs.py), with the logo's dot in front */
+.caughtup .caughtup-aside {
+  display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 10px;
+  font: 500 0.78rem var(--mono);
+}
 
 /* ---------- v3: two-level chips, slim card footer ---------- */
 .toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -1177,7 +1182,79 @@ a.chip { text-decoration: none; }
 .snav-version { margin: 20px 16px 0; font-size: 0.8rem; color: var(--muted); }
 .snav-version a, .spage-foot a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .about-hero { text-align: center; padding: 18px 0 0; }
-.about-hero img { border-radius: 16px; }
+/* The app icon, drawn in the page: an ink tile with the mark at 72%, as tools/make_icons.py renders the PNGs.
+   The colours are the icon's own in both themes. Its dot is an egg: after a few taps it cracks, then hatches
+   (app.js). Nothing here hints at it: no pointer, no hover. */
+.egg {
+  --tile: 72px;
+  display: grid; place-items: center; width: var(--tile); height: var(--tile); margin: 0 auto 16px; padding: 0; border: 0;
+  border-radius: 22%; background: #0a0a0c; color: #f4f4f6; cursor: default;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: width 0.55s var(--spring), height 0.55s var(--spring);
+}
+.egg:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.egg svg { display: block; width: 72%; height: 72%; overflow: visible; pointer-events: none; }
+.egg[data-stage="1"] { --tile: 76px; }
+.egg[data-stage="2"] { --tile: 80px; }
+.egg[data-stage="3"] { --tile: 84px; }
+.egg.hatched { --tile: 112px; }
+/* everything turns and grows around the dot's centre (SVG units) */
+.egg-arc, .egg-bird, .egg-part, .egg-shell path { transform-origin: 8.8px 23.2px; }
+.egg-arc { fill: none; stroke: currentColor; stroke-width: 3.6; stroke-linecap: round; }
+.egg-dot { fill: #c6ff3d; }
+.egg-crack {
+  fill: none; stroke: #0a0a0c; stroke-width: 0.55; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 100 100; stroke-dashoffset: 100; opacity: 0;
+  transition: stroke-dashoffset 0.3s ease-out, opacity 0.12s ease;
+}
+.egg[data-stage] .egg-crack { opacity: 1; }
+.egg[data-stage="1"] .egg-crack:not(.egg-crack-2, .egg-crack-3) { stroke-dashoffset: 55; }
+.egg[data-stage="2"] .egg-crack:not(.egg-crack-3), .egg[data-stage="3"] .egg-crack { stroke-dashoffset: 0; }
+.egg[data-stage="2"] .egg-crack:not(.egg-crack-2, .egg-crack-3) { stroke-dashoffset: 18; }
+/* the bird: the dot with a tail, a beak, a wing, an eye and legs, all tucked inside until it hatches */
+.egg-part { opacity: 0; scale: 0.3; }
+.egg-tail { fill: #c6ff3d; }
+.egg-beak { fill: #ffe14d; }
+.egg-wing { fill: #96d400; }
+.egg-eye { fill: #0a0a0c; }
+.egg-legs { fill: none; stroke: #f4f4f6; stroke-width: 0.55; stroke-linecap: round; }
+.egg-beak-up, .egg-beak-down { transform-box: fill-box; transform-origin: 0 50%; }
+.egg-shell path { fill: #efffc2; opacity: 0; }
+.egg.hatched .egg-crack { opacity: 0; }
+.egg.hatched .egg-bird { animation: egg-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.egg.hatched .egg-part {
+  opacity: 1; scale: 1;
+  transition: opacity 0.16s ease 0.1s, scale 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s;
+}
+.egg.hatched .egg-beak-up, .egg.hatched .egg-beak-down { transition-delay: 0.2s; }
+.egg.hatched .egg-shell path { animation: egg-shard 0.8s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes egg-pop {
+  0% { scale: 1; }
+  40% { scale: 1.3; }
+  100% { scale: 1.12; }
+}
+/* out fast, then a little fall as they fade */
+@keyframes egg-shard {
+  0% { opacity: 1; transform: none; }
+  55% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--turn)); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 2.4px)) rotate(calc(var(--turn) * 1.3)); }
+}
+.egg.hatched .egg-bird { scale: 1.12; }
+/* the line that owns up to it; no room is kept for it until it is there */
+.about-egg {
+  display: flex; align-items: center; justify-content: center; gap: 8px; max-height: 0; margin: 0; overflow: hidden; opacity: 0;
+  font: 500 0.78rem var(--mono); color: var(--muted);
+  transition: max-height 0.5s var(--spring), margin 0.5s var(--spring), opacity 0.45s ease 0.15s;
+}
+.about-egg.on { max-height: 3em; margin-top: 12px; opacity: 1; }
+.about-egg::before, .caughtup-aside::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--logo-dot);
+}
+@media (prefers-reduced-motion: reduce) {
+  .egg, .about-egg, .egg-crack { transition: opacity 0.2s ease; }
+  .egg.hatched .egg-bird, .egg.hatched .egg-shell path { animation: none; }
+  .egg.hatched .egg-part { transition: opacity 0.3s ease; }
+}
 .about-name { margin: 10px 0 0; font: 700 1.3rem var(--display); }
 .about-name .mono { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
 .about-tag { margin: 4px auto 0; max-width: 34ch; font-size: 0.9rem; color: var(--muted); }

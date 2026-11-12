@@ -1474,6 +1474,63 @@ if (feedPage && "ontouchstart" in window) {
   addEventListener("pageshow", () => { busy = false; ptr.classList.remove("refreshing"); reset(); });
 }
 
+// ---------- About: the logo's dot is an egg ----------
+// Tap the logo seven times: the last taps before the seventh crack the shell a bit more each, then the dot
+// hatches into a bird that chirps the logo's arcs, and chirps again on every tap after. Nothing is stored:
+// leave the page and it is an egg again. With reduced motion the steps still happen, without the movement.
+const egg = document.querySelector("[data-egg]");
+if (egg) {
+  const TAPS = 7;
+  const CRACKS = 3;        // taps 4, 5 and 6
+  const FORGET = 2500;     // ms: stray taps before the first crack don't add up over a visit
+  const LINE = "The dot was an egg all along.";
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  const bird = egg.querySelector(".egg-bird");
+  const arcs = [...egg.querySelectorAll(".egg-arc")];
+  const line = document.querySelector("[data-egg-line]");
+  let taps = 0;
+  let forget = null;
+  // one-off moves on top of whatever state the CSS holds (scale, rotate and translate, so they add to it)
+  const play = (el, frames, options) => { if (!still.matches) el?.animate?.(frames, options); };
+
+  function chirp(delay = 0) {
+    const ease = "cubic-bezier(0.3, 0.7, 0.2, 1)";
+    play(bird, { translate: ["0 0", "0 -2.6px", "0 0", "0 -1.1px", "0 0"], offset: [0, 0.3, 0.62, 0.8, 1] },
+         { duration: 520, delay, easing: ease });
+    play(egg.querySelector(".egg-beak-up"), { rotate: ["0deg", "-24deg", "0deg", "-16deg", "0deg"] }, { duration: 520, delay });
+    play(egg.querySelector(".egg-beak-down"), { rotate: ["0deg", "20deg", "0deg", "14deg", "0deg"] }, { duration: 520, delay });
+    arcs.forEach((arc, i) => play(arc, { scale: [1, 0.93, 1.08, 1], opacity: [1, 0.5, 1, 1] },
+                                  { duration: 460, delay: delay + 90 + i * 110, easing: ease }));
+  }
+
+  egg.addEventListener("click", () => {
+    clearTimeout(forget);
+    if (egg.classList.contains("hatched")) { navigator.vibrate?.(6); chirp(); return; }
+    taps += 1;
+    play(egg, { scale: [1, 0.94, 1.03, 1] }, { duration: 280, easing: "ease-out" });
+    const crack = taps - (TAPS - 1 - CRACKS);  // 1..CRACKS on the taps that crack the shell
+    if (taps < TAPS && crack < 1) {
+      forget = setTimeout(() => { taps = 0; }, FORGET);
+      return;
+    }
+    if (taps < TAPS) {
+      egg.dataset.stage = String(crack);
+      navigator.vibrate?.(6 + 4 * crack);
+      const lean = 6 + 5 * crack;  // it rocks harder as it cracks
+      play(bird, { rotate: ["0deg", `${-lean}deg`, `${lean * 0.8}deg`, `${-lean * 0.45}deg`, `${lean * 0.2}deg`, "0deg"] },
+           { duration: 460, easing: "ease-out" });
+      return;
+    }
+    delete egg.dataset.stage;
+    egg.classList.add("hatched");
+    navigator.vibrate?.([14, 60, 10, 40, 10]);
+    chirp(650);
+    if (line) {
+      setTimeout(() => { line.textContent = LINE; line.classList.add("on"); }, still.matches ? 0 : 900);
+    }
+  });
+}
+
 // ---------- PWA: service worker, install, refresh ----------
 if ("serviceWorker" in navigator && window.isSecureContext) {
   addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => { /* not installable here; the site still works */ }));

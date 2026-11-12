@@ -8,6 +8,9 @@
 <div class="caughtup">
   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/></svg>
   <h2>{% if feed.items %}That's everything{% else %}You're all caught up{% endif %}</h2>
+  {# now and then, one more line (newsnest/eggs.py) #}
+  {% set aside = caughtup_aside(token|default(''), not feed.items) %}
+  {% if aside %}<p class="caughtup-aside">{{ aside }}</p>{% endif %}
   <p>
     {% if feed.read_count %}<a href="/read">Read in the last {{ cfg.feed.window_hours|int }} h ({{ feed.read_count }})</a>{% endif %}
     {% if feed.dropped %}<span class="muted"> · {{ feed.dropped }} skipped, low-scoring or over a source's cap</span>{% endif %}
