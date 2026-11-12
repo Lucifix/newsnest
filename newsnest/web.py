@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
-from newsnest import REPO_URL, WEBSITE_URL, __version__, catalog, icons
+from newsnest import REPO_URL, WEBSITE_URL, __version__, catalog, eggs, icons
 from newsnest.ai import AIClient, AIError, BudgetExceeded, ai_setup, spent_today
 from newsnest.bootstrap import config_dir, env
 from newsnest.calibration import calibration_data, subscore_labels
@@ -304,6 +304,9 @@ def template_helpers(loaded: LoadedConfig) -> dict:
             "dock": lambda current=None: [Tab("all", "For you", "star"), *dock_tabs(loaded.config, current)],
             "hue": hue, "cat_hue": lambda c: (categories.index(c) % 8) + 1 if c in categories else 0,
             "now_local": datetime.now(tz), "today": datetime.now(tz).date(), "timedelta": timedelta,
+            # the hour only counts once a time zone was chosen: the default UTC is nobody's wall clock
+            "caughtup_aside": lambda seed, empty: eggs.caughtup_aside(
+                seed, empty, datetime.now(tz) if tz.key != "UTC" else None),
             "subscores": subscore_labels(loaded.config) if loaded.config else ()}
 
 

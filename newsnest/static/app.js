@@ -1387,6 +1387,7 @@ function refreshPage() {
 if (feedPage && "ontouchstart" in window) {
   const ARM = 64;   // how far the indicator travels before letting go refreshes
   const MAX = 110;
+  const PEEK = 98;  // nearly as far as it goes (a pull of about a third of a phone screen): the chick looks out
   document.documentElement.classList.add("pull-refresh");
   const ptr = document.createElement("div");
   ptr.className = "ptr";
@@ -1395,7 +1396,21 @@ if (feedPage && "ontouchstart" in window) {
   ptr.innerHTML = '<svg viewBox="0 0 24 24">'
     + '<circle class="ptr-track" cx="12" cy="12" r="9"/>'
     + '<circle class="ptr-ring" cx="12" cy="12" r="9" pathLength="100"/>'
-    + '<path class="ptr-arrow" d="M12 8.5v7M9 12.5l3 3 3-3"/></svg>';
+    + '<path class="ptr-arrow" d="M12 8.5v7M9 12.5l3 3 3-3"/></svg>'
+    // and, for a pull far past the mark, the chick from the About page's logo, looking out from below
+    + '<span class="ptr-peek"><svg viewBox="0 0 40 40"><defs><radialGradient id="ptr-g-down" cx="0.38" cy="0.24" r="0.82">'
+    + '<stop offset="0" stop-color="#fff8bf"/><stop offset="0.42" stop-color="#ffe14d"/><stop offset="1" stop-color="#f2a500"/>'
+    + '</radialGradient></defs><g transform="translate(20 45) scale(0.56)">'
+    + '<path fill="#ffd633" stroke="#d48a00" stroke-width="1.2" d="M-9 -47C-8.6 -53.5 -4.6 -57 -0.6 -56.2C-2.7 -54 -3.1 -51.4 -2.3 -48.2'
+    + 'C-1.1 -52 1.9 -53.6 4.7 -52.4C2.3 -50.6 1.5 -48 1.7 -44.6Z"/>'
+    + '<path fill="url(#ptr-g-down)" stroke="#d48a00" stroke-width="1.2" d="M0 -50C13.5 -50 24 -40.5 24 -28.5C24 -22.5 22 -18 19.5 -14.5'
+    + 'C23.5 -9.5 25 -3 25 3V30H-25V3C-25 -3 -23.5 -9.5 -19.5 -14.5C-22 -18 -24 -22.5 -24 -28.5C-24 -40.5 -13.5 -50 0 -50Z"/>'
+    + '<ellipse cx="-15.6" cy="-20.5" rx="5.4" ry="3.7" fill="#ff4fae" opacity="0.42"/>'
+    + '<ellipse cx="15.6" cy="-20.5" rx="5.4" ry="3.7" fill="#ff4fae" opacity="0.42"/>'
+    + [-9.2, 9.2].map((x) => `<g transform="translate(${x} -29.5)"><g class="ptr-eye"><ellipse rx="4.4" ry="5.3" fill="#1b1408"/>`
+      + '<circle cx="-1.5" cy="-2.1" r="1.75" fill="#fff"/><circle cx="1.5" cy="2.3" r="0.85" fill="#fff" opacity="0.85"/></g></g>').join("")
+    + '<path fill="#ff9d1c" d="M-5.4 -22.6Q0 -26 5.4 -22.6Q3 -18.6 0 -18.2Q-3 -18.6 -5.4 -22.6Z"/>'
+    + '<path fill="#ffc86a" d="M-3.6 -22.9Q0 -24.9 3.6 -22.9Q0 -22.1 -3.6 -22.9Z"/></g></svg></span>';
   document.body.append(ptr);
   let start = null;    // {x, y} of the touch, while a pull may be under way
   let vertical = null; // decided on the first few pixels: a pull down, or something else (chips, scrolling)
@@ -1416,11 +1431,16 @@ if (feedPage && "ontouchstart" in window) {
     ptr.classList.toggle("armed", distance >= ARM);
     ptr.classList.add("pulling");
     if (!wasArmed && distance >= ARM) navigator.vibrate?.(8);  // a tick where letting go starts to count
+    // once out, the chick stays until the pull eases a little, so a finger held at the edge doesn't make it flicker
+    const peeking = ptr.classList.contains("peek");
+    const peek = distance >= (peeking ? PEEK - 10 : PEEK);
+    ptr.classList.toggle("peek", peek);
+    if (peek && !peeking) navigator.vibrate?.([6, 50, 6]);
   };
   const reset = () => {
     start = vertical = null;
     travel = 0;
-    ptr.classList.remove("pulling", "armed");
+    ptr.classList.remove("pulling", "armed", "peek");
     ptr.style.removeProperty("--pull");
     ptr.style.removeProperty("--p");
   };
@@ -1463,7 +1483,7 @@ if (feedPage && "ontouchstart" in window) {
     if (travel < ARM) { reset(); return; }  // not far enough: it slides back
     start = null;
     busy = true;
-    ptr.classList.remove("pulling", "armed");
+    ptr.classList.remove("pulling", "armed", "peek");
     ptr.classList.add("refreshing");        // settles at the mark and spins until the new page arrives
     ptr.style.setProperty("--pull", `${ARM}px`);
     ptr.style.setProperty("--p", "1");
@@ -1472,6 +1492,71 @@ if (feedPage && "ontouchstart" in window) {
   addEventListener("touchcancel", reset);
   // Back to a page restored from the browser's cache: no spinner left behind
   addEventListener("pageshow", () => { busy = false; ptr.classList.remove("refreshing"); reset(); });
+}
+
+// ---------- About: the logo's dot is an egg ----------
+// Tap the logo seven times. Taps 4 to 6 each bring the view closer and crack the shell a bit more; the seventh
+// hatches a chick, which chirps the logo's arcs, and chirps again on every tap after. Nothing is stored: leave
+// the page and it is a dot again. With reduced motion the steps still happen, without the movement.
+const egg = document.querySelector("[data-egg]");
+if (egg) {
+  const TAPS = 7;
+  const CRACKS = 3;        // taps 4, 5 and 6
+  const FORGET = 2500;     // ms: stray taps before the first crack don't add up over a visit
+  const LINE = "The dot was an egg all along.";
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  const all = (selector) => [...egg.querySelectorAll(selector)];
+  const line = document.querySelector("[data-egg-line]");
+  let taps = 0;
+  let forget = null;
+  // one-off moves on top of whatever state the CSS holds: they use translate, rotate and scale, which add to
+  // an element's transform instead of replacing it
+  const play = (els, frames, options) => {
+    if (!still.matches) for (const el of [].concat(els)) el.animate?.(frames, options);
+  };
+
+  // A hop, the beak opens twice, the hat lags a beat behind, the arcs ring and two notes float off
+  function chirp(delay = 0) {
+    const ease = "cubic-bezier(0.3, 0.7, 0.2, 1)";
+    const hop = (rise) => ({ translate: ["0 0", `0 ${-rise}px`, "0 0", `0 ${-rise * 0.4}px`, "0 0"], offset: [0, 0.3, 0.62, 0.8, 1] });
+    play(all(".egg-chick, .egg-wings"), hop(7), { duration: 520, delay, easing: ease });
+    play(all(".egg-cap"), hop(11), { duration: 560, delay: delay + 45, easing: ease });
+    play(all(".egg-beak-low"), { translate: ["0 0", "0 3px", "0 0", "0 2.2px", "0 0"] }, { duration: 520, delay });
+    all(".egg-arc").forEach((arc, i) => play(arc, { scale: [1, 0.94, 1.07, 1], opacity: [1, 0.5, 1, 1] },
+                                             { duration: 460, delay: delay + 90 + i * 110, easing: ease }));
+    all(".egg-note").forEach((note, i) => play(note, {
+      opacity: [0, 1, 1, 0], offset: [0, 0.15, 0.6, 1],
+      translate: ["0 0", i ? "-2.2px -4px" : "3px -3.4px", i ? "-3px -6.6px" : "5.4px -6px", i ? "-3.4px -8.4px" : "6.6px -8px"],
+      rotate: ["0deg", i ? "-10deg" : "12deg", i ? "6deg" : "-6deg", i ? "-8deg" : "10deg"],
+    }, { duration: 1100, delay: delay + 60 + i * 190, easing: "ease-out" }));
+  }
+
+  egg.addEventListener("click", () => {
+    clearTimeout(forget);
+    if (egg.classList.contains("hatched")) { navigator.vibrate?.(6); chirp(); return; }
+    taps += 1;
+    play(egg, { scale: [1, 0.94, 1.03, 1] }, { duration: 280, easing: "ease-out" });
+    const crack = taps - (TAPS - 1 - CRACKS);  // 1..CRACKS on the taps that crack the shell
+    if (taps < TAPS && crack < 1) {
+      forget = setTimeout(() => { taps = 0; }, FORGET);
+      return;
+    }
+    if (taps < TAPS) {
+      egg.dataset.stage = String(crack);
+      navigator.vibrate?.(6 + 4 * crack);
+      const lean = 5 + 4 * crack;  // it rocks harder as it cracks
+      play(all(".egg-rock"), { rotate: ["0deg", `${-lean}deg`, `${lean * 0.8}deg`, `${-lean * 0.45}deg`, `${lean * 0.2}deg`, "0deg"] },
+           { duration: 520, delay: 120, easing: "ease-out" });
+      return;
+    }
+    delete egg.dataset.stage;
+    egg.classList.add("hatched");
+    navigator.vibrate?.([14, 60, 10, 40, 10]);
+    chirp(1250);
+    if (line) {
+      setTimeout(() => { line.textContent = LINE; line.classList.add("on"); }, still.matches ? 0 : 1500);
+    }
+  });
 }
 
 // ---------- PWA: service worker, install, refresh ----------
