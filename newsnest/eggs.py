@@ -4,7 +4,7 @@ The end of the feed now and then carries one more line under its heading, in abo
 ONE_IN. The line is picked from the session's id, so it holds still across reloads, tab switches and Back,
 like the feed itself; a new session can bring another line, or none.
 
-The other one lives in the browser (app.js): the logo on the About page.
+The other two live in the browser (app.js): the logo on the About page, and a long pull on the feed.
 """
 
 from __future__ import annotations

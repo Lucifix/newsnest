@@ -1387,6 +1387,7 @@ function refreshPage() {
 if (feedPage && "ontouchstart" in window) {
   const ARM = 64;   // how far the indicator travels before letting go refreshes
   const MAX = 110;
+  const PEEK = 98;  // nearly as far as it goes (a pull of about a third of a phone screen): the chick looks out
   document.documentElement.classList.add("pull-refresh");
   const ptr = document.createElement("div");
   ptr.className = "ptr";
@@ -1395,7 +1396,21 @@ if (feedPage && "ontouchstart" in window) {
   ptr.innerHTML = '<svg viewBox="0 0 24 24">'
     + '<circle class="ptr-track" cx="12" cy="12" r="9"/>'
     + '<circle class="ptr-ring" cx="12" cy="12" r="9" pathLength="100"/>'
-    + '<path class="ptr-arrow" d="M12 8.5v7M9 12.5l3 3 3-3"/></svg>';
+    + '<path class="ptr-arrow" d="M12 8.5v7M9 12.5l3 3 3-3"/></svg>'
+    // and, for a pull far past the mark, the chick from the About page's logo, looking out from below
+    + '<span class="ptr-peek"><svg viewBox="0 0 40 40"><defs><radialGradient id="ptr-g-down" cx="0.38" cy="0.24" r="0.82">'
+    + '<stop offset="0" stop-color="#fff8bf"/><stop offset="0.42" stop-color="#ffe14d"/><stop offset="1" stop-color="#f2a500"/>'
+    + '</radialGradient></defs><g transform="translate(20 45) scale(0.56)">'
+    + '<path fill="#ffd633" stroke="#d48a00" stroke-width="1.2" d="M-9 -47C-8.6 -53.5 -4.6 -57 -0.6 -56.2C-2.7 -54 -3.1 -51.4 -2.3 -48.2'
+    + 'C-1.1 -52 1.9 -53.6 4.7 -52.4C2.3 -50.6 1.5 -48 1.7 -44.6Z"/>'
+    + '<path fill="url(#ptr-g-down)" stroke="#d48a00" stroke-width="1.2" d="M0 -50C13.5 -50 24 -40.5 24 -28.5C24 -22.5 22 -18 19.5 -14.5'
+    + 'C23.5 -9.5 25 -3 25 3V30H-25V3C-25 -3 -23.5 -9.5 -19.5 -14.5C-22 -18 -24 -22.5 -24 -28.5C-24 -40.5 -13.5 -50 0 -50Z"/>'
+    + '<ellipse cx="-15.6" cy="-20.5" rx="5.4" ry="3.7" fill="#ff4fae" opacity="0.42"/>'
+    + '<ellipse cx="15.6" cy="-20.5" rx="5.4" ry="3.7" fill="#ff4fae" opacity="0.42"/>'
+    + [-9.2, 9.2].map((x) => `<g transform="translate(${x} -29.5)"><g class="ptr-eye"><ellipse rx="4.4" ry="5.3" fill="#1b1408"/>`
+      + '<circle cx="-1.5" cy="-2.1" r="1.75" fill="#fff"/><circle cx="1.5" cy="2.3" r="0.85" fill="#fff" opacity="0.85"/></g></g>').join("")
+    + '<path fill="#ff9d1c" d="M-5.4 -22.6Q0 -26 5.4 -22.6Q3 -18.6 0 -18.2Q-3 -18.6 -5.4 -22.6Z"/>'
+    + '<path fill="#ffc86a" d="M-3.6 -22.9Q0 -24.9 3.6 -22.9Q0 -22.1 -3.6 -22.9Z"/></g></svg></span>';
   document.body.append(ptr);
   let start = null;    // {x, y} of the touch, while a pull may be under way
   let vertical = null; // decided on the first few pixels: a pull down, or something else (chips, scrolling)
@@ -1416,11 +1431,16 @@ if (feedPage && "ontouchstart" in window) {
     ptr.classList.toggle("armed", distance >= ARM);
     ptr.classList.add("pulling");
     if (!wasArmed && distance >= ARM) navigator.vibrate?.(8);  // a tick where letting go starts to count
+    // once out, the chick stays until the pull eases a little, so a finger held at the edge doesn't make it flicker
+    const peeking = ptr.classList.contains("peek");
+    const peek = distance >= (peeking ? PEEK - 10 : PEEK);
+    ptr.classList.toggle("peek", peek);
+    if (peek && !peeking) navigator.vibrate?.([6, 50, 6]);
   };
   const reset = () => {
     start = vertical = null;
     travel = 0;
-    ptr.classList.remove("pulling", "armed");
+    ptr.classList.remove("pulling", "armed", "peek");
     ptr.style.removeProperty("--pull");
     ptr.style.removeProperty("--p");
   };
@@ -1463,7 +1483,7 @@ if (feedPage && "ontouchstart" in window) {
     if (travel < ARM) { reset(); return; }  // not far enough: it slides back
     start = null;
     busy = true;
-    ptr.classList.remove("pulling", "armed");
+    ptr.classList.remove("pulling", "armed", "peek");
     ptr.classList.add("refreshing");        // settles at the mark and spins until the new page arrives
     ptr.style.setProperty("--pull", `${ARM}px`);
     ptr.style.setProperty("--p", "1");
