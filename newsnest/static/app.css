@@ -1183,14 +1183,30 @@ a.chip { text-decoration: none; }
   .settings.is-root .spage, .settings:not(.is-root) .snav { display: none; }
 }
 @media (min-width: 900px) {
-  .settings { grid-template-columns: 250px minmax(0, 680px); justify-content: center; align-items: start; }
-  .snav { position: sticky; top: 56px; max-height: calc(100vh - 56px); overflow-y: auto; padding-bottom: 16px; }
+  .settings { grid-template-columns: 256px minmax(0, 680px); justify-content: center; align-items: start; }
+  .snav { position: sticky; top: 56px; max-height: calc(100vh - 56px); overflow-y: auto; padding-bottom: 16px; scrollbar-width: thin; }
   .snav-title { font-size: 1.5rem; }
   .snav .sgroup { margin-top: 16px; }
   .sback { display: none; }
   .sback + .pagehead { padding-top: 26px; }
-  .snav .srow[aria-current="page"] { background: var(--accent-soft); }
+  /* The sidebar is a menu, not a drill-down list: smaller rows, no chevrons, titles wrap instead of
+     ending in "…", and only short counts show on the right (the version is in the line under the menu) */
+  .snav .srow { gap: 10px; min-height: 42px; padding: 7px 12px 7px 10px; font-size: 0.94rem; }
+  .snav .stile { width: 26px; height: 26px; border-radius: 7px; }
+  .snav .stile svg { width: 16px; height: 16px; }
+  .snav .has-icons > * + *::before { left: 46px; }
+  .snav .srow-title { white-space: normal; overflow: visible; }
+  .snav .chev, .snav .srow[href$="/about"] .srow-value { display: none; }
+  .snav .srow-value { font-size: 0.86rem; }
+  .snav .srow[aria-current="page"] { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent); }
   .snav .srow[aria-current="page"] .srow-title { font-weight: 700; }
+}
+/* Wide screens: the home page's width, the menu where the home page's sidebar is, so the page doesn't
+   jump sideways between the feed and settings */
+@media (min-width: 1240px) {
+  body:has(main > .settings) { --page: 1352px; }
+  body:has(main > .settings) .banner { max-width: calc(var(--page) - 32px); }
+  .settings { grid-template-columns: 248px minmax(0, 720px); justify-content: start; }
 }
 
 .sgroup { margin: 24px 0 0; }
