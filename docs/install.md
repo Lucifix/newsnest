@@ -32,7 +32,7 @@ created them as root, NewsNest stops with "… is not writable by uid …": fix 
 `sudo chown -R 1000:1000 config data`.
 
 **Update:** `docker compose pull && docker compose up -d`. Set `NEWSNEST_IMAGE_TAG` in `.env` to pin a
-release such as `0.7.1`; the default is `latest`.
+release such as `0.8.0`; the default is `latest`.
 
 ## Build from source
 
