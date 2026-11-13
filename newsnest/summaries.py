@@ -23,6 +23,7 @@ from newsnest.ai import AIClient, AIError, BudgetExceeded, parse_json
 from newsnest.config import Config
 from newsnest.db import dumps, iso, loads, utcnow
 from newsnest.fetchers.base import FetchContext, FetchFailed, http_get, make_client
+from newsnest.levels import load_levels
 from newsnest.profile import read_profile, strip_comments
 from newsnest.scoring import final_score
 
@@ -71,11 +72,12 @@ def candidates(conn: sqlite3.Connection, cfg: Config, limit: int) -> list[sqlite
            WHERE i.score_status = 'scored' AND i.fetched_at >= ?""",
         (iso(utcnow() - SUMMARY_WINDOW),)).fetchall()
     done_stories = {r["story_id"] for r in rows if r["summary_status"]}
+    levels = load_levels(conn)
     best: dict[int, tuple[float, sqlite3.Row]] = {}
     for r in rows:
         if r["story_id"] in done_stories:
             continue
-        f = final_score(r, r["source_count"], cfg)
+        f = final_score(r, r["source_count"], cfg, levels.shift_of(r["interest"]))
         if f is not None and f >= cfg.scoring.summary_threshold and (r["story_id"] not in best or f > best[r["story_id"]][0]):
             best[r["story_id"]] = (f, r)
     ranked = sorted(best.values(), key=lambda t: t[0], reverse=True)

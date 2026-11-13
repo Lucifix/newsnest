@@ -30,6 +30,7 @@ from newsnest.config import NEWS, WORLD, Config, Source
 from newsnest.db import iso, parse_iso, utcnow
 from newsnest.digest import Card, Member, make_cards
 from newsnest.drift import FADED, LIFTED, Drift, current_drift
+from newsnest.levels import load_levels
 from newsnest.profile import profile_exists
 from newsnest.sections import HEADLINES, block_of, dock_tabs, section_keys, section_labels, scope_blocks, tab_of
 
@@ -288,7 +289,8 @@ def _revisit(capped: list[FeedItem], drift: Drift, cfg: Config) -> list[FeedItem
     """Mark up to drift.revisit_slots stories from interests (or categories) the reader has drifted away
     from, so view_feed places them early: without this a faded interest sits low in the feed and a return
     to it would go unnoticed. Only stories already in the feed (above the threshold), past the first
-    explore_every × 2, not top stories, one per interest, and none for an interest 👎'd in the last week.
+    explore_every × 2, not top stories, one per interest, and none for an interest 👎'd in the last week or
+    set to Less or Much less (newsnest.levels: the reader turned it down themself).
     They stay in `capped`, so chip counts and category views don't change."""
     slots = cfg.drift.revisit_slots
     if not drift.active or slots <= 0:
@@ -301,7 +303,7 @@ def _revisit(capped: list[FeedItem], drift: Drift, cfg: Config) -> list[FeedItem
     for it in sorted(capped[cfg.feed.explore_every * 2:], key=lambda it: it.rank, reverse=True):
         if len(picked) >= slots:
             break
-        if it.top or it.extra:
+        if it.top or it.extra or it.card.shift < 0:
             continue
         key = drift.key_of(it.card)
         if key in eligible and key not in keys:
@@ -356,7 +358,7 @@ def rank_feed(conn: sqlite3.Connection, cfg: Config, sources: list[Source], now:
     caps = {s.id: s.daily_cap for s in sources}
     discovered_ids = {s.id for s in sources if s.params.get("discovered")}
     cutoff = iso(now - timedelta(hours=f.window_hours))
-    cards = make_cards(window_rows(conn, cutoff), cfg, names)
+    cards = make_cards(window_rows(conn, cutoff), cfg, names, load_levels(conn))
     drift = current_drift(conn, cfg, now)
     weights = load_weights(conn, skip_old_boosts=drift.active)
     profile = profile_exists()
@@ -489,7 +491,8 @@ def swipe_deck(conn: sqlite3.Connection, cfg: Config, sources: list[Source], ski
     new_ids = _new_sources(conn, cfg.feed.new_source_days, discovered_ids, now)
     sections = section_keys(cfg)
     cutoff = cfg.digest.min_final
-    cards = make_cards(window_rows(conn, iso(now - timedelta(hours=cfg.feed.window_hours))), cfg, names)
+    cards = make_cards(window_rows(conn, iso(now - timedelta(hours=cfg.feed.window_hours))), cfg, names,
+                       load_levels(conn))
     picked: list[tuple[tuple, FeedItem]] = []
     for card in cards:
         members = [card.lead, *card.others]
@@ -672,7 +675,7 @@ def read_stories(conn: sqlite3.Connection, cfg: Config, sources: list[Source], n
            WHERE i.story_id IN (SELECT story_id FROM items WHERE last_read_at >= ?)
               OR i.event IN (SELECT event FROM items WHERE last_read_at >= ? AND event IS NOT NULL)
            ORDER BY i.id""", (cutoff, cutoff)).fetchall()
-    out = [(c, story_read_at(c)) for c in make_cards(rows, cfg, {s.id: s.name for s in sources})]
+    out = [(c, story_read_at(c)) for c in make_cards(rows, cfg, {s.id: s.name for s in sources}, load_levels(conn))]
     return sorted([(c, t) for c, t in out if t], key=lambda ct: ct[1], reverse=True)
 
 
@@ -683,7 +686,7 @@ def saved_stories(conn: sqlite3.Connection, cfg: Config, sources: list[Source]) 
            WHERE i.story_id IN (SELECT story_id FROM items WHERE saved_at IS NOT NULL)
               OR i.event IN (SELECT event FROM items WHERE saved_at IS NOT NULL AND event IS NOT NULL)
            ORDER BY i.id""").fetchall()
-    out = [(c, story_saved_at(c)) for c in make_cards(rows, cfg, {s.id: s.name for s in sources})]
+    out = [(c, story_saved_at(c)) for c in make_cards(rows, cfg, {s.id: s.name for s in sources}, load_levels(conn))]
     return sorted([(c, t) for c, t in out if t], key=lambda ct: ct[1], reverse=True)
 
 
@@ -731,7 +734,7 @@ def search_stories(conn: sqlite3.Connection, cfg: Config, sources: list[Source],
                OR i.story_id IN ({','.join('?' * len(story_ids)) or 'NULL'})
                OR i.event IN ({','.join('?' * len(events)) or 'NULL'})
             ORDER BY i.id""", (*item_ids, *story_ids, *events)).fetchall()
-    cards = make_cards(rows, cfg, {s.id: s.name for s in sources})
+    cards = make_cards(rows, cfg, {s.id: s.name for s in sources}, load_levels(conn))
     cards.sort(key=lambda c: c.newest or c.published, reverse=True)
     return cards[:SEARCH_LIMIT], older
 

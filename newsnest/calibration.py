@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from newsnest.config import Config
 from newsnest.db import iso, parse_iso, utcnow
+from newsnest.levels import load_levels
 from newsnest.scoring import final_score
 
 BINS = list(range(0, 12))  # final runs 0-10 plus the cross-source bonus
@@ -35,7 +36,8 @@ def calibration_data(conn: sqlite3.Connection, cfg: Config, days: int = 30) -> d
         """SELECT i.*, s.source_count FROM items i JOIN stories s ON s.id = i.story_id
            WHERE i.score_status = 'scored' AND i.fetched_at >= ?""",
         (iso(utcnow() - timedelta(days=days)),)).fetchall()
-    scored = [(r, final_score(r, r["source_count"], cfg)) for r in rows]
+    levels = load_levels(conn)
+    scored = [(r, final_score(r, r["source_count"], cfg, levels.shift_of(r["interest"]))) for r in rows]
     up = [f for r, f in scored if r["rating"] == 1]
     down = [f for r, f in scored if r["rating"] == -1]
     hist = {b: {"up": 0, "down": 0, "unrated": 0} for b in BINS}

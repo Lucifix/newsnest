@@ -8,11 +8,20 @@ from newsnest.ai import AIClient, AIError
 from newsnest.config import Config
 from newsnest.db import iso, utcnow
 from newsnest.fetchers.base import FetchContext, FetchFailed, html_to_text, http_get, make_client
+from newsnest.levels import NO_LEVELS, Levels, load_levels
 from newsnest.scoring import ScoreInput, final_score, score_items
 from newsnest.textmatch import normalize_url
 
 
-def explain_known(row: sqlite3.Row, final: float | None, cfg: Config) -> str:
+def level_note(levels: Levels, interest: str | None) -> str:
+    """'−0.5 for your level on Wristwatches' when the reader's level moved the score, else ''."""
+    shift = levels.shift_of(interest)
+    if not shift:
+        return ""
+    return f"{'+' if shift > 0 else '−'}{abs(shift):g} for your level on {levels.label_of(interest)}"
+
+
+def explain_known(row: sqlite3.Row, final: float | None, cfg: Config, levels: Levels = NO_LEVELS) -> str:
     if row["prefilter"] == "muted":
         return "We had it, but a mute keyword dropped it."
     if row["score_status"] == "pending":
@@ -22,9 +31,10 @@ def explain_known(row: sqlite3.Row, final: float | None, cfg: Config) -> str:
                 "scored stories for the day. Promote the source in Settings to get all of its stories.")
     if row["score_status"] in ("error", "refused", "skipped"):
         return f"We had it, but scoring failed ({row['score_status']})."
+    note = f", {n}" if (n := level_note(levels, row["interest"])) else ""
     if final is not None and final < cfg.digest.min_final:
-        return f"We had it, scored {final} (below the {cfg.digest.min_final} display threshold): {row['reason']}"
-    return f"We had it and it was shown with score {final}: {row['reason']}"
+        return f"We had it, scored {final}{note} (below the {cfg.digest.min_final} display threshold): {row['reason']}"
+    return f"We had it and it was shown with score {final}{note}: {row['reason']}"
 
 
 def handle_missed(conn: sqlite3.Connection, cfg: Config, url: str, ai: AIClient | None) -> int:
@@ -55,15 +65,18 @@ def handle_missed(conn: sqlite3.Connection, cfg: Config, url: str, ai: AIClient 
                 error, scores = scores["error"], {}
         except AIError as e:
             error = f"scoring failed: {e}"
+    levels = load_levels(conn)
     if scores:
-        final = final_score(scores, 1, cfg)
+        final = final_score(scores, 1, cfg, levels.shift_of(scores.get("interest")))
     elif ai is None and not error:
         error = "AI unavailable, not scored"
     reason = scores.get("reason")
+    if reason and (note := level_note(levels, scores.get("interest"))):
+        reason = f"{reason} ({note})"
     db_status = None
     if known:
-        known_final = final_score(known, known["source_count"] or 1, cfg)
-        db_status = explain_known(known, known_final, cfg)
+        known_final = final_score(known, known["source_count"] or 1, cfg, levels.shift_of(known["interest"]))
+        db_status = explain_known(known, known_final, cfg, levels)
     else:
         db_status = "Not in any configured source: consider adding a feed or a watch."
     return conn.execute(

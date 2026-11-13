@@ -40,9 +40,10 @@ from newsnest import feedsession
 from newsnest.drift import FADED, LIFTED, LINGER_MIN_CARDS, Drift, current_drift, current_lines, reading_report
 from newsnest.feed import (SEARCH_DAYS, TOP_STORIES, adjust_weight, front_page, load_weights, read_stories,
                         saved_stories, search_stories, story_hidden, swipe_deck, view_feed, weight_strength)
-from newsnest.interests import apply_changes, bullet_diff, word_diff
+from newsnest.interests import apply_changes, bullet_diff, bullets, norm, word_diff
+from newsnest.levels import NAMES as LEVEL_NAMES, forget_removed, level_rows, set_level
 from newsnest.missed import handle_missed
-from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
+from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, strip_comments, write_profile
 from newsnest.packs import LIFESTYLE_INTEREST, LIFESTYLE_PACK, LOCAL_PACKS, add_interest, add_pack, missing_from, pack_for
 from newsnest.profile_ai import draft_profile
 from newsnest.scoring import carry_interest_labels
@@ -834,10 +835,63 @@ def profile_page(request: Request, conn=Depends(get_conn), loaded: LoadedConfig 
     rated = conn.execute("SELECT COUNT(*) FROM items WHERE rating IS NOT NULL").fetchone()[0]
     onboarding = not profile_exists()
     proposals = [{**dict(r), "count": len((loads(r["changes"], None) or {}).get("items") or [])} for r in proposals]
+    levels = level_rows(conn, loaded.config)
+    skip = bullets(strip_comments(files["interests.md"]))["skip"]
+    edit = request.query_params.get("edit", "")
     return render(request, "profile.html", conn, loaded, page="profile", files=files, proposals=proposals, onboarding=onboarding,
                   items=onboarding_items(conn) if onboarding else [], rated=rated, error=request.query_params.get("error"),
                   saved=request.query_params.get("saved"), require_cfg=False, error_prefix="", tuning=tuning_rows(conn, loaded),
+                  levels=levels, skip=skip, edit=edit, level_names=LEVEL_NAMES,
+                  dropped=request.query_params.getlist("dropped"),
                   **settings_context("profile", conn, loaded))
+
+
+@app.post("/profile/level")
+def profile_level(line: str = Form(...), step: int = Form(...), conn=Depends(get_conn)):
+    """How much of one interest (newsnest.levels). Only a line that is in the interests file now."""
+    if step not in LEVEL_NAMES:
+        raise HTTPException(400, "unknown level")
+    from newsnest.scoring import want_lines
+    current = {norm(w): w for w in want_lines()}
+    if norm(line) not in current:
+        raise HTTPException(404, "that interest is no longer in your list")
+    set_level(conn, current[norm(line)], step)
+    return RedirectResponse("/profile?saved=level#interests", status_code=303)
+
+
+def _change_interests(conn, change: dict, saved: str) -> RedirectResponse:
+    """One line of interests.md added, reworded or removed from the Profile page's list. Only that line
+    changes; comments and everything else in the file stay as they are. A Want line reworded here keeps its
+    stories' history and its level, since the old and new wording are both known."""
+    text, applied, skipped = apply_changes(read_profile("interests.md"), [change])
+    if not applied:
+        reason = skipped[0][1] if skipped else "nothing changed"
+        return RedirectResponse(f"/profile?error={quote(reason[:1].upper() + reason[1:])}#interests", status_code=303)
+    write_profile("interests.md", text)
+    carry_interest_labels(conn, applied, text)
+    forget_removed(conn, text)
+    return RedirectResponse(f"/profile?saved={saved}#interests", status_code=303)
+
+
+@app.post("/profile/interest/add")
+def interest_add(section: str = Form(...), text: str = Form(""), conn=Depends(get_conn)):
+    return _change_interests(conn, {"op": "add", "section": section, "new": " ".join(text.split())}, "interest_add")
+
+
+@app.post("/profile/interest/edit")
+def interest_edit(section: str = Form(...), old: str = Form(...), new: str = Form(""), conn=Depends(get_conn)):
+    return _change_interests(conn, {"op": "reword", "section": section, "old": old, "new": " ".join(new.split())},
+                             "interest_edit")
+
+
+@app.post("/profile/interest/remove")
+def interest_remove(section: str = Form(...), line: str = Form(...), conn=Depends(get_conn)):
+    return _change_interests(conn, {"op": "remove", "section": section, "old": line}, "interest_remove")
+
+
+def _dropped_query(dropped: list[tuple[str, str]]) -> str:
+    """The levels a save dropped, for the note on the Profile page: '&dropped=Wristwatches%3ALess…'."""
+    return "".join("&" + urlencode({"dropped": f"{label}:{level}"}) for label, level in dropped)
 
 
 LATELY_SHOWN = 5
@@ -932,7 +986,8 @@ def profile_save(name: str, text: str = Form(""), proposal_id: int | None = Form
         p = conn.execute("SELECT changes FROM proposals WHERE id = ?", (proposal_id,)).fetchone()
         if name == "interests.md" and p:
             carry_interest_labels(conn, (loads(p["changes"], None) or {}).get("items") or [], text)
-    return RedirectResponse("/profile?saved=" + name, status_code=303)
+    dropped = forget_removed(conn, text) if name == "interests.md" else []
+    return RedirectResponse("/profile?saved=" + name + _dropped_query(dropped), status_code=303)
 
 
 @app.post("/profile/draft")
@@ -988,8 +1043,9 @@ def proposal_apply(pid: int, accept: list[str] = Form([]), conn=Depends(get_conn
         return RedirectResponse(f"{back}?error={quote('None of these fit your interests as they are now')}", status_code=303)
     write_profile("interests.md", text)
     carry_interest_labels(conn, applied, text)
+    dropped = forget_removed(conn, text)
     conn.execute("UPDATE proposals SET status = 'accepted', decided_at = ? WHERE id = ?", (iso(utcnow()), pid))
-    return RedirectResponse(f"/profile?saved=applied&skipped={len(skipped)}", status_code=303)
+    return RedirectResponse(f"/profile?saved=applied&skipped={len(skipped)}" + _dropped_query(dropped), status_code=303)
 
 
 @app.post("/profile/proposals/{pid}/reject")

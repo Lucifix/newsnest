@@ -94,6 +94,12 @@ outlets cover it. Our game: 0.4·9 + 0.3·4 + 0.3·8 + 1 = **8.2**. Comfortably 
 stories** (importance 8 or more). A national emergency gets through even if it's nowhere near your
 interests.
 
+**Your levels move that line per interest.** On Profile → *Your interests*, every interest has a level, from
+*Much less* to *Much more*. That adds −1 to +1 to the score of each story
+the AI matched to the line, before the cut-off, so it changes how many of them get in, not only where
+they sit. The score you see on a card already includes it, and its "why" panel says so. A level moves the
+whole line: to get fewer watch stories but not fewer gadget stories, split the line in two first.
+
 Stories scoring 6 or more also get **key points**: the AI reads the full article and writes a one-line
 summary, a few bullets and whether the full article is worth your time. Any other story gets them when
 you tap *Key points*.
@@ -156,6 +162,9 @@ NewsNest learns at three speeds. None of them ask you questions.
 Every story has a ⋯ menu: **More about** / **Less about** its category, **Less from** its outlet.
 Each tap moves that category or outlet by a quarter (× 1.25 or × 0.75), between × 0.2 and × 2. Only you
 change these. **Not interested** hides the story and counts as a 👎.
+
+These change the order. To change how many stories of one interest get in at all, set its **level** on the
+Profile page (see *Scored* above). A line you set to *Less* is never picked as the *Revisit* story (see *Ranked*).
 
 ### Day by day: ratings
 
@@ -231,7 +240,8 @@ time from Settings: see [Backup and restore](install.md#backup-and-restore).
 
 | I want to… | Go to |
 |---|---|
-| Change what I'm interested in | Profile → Interests |
+| Change what I'm interested in | Profile → Your interests (or Advanced → Edit interests as text) |
+| Get more or fewer stories of one interest | Profile → Your interests, the level next to it |
 | See why a story is in my feed | Its "why" panel |
 | See everything my reading changed | Profile → What it's based on |
 | Show more or less of an outlet or category | A story's ⋯ menu, or ⋮ on Profile → What it's based on |

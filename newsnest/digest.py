@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from newsnest.config import WORLD, Config, Source
 from newsnest.db import loads, parse_iso
+from newsnest.levels import NO_LEVELS, Levels, load_levels
 from newsnest.profile import profile_exists
 from newsnest.scoring import final_score
 from newsnest.sections import block_of, section_keys
@@ -41,6 +42,9 @@ class Card:
     muted: bool
     watches: list[str]
     reopened: bool = False  # read before, back in the feed as Updated: shown and handled as unread
+    interest: str | None = None     # the Want line it matches (normalized), when levels were given
+    shift: float = 0.0              # what the reader's level for that interest added to every article's score
+    interest_label: str | None = None
 
     @property
     def final(self) -> float | None:
@@ -149,14 +153,17 @@ def day_bounds(day: date, tz: ZoneInfo) -> tuple[str, str]:
     return iso(start), iso(end)
 
 
-def make_cards(rows: list[sqlite3.Row], cfg: Config, names: dict[str, str]) -> list[Card]:
+def make_cards(rows: list[sqlite3.Row], cfg: Config, names: dict[str, str], levels: Levels = NO_LEVELS) -> list[Card]:
     """Group item rows into cards. Items belong together when the headline matcher put them in one
     story or Claude gave them the same event label; either link is enough. The best-scoring item
-    leads, and the cross-outlet bonus counts the outlets of the whole group."""
+    leads, and the cross-outlet bonus counts the outlets of the whole group. With the reader's levels,
+    the card's interest decides one shift for all of its articles (newsnest.levels), so the lead stays."""
     cards: list[Card] = []
     for rows_in in group_rows(rows):
         ranked = rank_members(rows_in, cfg)
-        members = [Member(r, final, names.get(r["source_id"], r["source_id"])) for r, final in ranked]
+        interest, shift = levels.of_card([r for r, _ in ranked])
+        members = [Member(r, None if final is None else round(final + shift, 1), names.get(r["source_id"], r["source_id"]))
+                   for r, final in ranked]
         lead, others = members[0], members[1:]
         watches = sorted({w for m in members for w in loads(m.row["watches"], [])})
         cards.append(Card(
@@ -165,7 +172,7 @@ def make_cards(rows: list[sqlite3.Row], cfg: Config, names: dict[str, str]) -> l
             unseen=not any(m.row["seen_at"] or m.row["read_at"] for m in members),
             must_show=any(m.row["prefilter"] == "must_show" for m in members),
             muted=all(m.row["prefilter"] == "muted" for m in members),
-            watches=watches))
+            watches=watches, interest=interest, shift=shift, interest_label=levels.label_of(interest)))
     return cards
 
 
@@ -222,7 +229,7 @@ def build_digest(conn: sqlite3.Connection, cfg: Config, sources: list[Source], d
         """SELECT i.*, s.source_count FROM items i JOIN stories s ON s.id = i.story_id
            WHERE i.fetched_at >= ? AND i.fetched_at < ? ORDER BY i.id""", (start, end)).fetchall()
 
-    cards = make_cards(rows, cfg, names)
+    cards = make_cards(rows, cfg, names, load_levels(conn))
     profile = profile_exists()
     calibration = cfg.scoring.calibration_mode
     muted = [c for c in cards if c.muted]

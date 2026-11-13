@@ -14,6 +14,7 @@ from newsnest.ai import AIClient, parse_json
 from newsnest.config import Config
 from newsnest.db import iso, parse_iso, utcnow
 from newsnest.interests import OPS, SECTIONS, apply_changes
+from newsnest.levels import load_levels
 from newsnest.profile import read_profile, seed_examples, strip_comments
 from newsnest.scoring import final_score, reader_phrase
 
@@ -124,8 +125,10 @@ def weekly_proposal(conn: sqlite3.Connection, cfg: Config, ai: AIClient) -> int 
         """SELECT i.*, s.source_count FROM items i JOIN stories s ON s.id = i.story_id
            WHERE i.rated_at > ? ORDER BY i.rated_at DESC LIMIT 150""", (last,)).fetchall()
     lines = []
+    # With the reader's levels: a line they turned down on purpose isn't "underrated"
+    levels = load_levels(conn)
     for r in rated:
-        f = final_score(r, r["source_count"], cfg)
+        f = final_score(r, r["source_count"], cfg, levels.shift_of(r["interest"]))
         verdict = "+" if r["rating"] > 0 else "-"
         flag = ""
         if f is not None and r["rating"] > 0 and f < cfg.digest.min_final:

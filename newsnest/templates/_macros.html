@@ -212,6 +212,9 @@
     {% if (r.source_count or 1) >= 2 and cfg.scoring.cross_source_bonus %}
     <div class="whybar bonus"><span class="whylabel">Covered by {{ r.source_count }} outlets</span><span></span><b>+{{ '%g'|format(cfg.scoring.cross_source_bonus) }}</b></div>
     {% endif %}
+    {% if c.shift %}
+    <div class="whybar bonus"><span class="whylabel">Your level for {{ c.interest_label }}</span><span></span><b>{{ '+' if c.shift > 0 else '−' }}{{ '%g'|format(c.shift|abs) }}</b></div>
+    {% endif %}
   </div>
   {% endif %}
   {% set cutoff = '%g'|format(cfg.digest.min_final) %}

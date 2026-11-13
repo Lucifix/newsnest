@@ -245,6 +245,13 @@ MIGRATIONS: list[str] = [
     ALTER TABLE items ADD COLUMN expanded_at TEXT;
     CREATE INDEX IF NOT EXISTS items_last_seen ON items(last_seen_at) WHERE last_seen_at IS NOT NULL
     """,
+    # how much of each interest the reader wants (newsnest.levels): one row per Want line not on Normal.
+    # interest is the normalized line (as items.interest), line the text as written, step -2..2
+    """
+    CREATE TABLE interest_levels (
+        interest TEXT PRIMARY KEY, line TEXT NOT NULL, step INTEGER NOT NULL, updated_at TEXT NOT NULL
+    )
+    """,
 ]
 
 

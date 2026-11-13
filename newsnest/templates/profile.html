@@ -1,6 +1,6 @@
 {% extends "_settings_layout.html" %}
 {% from "_macros.html" import rate_buttons with context %}
-{% from "_settings_ui.html" import group, fold, expand, link_row, action_row, tuning_row, tuning_rows with context %}
+{% from "_settings_ui.html" import group, fold, expand, link_row, action_row, tuning_row, tuning_rows, value_select with context %}
 {% block stitle %}Profile &amp; tuning{% endblock %}
 {% block sintro %}<p class="sub">What NewsNest knows about you: your interests, and which outlets and topics it shows more or less of.</p>{% endblock %}
 {% block page %}
@@ -62,8 +62,59 @@
 {% endcall %}
 {% endmacro %}
 
-{% call group('Your interests', footnote='The AI reads this on every scoring call; changes apply from the next run. Text inside HTML comments is ignored.') %}
-  {{ editor('interests.md', 'Interests', 'What you care about and what to skip', 14) }}
+{# A new line for interests.md: an interest or something to skip #}
+{% macro add_form(section, label, placeholder) %}
+<form method="post" action="/profile/interest/add" class="line-form">
+  <input type="hidden" name="section" value="{{ section }}">
+  <input class="line-input" name="text" aria-label="{{ label }}" placeholder="{{ placeholder }}" maxlength="200" required>
+  <button class="button small" type="submit">Add</button>
+</form>
+{% endmacro %}
+
+{# A line's words with a pencil beside them. The pencil turns the words into a field in the same place:
+   ✓ or Enter saves, ✕ or Esc puts the words back, the bin removes the line. Without JavaScript the
+   pencil is a link that opens the page with that line in its field (?edit=). #}
+{% macro line_text(section, line, index, label) %}
+{% set editing = edit == section ~ '-' ~ index %}
+<span class="line-view"{% if editing %} hidden{% endif %}><span class="srow-title wrap">{{ line }}</span>
+  <a class="iconbtn line-btn" href="/profile?edit={{ section }}-{{ index }}#interests" data-line-edit aria-label="Edit {{ label }}" title="Edit">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4"/></svg></a></span>
+<form method="post" action="/profile/interest/edit" class="line-edit"{% if not editing %} hidden{% endif %}>
+  <input type="hidden" name="section" value="{{ section }}"><input type="hidden" name="old" value="{{ line }}">
+  <input class="line-input" name="new" value="{{ line }}" aria-label="Wording of {{ label }}" maxlength="200" required{% if editing %} autofocus{% endif %}>
+  <button class="iconbtn line-btn" type="submit" aria-label="Save" title="Save">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+  <a class="iconbtn line-btn" href="/profile#interests" data-line-cancel aria-label="Cancel" title="Cancel">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></a>
+  <button class="iconbtn line-btn danger" type="submit" formaction="/profile/interest/remove" formnovalidate name="line" value="{{ line }}"
+          data-confirm='Remove "{{ line }}"?' aria-label="Remove {{ label }}" title="Remove">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+</form>
+{% endmacro %}
+
+{% set cutoff = '%g'|format(cfg.digest.min_final) if cfg else '5' %}
+{% call group('Your interests', id='interests', footnote='The AI reads these on every scoring call. The level moves an interest\'s stories up or down before your ' ~ cutoff ~ ' cut-off decides what gets in; top stories and your watches always get in. A level moves the whole line: to tune part of it, split it into two. The count is stories a day that got in over the last 7 days.') %}
+  {% for r in levels %}
+  <div class="srow level-row{% if r.step %} level-set{% endif %}">
+    <span class="srow-main">{{ line_text('want', r.line, loop.index0, r.label) }}{% if r.count %}<span class="srow-sub">{{ r.count }}</span>{% endif %}</span>
+    <span class="srow-end">
+      <form method="post" action="/profile/level" data-autosubmit class="srow-form"><input type="hidden" name="line" value="{{ r.line }}">
+        {{ value_select('step', 'How much of ' ~ r.label, r.step, level_names) }}
+        <noscript><button class="button small secondary" type="submit">Save</button></noscript></form>
+    </span>
+  </div>
+  {% endfor %}
+  {% call expand('Add an interest', open=not levels) %}{{ add_form('want', 'New interest', 'e.g. Local news: traffic, parking, city decisions') }}{% endcall %}
+{% endcall %}
+{% for d in dropped %}{% set label, _, level = d.rpartition(':') %}
+<p class="callout warn">{{ label }} is no longer in your list; its level ({{ level }}) was removed.</p>
+{% endfor %}
+
+{% call group('Skip', footnote='Stories about these score low.') %}
+  {% for line in skip %}
+  <div class="srow"><span class="srow-main">{{ line_text('skip', line, loop.index0, line) }}</span></div>
+  {% endfor %}
+  {% call expand('Add something to skip') %}{{ add_form('skip', 'Something to skip', 'e.g. Celebrities, horoscopes') }}{% endcall %}
 {% endcall %}
 
 <section class="sgroup" id="tuning">
@@ -108,6 +159,7 @@
 {% endif %}
 
 {% call group('Advanced', footnote='Text inside HTML comments is ignored.') %}
+  {{ editor('interests.md', 'Edit interests as text', 'Many lines at once, or notes for yourself', 14) }}
   {{ editor('seed_examples.md', 'Seed examples', 'About 20 headlines starting with + (want) or - (don\'t want)', 9) }}
 {% endcall %}
 {% endblock %}
