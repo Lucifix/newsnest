@@ -91,8 +91,9 @@ def want_lines() -> list[str]:
 
 def carry_interest_labels(conn: sqlite3.Connection, changes: list[dict], text: str) -> int:
     """After an accepted proposal rewords Want lines, move the stories labelled with the old wording to the
-    new one, so that interest keeps its history. Only rewords that made it into the saved text count (the
-    reader can edit a proposal before accepting it). Returns how many items moved."""
+    new one, so that interest keeps its history, and its level (newsnest.levels) with it. Only rewords that
+    made it into the saved text count (the reader can edit a proposal before accepting it). Returns how many
+    items moved."""
     want = {norm(line) for line in bullets(strip_comments(text))["want"]}
     moved = 0
     for change in changes:
@@ -101,6 +102,8 @@ def carry_interest_labels(conn: sqlite3.Connection, changes: list[dict], text: s
         old, new = norm(change.get("old") or ""), norm(change.get("new") or "")
         if old and new and old != new and new in want and old not in want:
             moved += conn.execute("UPDATE items SET interest = ? WHERE interest = ?", (new, old)).rowcount
+            conn.execute("UPDATE OR IGNORE interest_levels SET interest = ?, line = ? WHERE interest = ?",
+                         (new, (change.get("new") or "").strip(), old))
     return moved
 
 
@@ -309,13 +312,14 @@ def run_scoring(conn: sqlite3.Connection, cfg: Config, ai: AIClient, max_batches
     return {"scored": scored, "ids": newly}
 
 
-def final_score(row, story_sources: int, cfg: Config) -> float | None:
-    """Weighted sum of the sub-scores, +bonus when 2+ sources cover the story. Computed on read, so
-    weight changes in config apply to everything immediately."""
+def final_score(row, story_sources: int, cfg: Config, shift: float = 0.0) -> float | None:
+    """Weighted sum of the sub-scores, +bonus when 2+ sources cover the story, + the shift of the reader's
+    level for its interest (newsnest.levels). Computed on read, so weight and level changes apply to
+    everything immediately."""
     if row["topic"] is None:
         return None
     w = cfg.scoring.weights
     final = w.topic * row["topic"] + w.importance * row["importance"] + w.personal * row["personal"]
     if story_sources >= 2:
         final += cfg.scoring.cross_source_bonus
-    return round(final, 1)
+    return round(final + shift, 1)

@@ -1381,6 +1381,9 @@ input.sinput:invalid { border-color: var(--danger); }
 .srow-form { display: contents; }
 .srow-end .srow-form { display: block; margin: 0; }
 .srow-accent { color: var(--accent-text); font-weight: 600; }
+/* How much of each interest: a level other than Normal stands out, like a section you picked */
+.level-set .vselect { color: var(--accent-text); font-weight: 600; }
+.level-set .vselect .chev { stroke: currentColor; }
 .srow-sub.warn { color: var(--warn); font-weight: 600; }
 .srow-sub.ok { color: var(--ok); font-weight: 600; }
 .srow-value.progress { color: var(--accent-text); font-weight: 600; }

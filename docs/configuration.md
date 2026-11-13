@@ -13,6 +13,10 @@ one by hand.
 Edits made in the Settings pages are written back to `config.yaml`, comments included, and the previous
 version is kept as `config.yaml.bak`.
 
+How much of each interest you want (Profile → *How much of each interest*) isn't in any of these files: it's
+kept in the database, so the AI never reads it and an accepted suggestion can't drop it. A level is removed
+when its line leaves `interests.md`, and follows its line when you accept a suggestion that rewords it.
+
 On first start NewsNest copies the starter config from [`config.example/`](../config.example/), with
 international news and tech feeds, no local ones, no region and the time zone `UTC`. Set where you live
 in **Settings → General** (country, city, time zone), and NewsNest offers your country's local pack.

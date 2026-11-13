@@ -25,21 +25,20 @@ import hashlib
 import json
 import math
 import sqlite3
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from newsnest.config import Config
 from newsnest.db import get_meta, iso, parse_iso, set_meta, utcnow
 from newsnest.digest import Card, group_rows, rank_members
-from newsnest.interests import norm
+from newsnest.interests import card_interest, norm, short_label  # noqa: F401  (short_label: used via drift too)
 
 LIFTED, FADED = 1.1, 0.9          # outside this band a weight is worth a "lately" line
 LINGER_FLOOR_MS = 3000            # a card under 3 s never counts as lingered
 LINGER_MIN_CARDS = 200            # too few timed cards to know what "longer than usual" is
 LINGER_QUANTILE = 0.75            # the reader's top quarter
 DISLIKE_DAYS = 7                  # a 👎 this recent keeps an interest out of the revisit slot
-LABEL_CHARS = 40
 
 
 @dataclass
@@ -90,29 +89,6 @@ class Drift:
     def faded(self) -> set[str]:
         """Interest and category keys the reader has been reading clearly less of lately."""
         return {k for k, w in self.weights.items() if not k.startswith("source:") and w <= FADED}
-
-
-def short_label(line: str) -> str:
-    """A Want line as a few words for the why panel: the part before ':' or ' (', at most LABEL_CHARS."""
-    text = line.split(":", 1)[0].split(" (", 1)[0].strip() or line.strip()
-    if len(text) <= LABEL_CHARS:
-        return text
-    cut = text[:LABEL_CHARS].rsplit(" ", 1)[0].rstrip(",;—-")
-    return cut + "…"
-
-
-def card_interest(rows: list, lines: dict[str, str]) -> str | None:
-    """The Want line (normalized) a card is about, from its item rows lead first: the lead's label, else the
-    most common label among its items (the higher-ranked one on a tie). A label for a line that is no longer
-    in the file doesn't count."""
-    labels = [r["interest"] for r in rows if r["interest"] and r["interest"] in lines]
-    if not labels:
-        return None
-    if rows[0]["interest"] in lines:
-        return rows[0]["interest"]
-    counts = Counter(labels)
-    best = max(counts.values())
-    return next(label for label in labels if counts[label] == best)
 
 
 def rows_key(rows: list, lines: dict[str, str]) -> str | None:

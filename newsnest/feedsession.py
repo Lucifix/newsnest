@@ -27,6 +27,7 @@ from newsnest.config import Config, Source
 from newsnest.db import iso, parse_iso, utcnow
 from newsnest.digest import make_cards
 from newsnest.feed import FeedItem, Ranking, rank_feed, story_hidden, story_read_at, window_rows
+from newsnest.levels import load_levels
 
 COOKIE = "newsnest_feed"
 # Bumped whenever the stored payload changes shape or meaning: a session of another format is ranked again
@@ -64,7 +65,7 @@ def _restore(conn: sqlite3.Connection, cfg: Config, sources: list[Source], paylo
              created: datetime) -> Ranking:
     """The stored ranking over the stories' current rows."""
     data = json.loads(payload)
-    cards = make_cards(window_rows(conn, data["cutoff"]), cfg, {s.id: s.name for s in sources})
+    cards = make_cards(window_rows(conn, data["cutoff"]), cfg, {s.id: s.name for s in sources}, load_levels(conn))
     card_of = {m.id: card for card in cards for m in [card.lead, *card.others]}
     placed: set[int] = set()
 

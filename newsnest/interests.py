@@ -8,14 +8,39 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections import Counter
 
 SECTIONS = ("want", "skip")
 OPS = ("add", "remove", "reword")
+LABEL_CHARS = 40
 
 
 def norm(text: str) -> str:
     """Bullets compare ignoring case, spacing and a final full stop."""
     return re.sub(r"\s+", " ", text).strip().rstrip(".").casefold()
+
+
+def short_label(line: str) -> str:
+    """A Want line as a few words for the why panel: the part before ':' or ' (', at most LABEL_CHARS."""
+    text = line.split(":", 1)[0].split(" (", 1)[0].strip() or line.strip()
+    if len(text) <= LABEL_CHARS:
+        return text
+    cut = text[:LABEL_CHARS].rsplit(" ", 1)[0].rstrip(",;—-")
+    return cut + "…"
+
+
+def card_interest(rows: list, lines: dict[str, str]) -> str | None:
+    """The Want line (normalized) a card is about, from its item rows lead first: the lead's label, else the
+    most common label among its items (the higher-ranked one on a tie). A label for a line that is no longer
+    in the file doesn't count."""
+    labels = [r["interest"] for r in rows if r["interest"] and r["interest"] in lines]
+    if not labels:
+        return None
+    if rows[0]["interest"] in lines:
+        return rows[0]["interest"]
+    counts = Counter(labels)
+    best = max(counts.values())
+    return next(label for label in labels if counts[label] == best)
 
 
 def _section_of(heading: str) -> str | None:

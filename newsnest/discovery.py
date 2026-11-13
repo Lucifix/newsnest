@@ -26,6 +26,7 @@ import httpx
 
 from newsnest.config import LEGACY_SECTIONS, NEWS, WORLD, Config, Source, slugify
 from newsnest.db import dumps, iso, parse_iso, session, utcnow
+from newsnest.levels import load_levels
 from newsnest.scoring import final_score
 from newsnest.sections import section_keys
 from newsnest.textmatch import fold, normalize_url
@@ -251,7 +252,9 @@ def good_stories(conn: sqlite3.Connection, cfg: Config, source_id: str, since: s
     rows = conn.execute("SELECT i.*, st.source_count FROM items i JOIN stories st ON st.id = i.story_id "
                         "WHERE i.source_id = ? AND i.score_status = 'scored' AND i.fetched_at >= ?",
                         (source_id, since or "")).fetchall()
-    return sum(1 for x in rows if (final_score(x, x["source_count"], cfg) or 0) >= cfg.discovery.min_final)
+    levels = load_levels(conn)
+    return sum(1 for x in rows if (final_score(x, x["source_count"], cfg, levels.shift_of(x["interest"])) or 0)
+               >= cfg.discovery.min_final)
 
 
 def promotion_suggestions(conn: sqlite3.Connection, cfg: Config) -> list[dict]:

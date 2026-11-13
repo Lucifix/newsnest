@@ -1,6 +1,6 @@
 {% extends "_settings_layout.html" %}
 {% from "_macros.html" import rate_buttons with context %}
-{% from "_settings_ui.html" import group, fold, expand, link_row, action_row, tuning_row, tuning_rows with context %}
+{% from "_settings_ui.html" import group, fold, expand, link_row, action_row, tuning_row, tuning_rows, value_select with context %}
 {% block stitle %}Profile &amp; tuning{% endblock %}
 {% block sintro %}<p class="sub">What NewsNest knows about you: your interests, and which outlets and topics it shows more or less of.</p>{% endblock %}
 {% block page %}
@@ -65,6 +65,24 @@
 {% call group('Your interests', footnote='The AI reads this on every scoring call; changes apply from the next run. Text inside HTML comments is ignored.') %}
   {{ editor('interests.md', 'Interests', 'What you care about and what to skip', 14) }}
 {% endcall %}
+{% for d in dropped %}{% set label, _, level = d.rpartition(':') %}
+<p class="callout warn">{{ label }} is no longer in your list; its level ({{ level }}) was removed.</p>
+{% endfor %}
+
+{% if levels %}
+{% call group('How much of each interest', id='levels', footnote='Moves the stories the AI matched to each interest up or down before your ' ~ ('%g'|format(cfg.digest.min_final)) ~ ' cut-off decides what gets in. Top stories and your watches always get in. A level moves the whole line: to tune part of it, split it into two lines first. Writing a line down and setting it to Less both lower it. The count is stories a day that got in over the last 7 days.') %}
+  {% for r in levels %}
+  <div class="srow level-row{% if r.step %} level-set{% endif %}">
+    <span class="srow-main"><span class="srow-title" title="{{ r.line }}">{{ r.label }}</span><span class="srow-sub">{{ r.count }}</span></span>
+    <span class="srow-end">
+      <form method="post" action="/profile/level" data-autosubmit class="srow-form"><input type="hidden" name="line" value="{{ r.line }}">
+        {{ value_select('step', 'How much of ' ~ r.label, r.step, level_names) }}
+        <noscript><button class="button small secondary" type="submit">Save</button></noscript></form>
+    </span>
+  </div>
+  {% endfor %}
+{% endcall %}
+{% endif %}
 
 <section class="sgroup" id="tuning">
   <h2 class="sgroup-title tuning-title">How your feed is tuned</h2>

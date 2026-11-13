@@ -28,6 +28,15 @@ _Avoid_: topic, tag, category (a category is the AI's coarse grouping, like Spor
 A "more / less of this outlet or category" choice the reader made in a card's menu. Only the reader
 changes it.
 
+**Level**:
+How much of one interest the reader wants: Much less, Less, Normal, More or Much more, set on the Profile
+page. Only the reader changes it.
+_Avoid_: weight (a weight multiplies a story's rank; a level moves its score)
+
+**Shift**:
+What a level adds to the score of every card matched to that interest: −1, −0.5, 0, +0.5 or +1. It counts
+before the cut-off, so it changes which stories get in, not only their order.
+
 **Old boost**:
 A small permanent lift an outlet or category got from past opens and likes, before drift replaced it.
 _Avoid_: nudge, learned weight
