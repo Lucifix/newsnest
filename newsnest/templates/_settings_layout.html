@@ -28,7 +28,7 @@
     {% endcall %}
     {% call group('You', icons=true) %}
       {{ link_row('/profile', 'Profile & tuning', icon='profile', current=page == 'profile') }}
-      {{ link_row('/settings/app', 'Install, backup & log out', icon='app', current=page == 'app') }}
+      {{ link_row('/settings/app', 'App & backup', icon='app', current=page == 'app') }}
       {{ link_row('/settings/about', 'About & report a bug', icon='about', value='v' ~ version, current=page == 'about') }}
     {% endcall %}
     {% endif %}

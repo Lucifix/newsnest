@@ -104,7 +104,7 @@ https address, for example one served by a reverse proxy, rather than `http://<s
 
 ## Backup and restore
 
-**Backup:** open **Settings → Install, backup & log out → Download database backup**. It gives you a
+**Backup:** open **Settings → App & backup → Download database backup**. It gives you a
 single consistent `.db` file with all stories, ratings and history, and it is safe to take while the app
 is running. Copy the `config/` folder too: it holds your feeds and interests, which the download does
 not include.
