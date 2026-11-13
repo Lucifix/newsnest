@@ -113,9 +113,10 @@ def per_day_text(per_day: float) -> str:
     return f"About {round(per_day)} a day"
 
 
-def level_rows(conn: sqlite3.Connection, cfg: Config) -> list[dict]:
-    """The Profile page's list: one row per Want line, in file order."""
+def level_rows(conn: sqlite3.Connection, cfg: Config | None) -> list[dict]:
+    """The Profile page's list: one row per Want line, in file order. Without a config there are no counts."""
     levels = load_levels(conn)
-    counts = daily_counts(conn, cfg, levels)
+    counts = daily_counts(conn, cfg, levels) if cfg else None
     return [{"line": line, "label": short_label(line), "step": levels.steps.get(key, 0),
-             "count": per_day_text(counts.get(key, 0.0))} for key, line in levels.lines.items()]
+             "count": per_day_text(counts.get(key, 0.0)) if counts is not None else None}
+            for key, line in levels.lines.items()]

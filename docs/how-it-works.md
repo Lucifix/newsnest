@@ -94,8 +94,8 @@ outlets cover it. Our game: 0.4·9 + 0.3·4 + 0.3·8 + 1 = **8.2**. Comfortably 
 stories** (importance 8 or more). A national emergency gets through even if it's nowhere near your
 interests.
 
-**Your levels move that line per interest.** On Profile → *How much of each interest*, every line of your
-interests file can be set from *Much less* to *Much more*. That adds −1 to +1 to the score of each story
+**Your levels move that line per interest.** On Profile → *Your interests*, every interest has a level, from
+*Much less* to *Much more*. That adds −1 to +1 to the score of each story
 the AI matched to the line, before the cut-off, so it changes how many of them get in, not only where
 they sit. The score you see on a card already includes it, and its "why" panel says so. A level moves the
 whole line: to get fewer watch stories but not fewer gadget stories, split the line in two first.
@@ -240,8 +240,8 @@ time from Settings: see [Backup and restore](install.md#backup-and-restore).
 
 | I want to… | Go to |
 |---|---|
-| Change what I'm interested in | Profile → Interests |
-| Get more or fewer stories of one interest | Profile → How much of each interest |
+| Change what I'm interested in | Profile → Your interests (or Advanced → Edit interests as text) |
+| Get more or fewer stories of one interest | Profile → Your interests, the level next to it |
 | See why a story is in my feed | Its "why" panel |
 | See everything my reading changed | Profile → What it's based on |
 | Show more or less of an outlet or category | A story's ⋯ menu, or ⋮ on Profile → What it's based on |

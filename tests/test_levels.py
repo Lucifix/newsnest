@@ -163,16 +163,47 @@ def test_missed_this_names_the_level(cfg):
 def test_profile_page_sets_a_level_and_notes_a_dropped_one(client):
     client.post("/profile/save/interests.md", data={"text": INTERESTS})
     page = client.get("/profile").text
-    assert "How much of each interest" in page and ">Wristwatches<" in page and "None in the last 7 days" in page
+    # each interest once: its words, its count and its level on one row
+    assert page.count(f'<span class="srow-title wrap">{WATCHES}</span>') == 1 and "None in the last 7 days" in page
     r = client.post("/profile/level", data={"line": WATCHES, "step": "-1"}, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/profile#levels"
+    assert r.status_code == 303 and r.headers["location"] == "/profile?saved=level#interests"
     page = client.get("/profile").text
     assert '<option value="-1" selected>Less</option>' in page and "level-set" in page
     assert client.post("/profile/level", data={"line": "Knitting", "step": "1"}).status_code == 404
     assert client.post("/profile/level", data={"line": WATCHES, "step": "3"}).status_code == 400
+    # the text box (Advanced) can still drop a line, and the page says what went with it
     page = client.post("/profile/save/interests.md", data={"text": "## Want\n- news\n"}).text
     assert "Wristwatches is no longer in your list; its level (Less) was removed." in page
-    assert "How much of each interest" in page and ">Wristwatches<" not in page
+    assert f'<span class="srow-title wrap">{WATCHES}</span>' not in page
+
+
+def test_lines_are_added_reworded_and_removed_in_place(client, env):
+    conn = connect()
+    (env.config / "interests.md").write_text(f"<!-- keep me -->\n## Want\n- news\n- {WATCHES}\n\n## Skip\n- Sports\n",
+                                             encoding="utf-8")
+    item = conn.execute("SELECT id FROM items LIMIT 1").fetchone()[0]
+    conn.execute("UPDATE items SET interest = ? WHERE id = ?", (W, item))
+    client.post("/profile/level", data={"line": WATCHES, "step": "-1"})
+    r = client.post("/profile/interest/add", data={"section": "want", "text": "  Everyday   carry "}, follow_redirects=False)
+    assert r.headers["location"] == "/profile?saved=interest_add#interests"
+    # reworded here, the interest keeps its level and its stories
+    new = "Wristwatches: only notable releases"
+    client.post("/profile/interest/edit", data={"section": "want", "old": WATCHES, "new": new})
+    assert load_levels(conn).steps == {norm(new): -1}
+    assert conn.execute("SELECT interest FROM items WHERE id = ?", (item,)).fetchone()[0] == norm(new)
+    client.post("/profile/interest/add", data={"section": "skip", "text": "Horoscopes"})
+    client.post("/profile/interest/remove", data={"section": "skip", "line": "Sports"})
+    assert (env.config / "interests.md").read_text(encoding="utf-8") == (
+        f"<!-- keep me -->\n## Want\n- news\n- {new}\n- Everyday carry\n\n## Skip\n- Horoscopes\n")
+    # removing an interest takes its level with it
+    client.post("/profile/interest/remove", data={"section": "want", "line": new})
+    assert load_levels(conn).steps == {}
+    page = client.post("/profile/interest/add", data={"section": "want", "text": "news"}).text
+    assert "Already in your interests" in page
+    # Edit wording opens that one line as a field, filled in
+    page = client.get("/profile?edit=want-1").text
+    assert page.count('class="line-edit" hidden') == 2  # the other lines stay as words
+    assert 'name="new" value="Everyday carry" aria-label="Wording of Everyday carry" maxlength="200" required autofocus' in page
 
 
 def test_why_panel_shows_the_level(client):

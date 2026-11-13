@@ -1384,6 +1384,20 @@ input.sinput:invalid { border-color: var(--danger); }
 /* How much of each interest: a level other than Normal stands out, like a section you picked */
 .level-set .vselect { color: var(--accent-text); font-weight: 600; }
 .level-set .vselect .chev { stroke: currentColor; }
+/* An interest's words with a pencil; the pencil turns them into a field in the same place */
+.line-view, .line-edit { display: flex; align-items: center; gap: 2px; min-width: 0; margin: 0; }
+.line-view[hidden], .line-edit[hidden] { display: none; }
+.line-view .srow-title { min-width: 0; cursor: text; }
+@media (hover: hover) { .line-view:hover .line-btn { color: var(--text); } }
+.iconbtn.line-btn { flex: none; width: 32px; height: 32px; color: var(--muted); }
+.iconbtn.line-btn svg { width: 17px; height: 17px; }
+.line-edit { gap: 4px; }
+.line-input { flex: 1 1 auto; min-width: 0; min-height: 36px; padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--bg); color: var(--text); font: 400 1rem/1.3 var(--sans); }
+.line-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+/* Adding a line: the field and its Add button */
+.line-form { display: flex; align-items: center; gap: 8px; margin: 0; padding-top: 12px; }
+.line-form .button { margin: 0; }
 .srow-sub.warn { color: var(--warn); font-weight: 600; }
 .srow-sub.ok { color: var(--ok); font-weight: 600; }
 .srow-value.progress { color: var(--accent-text); font-weight: 600; }

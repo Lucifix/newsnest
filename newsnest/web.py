@@ -40,10 +40,10 @@ from newsnest import feedsession
 from newsnest.drift import FADED, LIFTED, LINGER_MIN_CARDS, Drift, current_drift, current_lines, reading_report
 from newsnest.feed import (SEARCH_DAYS, TOP_STORIES, adjust_weight, front_page, load_weights, read_stories,
                         saved_stories, search_stories, story_hidden, swipe_deck, view_feed, weight_strength)
-from newsnest.interests import apply_changes, bullet_diff, norm, word_diff
+from newsnest.interests import apply_changes, bullet_diff, bullets, norm, word_diff
 from newsnest.levels import NAMES as LEVEL_NAMES, forget_removed, level_rows, set_level
 from newsnest.missed import handle_missed
-from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, write_profile
+from newsnest.profile import PROFILE_FILES, profile_exists, read_profile, strip_comments, write_profile
 from newsnest.packs import LIFESTYLE_INTEREST, LIFESTYLE_PACK, LOCAL_PACKS, add_interest, add_pack, missing_from, pack_for
 from newsnest.profile_ai import draft_profile
 from newsnest.scoring import carry_interest_labels
@@ -835,11 +835,14 @@ def profile_page(request: Request, conn=Depends(get_conn), loaded: LoadedConfig 
     rated = conn.execute("SELECT COUNT(*) FROM items WHERE rating IS NOT NULL").fetchone()[0]
     onboarding = not profile_exists()
     proposals = [{**dict(r), "count": len((loads(r["changes"], None) or {}).get("items") or [])} for r in proposals]
-    levels = level_rows(conn, loaded.config) if loaded.config and not onboarding else []
+    levels = level_rows(conn, loaded.config)
+    skip = bullets(strip_comments(files["interests.md"]))["skip"]
+    edit = request.query_params.get("edit", "")
     return render(request, "profile.html", conn, loaded, page="profile", files=files, proposals=proposals, onboarding=onboarding,
                   items=onboarding_items(conn) if onboarding else [], rated=rated, error=request.query_params.get("error"),
                   saved=request.query_params.get("saved"), require_cfg=False, error_prefix="", tuning=tuning_rows(conn, loaded),
-                  levels=levels, level_names=LEVEL_NAMES, dropped=request.query_params.getlist("dropped"),
+                  levels=levels, skip=skip, edit=edit, level_names=LEVEL_NAMES,
+                  dropped=request.query_params.getlist("dropped"),
                   **settings_context("profile", conn, loaded))
 
 
@@ -853,7 +856,37 @@ def profile_level(line: str = Form(...), step: int = Form(...), conn=Depends(get
     if norm(line) not in current:
         raise HTTPException(404, "that interest is no longer in your list")
     set_level(conn, current[norm(line)], step)
-    return RedirectResponse("/profile#levels", status_code=303)
+    return RedirectResponse("/profile?saved=level#interests", status_code=303)
+
+
+def _change_interests(conn, change: dict, saved: str) -> RedirectResponse:
+    """One line of interests.md added, reworded or removed from the Profile page's list. Only that line
+    changes; comments and everything else in the file stay as they are. A Want line reworded here keeps its
+    stories' history and its level, since the old and new wording are both known."""
+    text, applied, skipped = apply_changes(read_profile("interests.md"), [change])
+    if not applied:
+        reason = skipped[0][1] if skipped else "nothing changed"
+        return RedirectResponse(f"/profile?error={quote(reason[:1].upper() + reason[1:])}#interests", status_code=303)
+    write_profile("interests.md", text)
+    carry_interest_labels(conn, applied, text)
+    forget_removed(conn, text)
+    return RedirectResponse(f"/profile?saved={saved}#interests", status_code=303)
+
+
+@app.post("/profile/interest/add")
+def interest_add(section: str = Form(...), text: str = Form(""), conn=Depends(get_conn)):
+    return _change_interests(conn, {"op": "add", "section": section, "new": " ".join(text.split())}, "interest_add")
+
+
+@app.post("/profile/interest/edit")
+def interest_edit(section: str = Form(...), old: str = Form(...), new: str = Form(""), conn=Depends(get_conn)):
+    return _change_interests(conn, {"op": "reword", "section": section, "old": old, "new": " ".join(new.split())},
+                             "interest_edit")
+
+
+@app.post("/profile/interest/remove")
+def interest_remove(section: str = Form(...), line: str = Form(...), conn=Depends(get_conn)):
+    return _change_interests(conn, {"op": "remove", "section": section, "old": line}, "interest_remove")
 
 
 def _dropped_query(dropped: list[tuple[str, str]]) -> str:

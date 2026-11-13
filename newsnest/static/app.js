@@ -135,7 +135,9 @@ document.addEventListener("DOMContentLoaded", () => {
 // ---------- forms: rating, read toggle, mark all read ----------
 document.addEventListener("submit", async (event) => {
   const form = event.target;
-  if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+  // A button can ask on its own (the bin beside an interest being edited), else the form asks
+  const ask = event.submitter?.dataset.confirm || form.dataset.confirm;
+  if (ask && !window.confirm(ask)) {
     event.preventDefault();
     return;
   }
@@ -1602,6 +1604,41 @@ document.addEventListener("DOMContentLoaded", () => {
     renderInstallPanel();
   });
   document.querySelectorAll("[data-refresh]").forEach((b) => b.addEventListener("click", refreshPage));
+});
+
+
+// ---------- profile: the pencil beside an interest turns its words into a field, in the same place ----------
+function closeLineEdit(form) {
+  form.reset();
+  form.hidden = true;
+  form.previousElementSibling.hidden = false;
+  form.previousElementSibling.querySelector("[data-line-edit]")?.focus({ preventScroll: true });
+}
+
+document.addEventListener("click", (event) => {
+  // The pencil, or the words themselves: a bigger target on a phone
+  const pencil = event.target.closest("[data-line-edit]")
+    || event.target.closest(".line-view .srow-title")?.parentElement.querySelector("[data-line-edit]");
+  if (pencil) {
+    event.preventDefault();
+    document.querySelectorAll(".line-edit:not([hidden])").forEach(closeLineEdit);
+    const view = pencil.closest(".line-view");
+    const form = view.nextElementSibling;
+    view.hidden = true;
+    form.hidden = false;
+    const input = form.querySelector(".line-input");
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    return;
+  }
+  const cancel = event.target.closest("[data-line-cancel]");
+  if (cancel) {
+    event.preventDefault();
+    closeLineEdit(cancel.closest(".line-edit"));
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && event.target.matches(".line-edit .line-input")) closeLineEdit(event.target.form);
 });
 
 
