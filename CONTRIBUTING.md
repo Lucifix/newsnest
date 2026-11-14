@@ -4,6 +4,12 @@ Bug reports, ideas and pull requests are welcome. Found a bug? Settings → *Abo
 app opens a new issue with your version filled in. Please open an issue first for anything big. Planned
 work is tracked in [GitHub issues](https://github.com/Lucifix/newsnest/issues).
 
+## License of your contribution
+
+NewsNest is licensed under the [GNU AGPL v3.0 or later](LICENSE). By opening a pull request you agree
+that your contribution is released under that license, and that the maintainer may also release it under
+other licenses later (for example a commercial license next to the AGPL).
+
 ## Development
 
 ```bash

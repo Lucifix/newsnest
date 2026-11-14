@@ -11,7 +11,7 @@ into a single card, and uses Claude (or a model of your choice, even a local one
 what matters to you.
 
 [![Latest release](https://img.shields.io/github/v/release/Lucifix/newsnest)](https://github.com/Lucifix/newsnest/releases/latest)
-![License: MIT](https://img.shields.io/github/license/Lucifix/newsnest)
+![License: AGPL-3.0](https://img.shields.io/github/license/Lucifix/newsnest)
 [![Docker pulls](https://img.shields.io/docker/pulls/lucifix/newsnest?logo=docker&logoColor=white)](https://hub.docker.com/r/lucifix/newsnest)
 [![Build status](https://img.shields.io/github/actions/workflow/status/Lucifix/newsnest/docker-publish.yml?branch=main&label=build)](https://github.com/Lucifix/newsnest/actions/workflows/docker-publish.yml)
 
@@ -186,7 +186,15 @@ news pack for your country) are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE), except the bundled fonts in [`newsnest/static/fonts/`](newsnest/static/fonts/):
+Copyright © 2026 Lucifix. NewsNest is free software under the
+[GNU Affero General Public License v3.0 or later](LICENSE) (AGPL). You may use, change and share it, also
+commercially. If you share a changed version, or run one for other people over a network, you must give
+them its source code under the same license.
+
+Versions up to and including v0.8.0 were released under the MIT License, and copies of those versions
+stay under MIT.
+
+The bundled fonts in [`newsnest/static/fonts/`](newsnest/static/fonts/) have their own license:
 [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) and
 [Space Grotesk](https://github.com/floriankarsten/space-grotesk) are licensed under the
 [SIL Open Font License 1.1](https://openfontlicense.org); their license files sit next to the fonts.
