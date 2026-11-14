@@ -1376,6 +1376,8 @@ input.sinput {
 input.sinput:focus { background: var(--bg); border-color: var(--border); }
 input.sinput:invalid { border-color: var(--danger); }
 .slist.saving { opacity: 0.7; }
+/* A row saving in place (data-inplace in app.js) dims until the new page is in */
+.srow.saving, .srow-expand.saving { opacity: 0.6; transition: opacity 0.2s ease; }
 
 /* ---------- settings: feeds, folds, expanding rows, menus ---------- */
 .srow-form { display: contents; }

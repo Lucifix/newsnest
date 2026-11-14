@@ -37,7 +37,7 @@
     <span class="srow-end"><span class="srow-value">{{ cal.n_up }} 👍 · {{ cal.n_down }} 👎</span></span></div>
   <div class="srow"><span class="srow-main"><span class="srow-title">Feed hides stories below</span></span>
     <span class="srow-end"><span class="srow-value">{{ limit }}</span></span></div>
-  <form method="post" action="/settings/calibration_toggle" data-autosubmit class="srow-form">
+  <form method="post" action="/settings/calibration_toggle" data-autosubmit data-inplace class="srow-form"><input type="hidden" name="days" value="{{ days }}">
     <label class="srow"><span class="srow-main"><span class="srow-title">Calibration mode</span>
       <span class="srow-sub wrap">{{ 'On: you see every story with its score, so the limit isn\'t applied yet' if cfg.scoring.calibration_mode else 'Off: stories below the limit are hidden' }}</span></span>
       <span class="srow-end"><input class="switch" type="checkbox" role="switch" {% if cfg.scoring.calibration_mode %}checked{% endif %}></span></label>
@@ -60,7 +60,7 @@
     </div>
     {{ chart_svg(cal.chart, 'chart-wide') }}
     {{ chart_svg(cal.chart_narrow, 'chart-narrow') }}
-    <details class="charttable">
+    <details class="charttable" id="chart-table">
       <summary>Show as a table</summary>
       <div class="tablewrap">
       <table>
@@ -76,14 +76,14 @@
 {# Each possible limit as a row: what it keeps, what it hides, how much you'd read; one tap to use it #}
 {% call group('Where to cut off', footnote=('Best fit is the limit that keeps the most of what you like while hiding the most of what you don\'t. ' if cal.suggested else 'A best fit appears after at least 5 👍 and 5 👎. ') ~ 'Watched topics and must-show words are never hidden.') %}
   {% for t in cal.table %}
-  <div class="srow limit-row{% if t.current %} is-current{% endif %}">
+  <div class="srow limit-row{% if t.current %} is-current{% endif %}" id="limit-{{ t.threshold }}">
     <span class="srow-main">
       <span class="srow-title">Hide below {{ t.threshold }}{% if t.threshold == cal.suggested %} <span class="pill watch">best fit</span>{% endif %}</span>
       <span class="srow-sub wrap">{% if t.kept_up is not none %}Keeps {{ '%d%%'|format(100 * t.kept_up) }} of 👍{% endif %}{% if t.hidden_down is not none %} · hides {{ '%d%%'|format(100 * t.hidden_down) }} of 👎{% endif %} · about {{ '%.0f'|format(t.per_day) }} a day</span>
     </span>
     <span class="srow-end">
       {% if t.current %}<span class="srow-value">Current</span>
-      {% else %}<form method="post" action="/settings/threshold" class="srow-form"><input type="hidden" name="min_final" value="{{ t.threshold }}">
+      {% else %}<form method="post" action="/settings/threshold" class="srow-form" data-inplace><input type="hidden" name="min_final" value="{{ t.threshold }}"><input type="hidden" name="days" value="{{ days }}">
         <button class="button small secondary" type="submit">Use</button></form>{% endif %}
     </span>
   </div>

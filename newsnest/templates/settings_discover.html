@@ -12,7 +12,7 @@
 {% if request.query_params.get('added') is not none %}<p class="callout ok">{{ request.query_params.get('added') }} feeds added; checking them in the background (refresh in a minute).</p>{% endif %}
 
 {# What a trial is: open on a first visit, one line once something is on trial #}
-<details class="sgroup trial-how"{% if not (live or checking) %} open{% endif %}>
+<details class="sgroup trial-how" id="trial-how"{% if not (live or checking) %} open{% endif %}>
   <summary class="sgroup-title"><span>How trials work</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
   <ol class="slist trial-steps">
     <li><b>You pick a source</b> from the catalog or an OPML file.</li>
@@ -22,14 +22,14 @@
 </details>
 
 {% if suggestions %}
-{% call group('Earned a place · ' ~ suggestions|length, footnote='You opened or liked their stories a lot this week. Keep makes them regular sources.', icons=true) %}
+{% call group('Earned a place · ' ~ suggestions|length, id='earned', footnote='You opened or liked their stories a lot this week. Keep makes them regular sources.', icons=true) %}
   {% for sgg in suggestions %}
   <div class="srow">
     {{ avatar(sgg.title, sgg.source_id) }}
     <span class="srow-main"><span class="srow-title">{{ sgg.title }}</span><span class="srow-sub">You read {{ sgg.signals }} this week</span></span>
-    <span class="srow-end"><form method="post" action="/discovery/{{ sgg.source_id }}/promote" class="srow-form"><button class="button small" type="submit">Keep</button></form>
+    <span class="srow-end"><form method="post" action="/discovery/{{ sgg.source_id }}/promote" class="srow-form" data-inplace><button class="button small" type="submit">Keep</button></form>
       {% call menu(sgg.title) %}
-        {{ menu_item('/discovery/' ~ sgg.source_id ~ '/remove', 'Remove', 'trash', danger=true) }}
+        {{ menu_item('/discovery/' ~ sgg.source_id ~ '/remove', 'Remove', 'trash', danger=true, inplace=true) }}
       {% endcall %}</span>
   </div>
   {% endfor %}
@@ -79,9 +79,9 @@
       {%- if need <= 5 %}{% for i in range(need) %}<i{% if i < c.signals %} class="on"{% endif %}></i>{% endfor %}{% else %}{{ c.signals }}/{{ need }}{% endif %}</span>
     {% endif %}
     {% call menu(c.title) %}
-      {% if c.status == 'candidate' %}{{ menu_item('/discovery/' ~ c.source_id ~ '/promote', 'Keep as a regular source', 'check') }}{% endif %}
+      {% if c.status == 'candidate' %}{{ menu_item('/discovery/' ~ c.source_id ~ '/promote', 'Keep as a regular source', 'check', inplace=true) }}{% endif %}
       {{ menu_select('/discovery/' ~ c.source_id ~ '/section', 'category', 'Section', 'Section of ' ~ c.title, c.category, section_labels) }}
-      {{ menu_item('/discovery/' ~ c.source_id ~ '/remove', 'Remove', 'trash', danger=true) }}
+      {{ menu_item('/discovery/' ~ c.source_id ~ '/remove', 'Remove', 'trash', danger=true, inplace=true) }}
     {% endcall %}
   </span>
 </div>
@@ -103,7 +103,7 @@
 {% endif %}
 
 {% if others %}
-{% call fold('Past trials', others|length) %}
+{% call fold('Past trials', others|length, id='past-trials') %}
   {% for c in others %}
   {% set reason = c.check.reason if c.check.reason and c.check.reason != 'ok' else '' %}
   <div class="srow">
@@ -115,7 +115,7 @@
         {%- elif c.status == 'rejected' %}Couldn't use it{% if reason %}: {{ reason }}{% endif %}
         {%- else %}{{ c.status }}{% endif %}</span></span>
     {% if c.status in ('dismissed', 'retired') %}
-    <span class="srow-end"><form method="post" action="/discovery/{{ c.source_id }}/restore" class="srow-form"><button class="button small secondary" type="submit">Try again</button></form></span>
+    <span class="srow-end"><form method="post" action="/discovery/{{ c.source_id }}/restore" class="srow-form" data-inplace><button class="button small secondary" type="submit">Try again</button></form></span>
     {% endif %}
   </div>
   {% endfor %}

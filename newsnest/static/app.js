@@ -92,9 +92,16 @@ document.addEventListener("click", async (event) => {
 document.addEventListener("change", (event) => {
   const form = event.target.closest("form[data-autosubmit]");
   if (!form) return;
+  showChoice(event.target);
   form.classList.add("saving");
   form.requestSubmit();
 });
+
+// A value-select is gray text over an invisible <select>: the text follows the choice right away
+function showChoice(select) {
+  const text = select.closest?.(".vselect")?.querySelector(".vselect-text");
+  if (text && select.selectedOptions?.[0]) text.textContent = select.selectedOptions[0].textContent;
+}
 
 // The onboarding region form sends the browser's time zone, so nobody has to pick one from a list
 document.addEventListener("DOMContentLoaded", () => {
@@ -139,6 +146,11 @@ document.addEventListener("submit", async (event) => {
   const ask = event.submitter?.dataset.confirm || form.dataset.confirm;
   if (ask && !window.confirm(ask)) {
     event.preventDefault();
+    return;
+  }
+  if (form.matches("[data-inplace]")) {
+    event.preventDefault();
+    saveInPlace(form, event.submitter);
     return;
   }
   const button = event.submitter;
@@ -1678,49 +1690,159 @@ document.addEventListener("click", (event) => {
 });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeRowMenu(); });
 
-// Mute / always-show words: the textarea (one word per line) becomes chips; every change saves through the form's data-autosave
-document.querySelectorAll("[data-chipbox]").forEach((box) => {
-  const area = box.querySelector("textarea");
-  const form = box.closest("form");
-  const words = area.value.split(/[\n,]/).map((w) => w.trim()).filter(Boolean);
-  const ui = document.createElement("div");
-  ui.className = "chipbox-ui";
-  const input = document.createElement("input");
-  input.className = "chipinput";
-  input.placeholder = "Add a word…";
-  input.setAttribute("aria-label", `Add to ${area.getAttribute("aria-label")}`);
-  input.enterKeyHint = "done";
+// ---------- settings: save in place ----------
+// A form with data-inplace posts in the background. The server answers as it does without JS, with a redirect to the
+// settings page and ?saved=… or ?error=…; that page's content replaces this one's, so counts, names and order are the
+// server's own, while the scroll position, the groups you opened or closed and the focus stay. One save at a time, in
+// the order they were made, so a slower answer never overwrites a newer one.
+let saveQueue = Promise.resolve();
+const savingForms = new WeakSet();
 
-  function sync(save) {
-    area.value = words.join("\n");
-    ui.querySelectorAll(".schip").forEach((chip) => chip.remove());
-    words.forEach((word) => {
-      const chip = document.createElement("span");
-      chip.className = "schip";
-      chip.innerHTML = '<span></span><button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>';
-      chip.firstChild.textContent = word;
-      chip.lastChild.setAttribute("aria-label", `Remove ${word}`);
-      chip.lastChild.addEventListener("click", () => { words.splice(words.indexOf(word), 1); sync(true); });
-      ui.insertBefore(chip, input);
-    });
-    if (save) area.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-  function add() {
-    const typed = input.value.split(",").map((w) => w.trim()).filter((w) => w && !words.includes(w));
-    input.value = "";
-    if (typed.length) { words.push(...typed); sync(true); }
-  }
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === ",") { event.preventDefault(); add(); }
-    else if (event.key === "Backspace" && !input.value && words.length) { words.pop(); sync(true); }
+function saveInPlace(form, submitter) {
+  if (savingForms.has(form)) return;  // a double tap is one save
+  savingForms.add(form);
+  const body = new FormData(form);
+  if (submitter?.name) body.append(submitter.name, submitter.value);
+  // A ⋯ menu item lives in the sheet: the row it belongs to is where the page holds still and the focus returns
+  const fromMenu = rowSheet?.contains(form);
+  if (fromMenu) closeRowMenu();
+  const origin = fromMenu ? rowButton : form;
+  const page = document.querySelector(".spage");
+  const anchors = [];
+  for (let el = origin?.closest("[id]"); el && page?.contains(el); el = el.parentElement.closest("[id]")) anchors.push(el.id);
+  const focus = focusPath(fromMenu ? rowButton : document.activeElement, page);
+  const row = origin?.closest(".srow, .srow-expand");
+  form.classList.add("saving");
+  row?.classList.add("saving");
+  saveQueue = saveQueue.then(async () => {
+    try {
+      const response = await fetch(form.action, { method: "POST", body });
+      if (!response.ok) throw new Error(await failure(response));
+      const url = new URL(response.url);
+      const error = url.searchParams.get("error");
+      if (error) throw new Error(error);
+      const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+      // Saved, but the answer is another page (or not a settings page): go there, as the plain form would
+      if (url.pathname !== location.pathname || !doc.querySelector(".spage")) { location.assign(url); return; }
+      swapSettings(doc, anchors, focus);
+      toast(doc.querySelector(".settings")?.dataset.toast || "Saved");
+    } catch (e) {
+      toast(e instanceof TypeError || !e.message ? "Not saved; try again" : `Not saved: ${e.message}`);
+      // A switch or a select that didn't save goes back to what is saved
+      if (form.matches("[data-autosubmit]") && form.isConnected) {
+        form.reset();
+        form.querySelectorAll("select").forEach(showChoice);
+      }
+    } finally {
+      savingForms.delete(form);
+      form.classList.remove("saving");
+      row?.classList.remove("saving");
+    }
   });
-  input.addEventListener("blur", add);
-  ui.append(input);
-  area.hidden = true;
-  box.append(ui);
-  form.querySelector("[data-chip-save]")?.setAttribute("hidden", "");
-  sync(false);
-});
+}
+
+// The reason a save was refused: FastAPI's {"detail": …}, the login check's {"error": …}, else the status
+async function failure(response) {
+  try {
+    const data = await response.json();
+    if (typeof (data.detail || data.error) === "string") return data.detail || data.error;
+  } catch { /* not JSON */ }
+  return response.statusText || `error ${response.status}`;
+}
+
+// Where the focus was, as selectors that find the same control on the new page: the control by its form and name
+// inside the nearest element with an id, else that row's ⋯ button
+function focusPath(el, page) {
+  if (!el || !page?.contains(el)) return [];
+  const host = el.closest("[id]");
+  const scope = host && page.contains(host) ? `#${CSS.escape(host.id)} ` : "";
+  const paths = [];
+  const action = el.form?.getAttribute("action");
+  if (action) {
+    const form = `${scope}form[action="${CSS.escape(action)}"]`;
+    paths.push(el.name ? `${form} [name="${CSS.escape(el.name)}"]` : `${form} ${el.localName}`);
+  }
+  if (scope) paths.push(`${scope}.rowmenu-btn`);
+  return paths;
+}
+
+function swapSettings(doc, anchors, focus) {
+  const page = document.querySelector(".spage");
+  const fresh = doc.querySelector(".spage");
+  fresh.querySelectorAll("noscript").forEach((n) => n.remove());  // parsed without scripting, they would show
+  // Groups stay as you left them; a new one opens or not as the server says
+  for (const details of fresh.querySelectorAll("details[id]")) {
+    const old = document.getElementById(details.id);
+    if (old?.tagName === "DETAILS") details.open = old.open;
+  }
+  const tops = new Map(anchors.map((id) => [id, document.getElementById(id)?.getBoundingClientRect().top]));
+  page.replaceChildren(...fresh.childNodes);
+  // The settings menu shows counts (feeds, on trial, watches): take the new rows, not the whole menu, which may be scrolled
+  for (const link of doc.querySelectorAll(".snav a.srow")) {
+    document.querySelector(`.snav a.srow[href="${CSS.escape(link.getAttribute("href"))}"]`)?.replaceWith(link);
+  }
+  initChipboxes(page);
+  // Hold the page still: the innermost element around the change that is still shown stays where it was on screen
+  for (const id of anchors) {
+    const el = document.getElementById(id);
+    if (!el?.getClientRects().length || tops.get(id) === undefined) continue;
+    window.scrollBy({ top: el.getBoundingClientRect().top - tops.get(id), behavior: "instant" });
+    break;
+  }
+  for (const path of focus) {
+    const el = page.querySelector(path);
+    if (!el?.getClientRects().length) continue;
+    el.focus({ preventScroll: true });
+    break;
+  }
+}
+
+// Mute / always-show words: the textarea (one word per line) becomes chips; every change saves through the form's data-autosave
+function initChipboxes(root) {
+  root.querySelectorAll("[data-chipbox]").forEach((box) => {
+    const area = box.querySelector("textarea");
+    const form = box.closest("form");
+    const words = area.value.split(/[\n,]/).map((w) => w.trim()).filter(Boolean);
+    const ui = document.createElement("div");
+    ui.className = "chipbox-ui";
+    const input = document.createElement("input");
+    input.className = "chipinput";
+    input.placeholder = "Add a word…";
+    input.setAttribute("aria-label", `Add to ${area.getAttribute("aria-label")}`);
+    input.enterKeyHint = "done";
+
+    function sync(save) {
+      area.value = words.join("\n");
+      ui.querySelectorAll(".schip").forEach((chip) => chip.remove());
+      words.forEach((word) => {
+        const chip = document.createElement("span");
+        chip.className = "schip";
+        chip.innerHTML = '<span></span><button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>';
+        chip.firstChild.textContent = word;
+        chip.lastChild.setAttribute("aria-label", `Remove ${word}`);
+        chip.lastChild.addEventListener("click", () => { words.splice(words.indexOf(word), 1); sync(true); });
+        ui.insertBefore(chip, input);
+      });
+      if (save) area.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function add() {
+      const typed = input.value.split(",").map((w) => w.trim()).filter((w) => w && !words.includes(w));
+      input.value = "";
+      if (typed.length) { words.push(...typed); sync(true); }
+    }
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === ",") { event.preventDefault(); add(); }
+      else if (event.key === "Backspace" && !input.value && words.length) { words.pop(); sync(true); }
+    });
+    input.addEventListener("blur", add);
+    ui.append(input);
+    area.hidden = true;
+    box.append(ui);
+    form.querySelector("[data-chip-save]")?.setAttribute("hidden", "");
+    sync(false);
+  });
+}
+initChipboxes(document);
 
 // A feed you came back to (#feed-…) may sit in a folded group: open it and bring the row into view
 function openTargetGroup() {
