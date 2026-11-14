@@ -328,7 +328,7 @@ def test_a_trial_source_from_a_removed_section_is_promoted_to_world(client, env)
     conn.execute("INSERT INTO candidates (source_id, url, title, category, origin, status, added_at) "
                  "VALUES ('disc-x', 'https://x.example/rss', 'X', 'lifestyle', 'test', 'candidate', ?)", (iso(NOW),))
     r = client.post("/discovery/disc-x/promote", follow_redirects=False)
-    assert r.headers["location"] == "/settings/discover?saved=discovery"
+    assert r.headers["location"] == "/settings/discover?saved=discovery_promote"
     assert [f.category for f in env_cfg(env).feeds if f.url == "https://x.example/rss"] == ["world"]
 
 
@@ -667,6 +667,67 @@ def test_calibration_page_picks_a_limit_in_one_tap(client, env):
     before = "calibration_mode: true" in (env.config / "config.yaml").read_text(encoding="utf-8")
     client.post("/settings/calibration_toggle")
     assert ("calibration_mode: true" in (env.config / "config.yaml").read_text(encoding="utf-8")) != before
+
+
+def test_calibration_changes_come_back_to_the_period_on_screen(client, env):
+    page = client.get("/calibration?days=90").text
+    assert page.count('<input type="hidden" name="days" value="90">') >= 2  # the mode switch and every "Use"
+    r = client.post("/settings/threshold", data={"min_final": "6.0", "days": "90"}, follow_redirects=False)
+    assert r.headers["location"] == "/calibration?saved=threshold&days=90"
+    r = client.post("/settings/calibration_toggle", data={"days": "7"}, follow_redirects=False)
+    assert r.headers["location"] == "/calibration?saved=calibration_toggle&days=7"
+    # only the page's own periods go into the address
+    r = client.post("/settings/threshold", data={"min_final": "6.0", "days": "7#x"}, follow_redirects=False)
+    assert r.headers["location"] == "/calibration?saved=threshold"
+
+
+def test_settings_changes_save_in_place(client, env):
+    """The changes listed in issue #79 are marked data-inplace (app.js posts them in the background and swaps in the
+    page the redirect lands on); they stay plain POST forms underneath, for a browser without JS."""
+    def forms(html, action):
+        return re.findall(r'<form method="post" action="' + re.escape(action) + r'"[^>]*>', html)
+
+    def inplace(html, action):
+        found = forms(html, action)
+        return bool(found) and all("data-inplace" in f for f in found)
+
+    feeds = client.get("/settings/feeds").text
+    for action in ("/settings/feed_section", "/settings/feed_toggle", "/settings/feed_favicon", "/settings/feed_remove",
+                   "/settings/section_add", "/settings/section_edit", "/settings/section_move"):
+        assert inplace(feeds, action), action
+    client.post("/settings/section_add", data={"label": "Sports", "icon": "star"})
+    feeds = client.get("/settings/feeds").text
+    assert inplace(feeds, "/settings/section_remove")
+    assert 'id="edit-section-sports"' in feeds and 'id="edit-section-news"' in feeds  # an open edit stays open
+    assert not inplace(feeds, "/settings/feed_find")  # finding a feed shows its own page
+
+    client.post("/settings/watch_add", data={"name": "Energy", "keywords": "elektrik"})
+    topics = client.get("/settings/topics").text
+    assert inplace(topics, "/settings/watch_add") and inplace(topics, "/settings/watch_remove")
+    assert 'id="watches"' in topics
+
+    calibration = client.get("/calibration").text
+    assert inplace(calibration, "/settings/calibration_toggle") and inplace(calibration, "/settings/threshold")
+
+    conn = connect()
+    for sid, status in (("disc-a", "candidate"), ("disc-b", "dismissed")):
+        conn.execute("INSERT INTO candidates (source_id, url, title, category, origin, status, added_at) "
+                     "VALUES (?, ?, ?, 'tech', 'test', ?, ?)", (sid, f"https://{sid}.example/rss", sid, status, iso(NOW)))
+    conn.close()
+    discover = client.get("/settings/discover").text
+    for action in ("/discovery/disc-a/promote", "/discovery/disc-a/remove", "/discovery/disc-a/section",
+                   "/discovery/disc-b/restore"):
+        assert inplace(discover, action), action
+    assert 'id="past-trials"' in discover and 'id="trial-how"' in discover
+
+    # each change says what it did in the toast
+    for action, toast in (("restore", "Back on trial"), ("remove", "Removed from trial")):
+        r = client.post(f"/discovery/disc-b/{action}")
+        assert f'data-toast="{toast}"' in r.text
+    r = client.post("/discovery/disc-a/section", data={"category": "world"})
+    assert 'data-toast="Section changed"' in r.text
+    r = client.post("/discovery/disc-a/promote")
+    assert 'data-toast="Kept as a regular source"' in r.text
 
 
 def test_source_icons_are_served_and_shown_unless_turned_off(client, env):

@@ -55,8 +55,8 @@
   {% for s in cfg.all_sections %}
   {% set n = cfg.feeds|selectattr('category', 'equalto', s.key)|list|length %}
   {% set builtin = s.key in ('news', 'world') %}
-  {% call expand(s.label, ('News tab' if builtin else 'Tab' if s.tab else 'Chip under For you') ~ ' · ' ~ n ~ (' feed' if n == 1 else ' feeds')) %}
-  <form method="post" action="/settings/section_edit" class="sform">
+  {% call expand(s.label, id='edit-section-' ~ s.key, sub=('News tab' if builtin else 'Tab' if s.tab else 'Chip under For you') ~ ' · ' ~ n ~ (' feed' if n == 1 else ' feeds')) %}
+  <form method="post" action="/settings/section_edit" class="sform" data-inplace>
     <input type="hidden" name="key" value="{{ s.key }}">
     <label>Name <input name="label" required maxlength="24" value="{{ s.label }}"></label>
     {% if not builtin %}
@@ -67,14 +67,14 @@
   </form>
   <div class="sform" style="display: flex; gap: 8px">
     {% for dir, text in (('up', 'Move up'), ('down', 'Move down')) %}
-    <form method="post" action="/settings/section_move" class="srow-form">
+    <form method="post" action="/settings/section_move" class="srow-form" data-inplace>
       <input type="hidden" name="key" value="{{ s.key }}"><input type="hidden" name="dir" value="{{ dir }}">
       <button class="button small secondary" type="submit">{{ text }}</button>
     </form>
     {% endfor %}
   </div>
   {% if not builtin %}
-  <form method="post" action="/settings/section_remove" class="sform" data-confirm="Remove {{ s.label }}? Its feeds and stories move to the section you chose.">
+  <form method="post" action="/settings/section_remove" class="sform" data-inplace data-confirm="Remove {{ s.label }}? Its feeds and stories move to the section you chose.">
     <input type="hidden" name="key" value="{{ s.key }}">
     <label>Move its {{ n }} {{ 'feed' if n == 1 else 'feeds' }} and stories to
       <select name="move_to">{% for o in cfg.all_sections if o.key != s.key %}<option value="{{ o.key }}" {% if o.key == 'world' %}selected{% endif %}>{{ o.label }}</option>{% endfor %}</select></label>
@@ -84,7 +84,7 @@
   {% endcall %}
   {% endfor %}
   {% call expand('Add a section…') %}
-  <form method="post" action="/settings/section_add" class="sform">
+  <form method="post" action="/settings/section_add" class="sform" data-inplace>
     <label>Name <input name="label" required maxlength="24" placeholder="Sports" autocapitalize="words"></label>
     <label>Icon <select name="icon">{% for i in section_icons %}<option value="{{ i }}" {% if i == 'star' %}selected{% endif %}>{{ i|capitalize }}</option>{% endfor %}</select></label>
     <p class="muted small">Then give it feeds: add one above, or change a feed's section.</p>

@@ -2,15 +2,15 @@
 {% from "_settings_ui.html" import group, expand, remove_btn %}
 {% block stitle %}Topics &amp; filters{% endblock %}
 {% block page %}
-{% call group('Watches', footnote='Matches are tagged, never hidden. Keywords match at a word start, so use stems: electr matches electric and electricity.') %}
+{% call group('Watches', id='watches', footnote='Matches are tagged, never hidden. Keywords match at a word start, so use stems: electr matches electric and electricity.') %}
   {% for w in cfg.watches %}
   <div class="srow">
     <span class="srow-main"><span class="srow-title">{{ w.name }}</span><span class="srow-sub">{{ w.keywords|join(', ') }}</span></span>
-    <span class="srow-end">{{ remove_btn('/settings/watch_remove', {'name': w.name}, 'Remove ' ~ w.name, 'Remove watch ' ~ w.name ~ '?') }}</span>
+    <span class="srow-end">{{ remove_btn('/settings/watch_remove', {'name': w.name}, 'Remove ' ~ w.name, 'Remove watch ' ~ w.name ~ '?', inplace=true) }}</span>
   </div>
   {% endfor %}
   {% call expand('Add a watch…') %}
-  <form method="post" action="/settings/watch_add" class="sform">
+  <form method="post" action="/settings/watch_add" class="sform" data-inplace>
     <label>Name <input name="name" required placeholder="Energy prices"></label>
     <label>Keywords (comma-separated) <input name="keywords" required placeholder="elektrik, cene energ"></label>
     <button class="button" type="submit">Add watch</button>

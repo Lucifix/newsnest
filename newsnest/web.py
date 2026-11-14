@@ -1066,6 +1066,7 @@ ACTION_PAGE = {"general": "general", "region": "general",
                "repo_add": "more", "repo_remove": "more"}
 # These are made on the Calibration page and go back there
 CALIBRATION_ACTIONS = ("threshold", "calibration_toggle")
+CALIBRATION_DAYS = {"7": "7", "30": "30", "90": "90"}
 TIME_ZONES = sorted(available_timezones())
 
 
@@ -1417,6 +1418,9 @@ async def settings_action(action: str, request: Request):
         anchor = f"#feed-{added['id']}"
     elif action.startswith("section_"):
         anchor = "#sections"
+    # Calibration comes back to the period you were looking at (one of the page's own three, never the raw input)
+    if action in CALIBRATION_ACTIONS and (days := CALIBRATION_DAYS.get(form.get("days", ""))):
+        extra += "&days=" + days
     # Concatenated, not formatted: CodeQL sees that what the form sent only follows our own path
     return RedirectResponse(back + "?saved=" + action + extra + anchor, status_code=303)
 
@@ -1535,7 +1539,7 @@ async def discovery_section(source_id: str, category: str = Form(...), conn=Depe
     n = await asyncio.to_thread(_refile)
     # The id in the address is the stored one, never what the request sent
     sid = quote(row["source_id"])
-    return RedirectResponse("/settings/discover?saved=discovery&changed=" + sid + "&n=" + str(n) + "#trial-" + sid,
+    return RedirectResponse("/settings/discover?saved=discovery_section&changed=" + sid + "&n=" + str(n) + "#trial-" + sid,
                             status_code=303)
 
 
@@ -1565,4 +1569,4 @@ def discovery_action(source_id: str, action: str, conn=Depends(get_conn), loaded
     else:
         status = "dismissed" if action == "remove" else "candidate"
     conn.execute("UPDATE candidates SET status = ?, decided_at = ? WHERE id = ?", (status, iso(utcnow()), row["id"]))
-    return RedirectResponse("/settings/discover?saved=discovery", status_code=303)
+    return RedirectResponse("/settings/discover?saved=discovery_" + action, status_code=303)
