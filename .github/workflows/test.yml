@@ -1,0 +1,21 @@
+name: Test
+
+# Main is already tested by docker-publish.yml before it builds the image,
+# so this only runs on pull requests, to catch a failing test before merge.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt pytest
+      - run: python -m pytest
