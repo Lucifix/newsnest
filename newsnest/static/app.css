@@ -1435,6 +1435,22 @@ input.sinput:invalid { border-color: var(--danger); }
 .sback.deep + .pagehead { padding-top: 2px; }
 .sempty { margin: 24px 16px 0; color: var(--muted); font-size: 0.92rem; }
 
+/* A feed row that opens the feed's page: the name is the link and covers the row; the select and ⋮ sit above it */
+.feed-row.has-page .feed-link { color: inherit; text-decoration: none; }
+.feed-row.has-page .feed-link::after { content: ""; position: absolute; inset: 0; }
+.feed-row.has-page .srow-end { position: relative; z-index: 1; }
+@media (hover: hover) { .feed-row.has-page:has(.feed-link:hover) { background: var(--surface-2); } }
+.feed-row.has-page:has(.feed-link:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.feed-row.has-page .feed-link:focus-visible { outline: none; }
+
+/* A feed's page: its latest stories, two lines each, the ones kept out of the feed in gray */
+.story-row .srow-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.story-row.dim .srow-title { color: var(--text-2); }
+.story-row .srow-sub .ok { color: var(--ok); font-weight: 600; }
+.srow-value.score { font: 600 0.92rem var(--mono); }
+.story-row.dim .srow-value.score { color: var(--muted); font-weight: 400; }
+.spage .pagehead .sub a { color: inherit; }
+
 /* a group that folds */
 .sfold > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; min-height: 36px; margin: 0 0 0 16px; padding-right: 16px; }
 .sfold > summary::-webkit-details-marker, .srow-expand > summary::-webkit-details-marker { display: none; }

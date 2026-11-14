@@ -147,15 +147,17 @@
 {% endmacro %}
 
 {# One feed: badge, name, host, its section as a value-select, and a ⋯ menu.
-   `section`: the section page it is shown on; its changes come back to that page (a moved feed stays there, marked). #}
+   `section`: the section page it is shown on; its changes come back to that page (a moved feed stays there, marked),
+   and the row opens the feed's own page (the name is the link; it covers the row, under the select and the menu). #}
 {% macro feed_row(f, flagged=false, section=none) %}
 {% set name = f.name or f.id %}
 {% set moved = request.query_params.get('changed') == f.id %}
 {% set here = {'section': section} if section else {} %}
-<div class="srow feed-row{% if not f.enabled %} paused{% endif %}{% if flagged %} flagged{% endif %}" id="feed-{{ f.id }}">
+<div class="srow feed-row{% if not f.enabled %} paused{% endif %}{% if flagged %} flagged{% endif %}{% if section %} has-page{% endif %}" id="feed-{{ f.id }}">
   {{ avatar(name, f.id) }}
   <span class="srow-main">
-    <span class="srow-title">{{ name }}</span>
+    {% if section %}<a class="srow-title feed-link" href="/settings/feeds/{{ f.category }}/{{ f.id }}">{{ name }}</a>
+    {% else %}<span class="srow-title">{{ name }}</span>{% endif %}
     {% if flagged %}<span class="srow-sub warn">Doesn't read like your other {{ section_labels['news'] }} feeds. Move it to another section</span>
     {% elif moved %}<span class="srow-sub ok">Moved{% if section and f.category != section %} to {{ section_labels[f.category] }}{% endif %}{% if request.query_params.get('n') %} · {{ request.query_params.get('n') }} stories{% endif %}</span>
     {% else %}<span class="srow-sub" title="{{ f.url }}">{{ host(f.url) }}{% if not f.enabled %} · paused{% endif %}{% if f.daily_cap %} · max {{ f.daily_cap }}/day{% endif %}</span>{% endif %}
@@ -170,6 +172,7 @@
       {{ menu_item('/settings/feed_favicon', 'Show initials, not logo' if f.favicon else 'Show logo', 'badge', dict(id=f.id, **here), inplace=true) }}
       {{ menu_item('/settings/feed_remove', 'Remove', 'trash', dict(id=f.id, **here), danger=true, confirm='Remove ' ~ name ~ '?', inplace=true) }}
     {% endcall %}
+    {% if section %}{{ chevron() }}{% endif %}
   </span>
 </div>
 {% endmacro %}
