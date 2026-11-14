@@ -1202,8 +1202,8 @@ a.chip { text-decoration: none; }
   .snav .srow-title { white-space: normal; overflow: visible; }
   .snav .chev, .snav .srow[href$="/about"] .srow-value { display: none; }
   .snav .srow-value { font-size: 0.86rem; }
-  @media (hover: hover) { .snav a.srow:hover { background: var(--surface); } }
-  .snav a.srow:active { background: var(--surface-2); }
+  @media (hover: hover) { .snav a.srow:not([aria-current="page"]):hover { background: var(--surface); } }
+  .snav a.srow:not([aria-current="page"]):active { background: var(--surface-2); }
   .snav .srow[aria-current="page"] { background: var(--text); color: var(--bg); }
   .snav .srow[aria-current="page"] .srow-title { font-weight: 700; }
   .snav .srow[aria-current="page"] .srow-end { color: color-mix(in srgb, var(--bg) 70%, transparent); }
