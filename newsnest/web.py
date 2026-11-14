@@ -398,13 +398,19 @@ def home(request: Request, f: str | None = None, n: int = PAGE_SIZE, refresh: in
     token = sid
     shown = max(PAGE_SIZE, min(n, 300))
     start = next((i for i, it in enumerate(feed.items) if it.card.lead.id == at), 0) if list_view and at else 0
-    end = start + shown
+    # front: the desktop front page beside the feed (wide screens only; phones never show it). On wide
+    # screens the feed lane hides the front page's stories (on_front), so its first page runs on until
+    # it holds `shown` stories that are not on the front page; phones simply get a longer first page.
+    front = None if list_view else front_page(feed.items)
+    on_front = front.lead_ids if front and front.lead else set()
+    end, kept = start, 0
+    while end < len(feed.items) and kept < shown:
+        kept += feed.items[end].card.lead.id not in on_front
+        end += 1
     suggestion = (promotion_suggestions(conn, cfg) or [None])[0] if feed.active == "all" else None
-    # front: the desktop front page beside the feed (wide screens only; phones never show it)
     response = render(request, "home.html", conn, loaded, feed=feed, token=token, suggestion=suggestion,
                       page=feed.items[start:end], next_offset=end if end < len(feed.items) else None,
-                      front=None if list_view else front_page(feed.items), top_stories=TOP_STORIES,
-                      list_view=list_view, start=start)
+                      front=front, on_front=on_front, top_stories=TOP_STORIES, list_view=list_view, start=start)
     response.set_cookie(FILTER_COOKIE, feed.active, max_age=365 * 86400, samesite="lax")
     _set_feed_cookie(request, response, sid)
     return response

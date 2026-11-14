@@ -227,6 +227,21 @@
 </div>
 {% endmacro %}
 
+{# 👍, not interested, save and ⋯: on every feed card and every front page story #}
+{% macro story_acts(it) %}
+{% set c = it.card %}{% set r = c.lead.row %}
+<div class="acts slim">
+  <button type="button" class="act like" data-lead="{{ c.lead.id }}" aria-pressed="{{ 'true' if r.rating == 1 else 'false' }}"
+          aria-label="More like this" title="More like this">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v9H4v-9h3Zm2 9h8.2a2 2 0 0 0 2-1.6l1.2-6A2 2 0 0 0 18.4 10H14l.8-3.8A1.8 1.8 0 0 0 13 4l-4 6v10Z"/></svg>
+  </button>
+  <button type="button" class="act dislike" data-ids="{{ c.ids }}" aria-label="Not interested" title="Not interested">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 13V4h3v9h-3Zm-2-9H6.8a2 2 0 0 0-2 1.6l-1.2 6A2 2 0 0 0 5.6 14H10l-.8 3.8A1.8 1.8 0 0 0 11 20l4-6V4Z"/></svg>
+  </button>
+  {{ save_button(c) }}{{ more_menu(it) }}
+</div>
+{% endmacro %}
+
 {% macro feed_foot(it, calibration) %}
 {% set c = it.card %}{% set r = c.lead.row %}
 <div class="slimfoot">
@@ -238,16 +253,7 @@
     </summary>
     {{ why_panel(it) }}
   </details>
-  <div class="acts slim">
-    <button type="button" class="act like" data-lead="{{ c.lead.id }}" aria-pressed="{{ 'true' if r.rating == 1 else 'false' }}"
-            aria-label="More like this" title="More like this">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v9H4v-9h3Zm2 9h8.2a2 2 0 0 0 2-1.6l1.2-6A2 2 0 0 0 18.4 10H14l.8-3.8A1.8 1.8 0 0 0 13 4l-4 6v10Z"/></svg>
-    </button>
-    <button type="button" class="act dislike" data-ids="{{ c.ids }}" aria-label="Not interested" title="Not interested">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 13V4h3v9h-3Zm-2-9H6.8a2 2 0 0 0-2 1.6l-1.2 6A2 2 0 0 0 5.6 14H10l-.8 3.8A1.8 1.8 0 0 0 11 20l4-6V4Z"/></svg>
-    </button>
-    {{ save_button(c) }}{{ more_menu(it) }}
-  </div>
+  {{ story_acts(it) }}
 </div>
 {% if c.others %}
 <details class="coverage">
@@ -289,10 +295,12 @@
 </div>
 {% endmacro %}
 
+{# on-front: the story is also on the desktop front page, so the feed lane beside it hides this copy #}
 {% macro feed_card(it, calibration) %}
 {% set c = it.card %}{% set r = c.lead.row %}
+{% set dup = ' on-front' if on_front is defined and c.lead.id in on_front else '' %}
 {% if it.big %}
-<article {{ card_attrs(c, 'fcard big h' ~ hue(c.lead.source_name)) }}>
+<article {{ card_attrs(c, 'fcard big h' ~ hue(c.lead.source_name) ~ dup) }}>
   <a class="big-media" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
     <img src="{{ c.image }}" alt="" decoding="async" referrerpolicy="no-referrer" loading="{{ 'eager' if it.first else 'lazy' }}">
     <span class="hero-mono">{{ initials(c.lead.source_name) }}</span>
@@ -305,7 +313,7 @@
   </div>
 </article>
 {% else %}
-<article {{ card_attrs(c, 'card fcard' ~ (' has-img' if c.image else '')) }}>
+<article {{ card_attrs(c, 'card fcard' ~ (' has-img' if c.image else '') ~ dup) }}>
   <div class="card-text">
     {{ feed_meta(it) }}
     <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h3>
@@ -322,9 +330,10 @@
 {% endmacro %}
 
 {# ---------- desktop front page: the lead and the packages beside the feed (wide screens only) ----------
-   Reading entry points: every story here is also in the feed lane, which keeps the buttons. They carry
-   data-ids, so marking a story read in either place dims both (app.js setStoryRead), but no id attribute
-   (that belongs to the feed's card) and no seen tracking (the feed's card counts that). #}
+   The feed lane beside it hides these stories (feed_card's on-front), so each story here has the feed
+   card's buttons (story_acts) and counts as seen and read on its own ([data-track-seen] on the section).
+   Its feed card is still in the page for phones, so a story has no id attribute here (that belongs to
+   the feed's card); data-ids lets marking it read in either place dim both (app.js setStoryRead). #}
 {% macro front_attrs(c, kind) %}class="story {{ kind }}{% if c.read %} read{% endif %}" data-ids="{{ c.ids }}" data-read="{{ 1 if c.read else 0 }}"{% endmacro %}
 
 {% macro front_labels(it) %}
@@ -344,11 +353,15 @@
 {% if text %}<p class="fdek clamp-{{ lines }}">{{ text }}</p>{% endif %}
 {% endmacro %}
 
-{% macro front_byline(it) %}
+{# The source line, with the feed card's buttons at its end #}
+{% macro front_foot(it) %}
 {% set c = it.card %}{% set r = c.lead.row %}
-<p class="fbyline">{{ badge(c.lead.source_name, c.logo, r.source_id) }}<span class="src">{{ c.lead.source_name }}</span>{{ paid_mark(c.lead) }}
-  <time datetime="{{ r.published or r.fetched_at }}" title="{{ localtime(r.published or r.fetched_at, '%d.%m. %H:%M') }}">{{ ago(r.published or r.fetched_at) }}</time>
-  {% if c.others %}<span class="fcov">{{ c.outlets }} outlets</span>{% endif %}</p>
+<div class="ffoot">
+  <p class="fbyline">{{ badge(c.lead.source_name, c.logo, r.source_id) }}<span class="src">{{ c.lead.source_name }}</span>{{ paid_mark(c.lead) }}
+    <time datetime="{{ r.published or r.fetched_at }}" title="{{ localtime(r.published or r.fetched_at, '%d.%m. %H:%M') }}">{{ ago(r.published or r.fetched_at) }}</time>
+    {% if c.others %}<span class="fcov">{{ c.outlets }} outlets</span>{% endif %}</p>
+  {{ story_acts(it) }}
+</div>
 {% endmacro %}
 
 {# The score as a block on the photo: lime, or pink from 7 up (the feed's "high") #}
@@ -374,7 +387,7 @@
     <h2><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ r.title }}</a></h2>
     {{ front_dek(c, 3) }}
     {% if points %}<ul class="fpoints">{% for p in points[:3] %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
-    {{ front_byline(it) }}
+    {{ front_foot(it) }}
   </div>
 </article>
 {% endmacro %}
@@ -390,7 +403,7 @@
       {{ front_labels(big) }}
       <h3><a href="/go/{{ bc.lead.id }}" target="_blank" rel="noopener">{{ bc.lead.row.title }}</a></h3>
       {{ front_dek(bc, 3) }}
-      {{ front_byline(big) }}
+      {{ front_foot(big) }}
     </article>
     <div class="fpack-list">
       {% for it in p.items[1:] %}{% set c = it.card %}
@@ -399,7 +412,7 @@
           {{ front_labels(it) }}
           <h3><a href="/go/{{ c.lead.id }}" target="_blank" rel="noopener">{{ c.lead.row.title }}</a></h3>
           {{ front_dek(c, 2) }}
-          {{ front_byline(it) }}
+          {{ front_foot(it) }}
         </div>
         {% if c.image %}<a class="thumb-img fitem-thumb" href="/go/{{ c.lead.id }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
           <img src="{{ c.image }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></a>{% endif %}

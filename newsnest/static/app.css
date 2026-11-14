@@ -1573,11 +1573,12 @@ input.chipinput:focus { outline: none; }
 /* From 1240px the home page has two lanes, each read top to bottom. On the left the front page: the lead
    story large, its headline on a panel over the photo and its score as a block on it, then packages (Top
    stories, then a category each): one story large beside a few headlines, under a rule in the package's
-   colour. On the right, behind a dashed line, the feed itself, in rank order, as compact cards with the
-   buttons and the seen and read tracking. It stops after its first page with More stories, so both lanes
-   end together; that opens the list view (view=list, no front page): the whole feed as the phone's column,
-   with a way back. Below 1240px the front page is not shown and the feed is the phone's column, loading on.
-   The front page's stories are also in the feed; read state follows both copies.
+   colour. On the right, behind a dashed line, the feed itself, in rank order, as compact cards, without the
+   stories already on the front page (.on-front; they are in the page for phones). Both lanes have the
+   buttons and the seen and read tracking. The feed stops after its first page with More stories, so both
+   lanes end together; that opens the list view (view=list, no front page): the whole feed as the phone's
+   column, with a way back. Below 1240px the front page is not shown and the feed is the phone's column,
+   loading on. Read state follows both copies of a story.
    Every two-lane rule is scoped to :has(> .front); the list view has its own section below. */
 .front, .lane-head, .lane-more { display: none; }
 .feedwrap.swapping > .front { opacity: 0.45; transition: opacity 0.15s ease; }
@@ -1606,8 +1607,8 @@ input.chipinput:focus { outline: none; }
   .lane-head span { padding: 7px 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 0.74rem; }
   /* The lane's end: the rest of the feed is one click away, in the list view */
   .feedwrap.home:has(> .front) .stream > .loadmore { display: none; }
-  /* past the front page (app.js fitLane); above the cards' own display: grid below */
-  .feedwrap.home:has(> .front) .stream > .story.lane-over { display: none !important; }
+  /* on the front page already, or past its end (app.js fitLane); above the cards' own display: grid below */
+  .feedwrap.home:has(> .front) .stream > .story:is(.on-front, .lane-over) { display: none !important; }
   /* fitLane measures the lane's cards: off-screen skipping would report placeholder heights (it is one page) */
   .feedwrap.home:has(> .front) .stream > .story { content-visibility: visible; }
   .feedwrap.home:has(> .front) .lane-more {
@@ -1637,8 +1638,11 @@ input.chipinput:focus { outline: none; }
     padding: 0 7px; border-radius: 3px; background: var(--h, var(--muted)); color: #fff;
     font: 700 0.64rem/1.6 var(--mono); text-transform: uppercase; letter-spacing: 0.04em;
   }
+  /* The source line, the buttons at its end (they wrap below it when the column is narrow) */
+  .ffoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin: 10px 0 0; }
+  .ffoot .acts { margin: -6px -6px -6px auto; }
   .fbyline {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 10px 0 0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0;
     font: 500 0.68rem var(--mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
   }
   .fbyline .src { color: var(--accent-text); font-weight: 700; }
