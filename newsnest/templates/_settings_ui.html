@@ -1,9 +1,10 @@
 {# Settings building blocks, iOS Settings style: a group is a rounded list of rows with a small header above
    and an optional footnote below. A row is [icon] [title + subtitle] [value or control]; the control never wraps. #}
 
-{% macro group(title=none, footnote=none, id=none, icons=false) %}
+{# `action`: (href, label), a small link at the right of the header ("Arrange", "Done") #}
+{% macro group(title=none, footnote=none, id=none, icons=false, action=none) %}
 <section class="sgroup"{% if id %} id="{{ id }}"{% endif %}>
-  {% if title %}<h2 class="sgroup-title">{{ title }}</h2>{% endif %}
+  {% if title %}<h2 class="sgroup-title{% if action %} has-action{% endif %}"><span>{{ title }}</span>{% if action %}<a class="sgroup-action" href="{{ action[0] }}">{{ action[1] }}</a>{% endif %}</h2>{% endif %}
   <div class="slist{% if icons %} has-icons{% endif %}">{{ caller() }}</div>
   {% if footnote %}<p class="sgroup-foot">{{ footnote }}</p>{% endif %}
 </section>
@@ -36,11 +37,11 @@
 </a>
 {% endmacro %}
 
-{# A row that opens another page: title, optional gray value, chevron #}
-{% macro link_row(href, title, icon=none, value=none, dot=false, current=false) %}
-<a class="srow" href="{{ href }}"{% if current %} aria-current="page"{% endif %}>
+{# A row that opens another page: title (and a gray line under it), optional gray value, chevron #}
+{% macro link_row(href, title, icon=none, value=none, dot=false, current=false, sub=none, id=none) %}
+<a class="srow" href="{{ href }}"{% if id %} id="{{ id }}"{% endif %}{% if current %} aria-current="page"{% endif %}>
   {% if icon %}{{ tile(icon) }}{% endif %}
-  <span class="srow-main"><span class="srow-title">{{ title }}</span></span>
+  <span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
   <span class="srow-end">{% if dot %}<span class="sdot" aria-label="needs a look"></span>{% endif %}{% if value is not none %}<span class="srow-value">{{ value }}</span>{% endif %}{{ chevron() }}</span>
 </a>
 {% endmacro %}
@@ -81,9 +82,9 @@
 {% endmacro %}
 
 {# "Add a feed…": a row that opens its form in place. With an `id` it stays open (or shut) while the page saves in place. #}
-{% macro expand(title, sub=none, open=false, icon=none, accent=true, id=none) %}
+{% macro expand(title, sub=none, open=false, icon=none, accent=true, id=none, danger=false) %}
 <details class="srow-expand"{% if id %} id="{{ id }}"{% endif %}{% if open %} open{% endif %}>
-  <summary class="srow">{% if icon %}{{ tile(icon) }}{% endif %}<span class="srow-main"><span class="srow-title{% if accent %} srow-accent{% endif %}">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
+  <summary class="srow">{% if icon %}{{ tile(icon) }}{% endif %}<span class="srow-main"><span class="srow-title{% if danger %} srow-danger{% elif accent %} srow-accent{% endif %}">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
     <svg class="chev expand-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
   <div class="sbody">{{ caller() }}</div>
 </details>
@@ -145,30 +146,69 @@
   <select name="{{ name }}" aria-label="{{ label }}">{% for key, text in options.items() %}<option value="{{ key }}" {% if key == selected %}selected{% endif %}>{{ text }}</option>{% endfor %}</select></span>
 {% endmacro %}
 
-{# One feed: badge, name, host, its section as a value-select, and a ⋯ menu #}
-{% macro feed_row(f, flagged=false) %}
+{# One feed: badge, name, host, its section as a value-select, and a ⋯ menu.
+   `section`: the section page it is shown on; its changes come back to that page (a moved feed stays there, marked). #}
+{% macro feed_row(f, flagged=false, section=none) %}
 {% set name = f.name or f.id %}
 {% set moved = request.query_params.get('changed') == f.id %}
+{% set here = {'section': section} if section else {} %}
 <div class="srow feed-row{% if not f.enabled %} paused{% endif %}{% if flagged %} flagged{% endif %}" id="feed-{{ f.id }}">
   {{ avatar(name, f.id) }}
   <span class="srow-main">
     <span class="srow-title">{{ name }}</span>
     {% if flagged %}<span class="srow-sub warn">Doesn't read like your other {{ section_labels['news'] }} feeds. Move it to another section</span>
-    {% elif moved %}<span class="srow-sub ok">Moved{% if request.query_params.get('n') %} · {{ request.query_params.get('n') }} stories{% endif %}</span>
+    {% elif moved %}<span class="srow-sub ok">Moved{% if section and f.category != section %} to {{ section_labels[f.category] }}{% endif %}{% if request.query_params.get('n') %} · {{ request.query_params.get('n') }} stories{% endif %}</span>
     {% else %}<span class="srow-sub" title="{{ f.url }}">{{ host(f.url) }}{% if not f.enabled %} · paused{% endif %}{% if f.daily_cap %} · max {{ f.daily_cap }}/day{% endif %}</span>{% endif %}
   </span>
   <span class="srow-end">
     <form method="post" action="/settings/feed_section" data-autosubmit data-inplace class="srow-form"><input type="hidden" name="id" value="{{ f.id }}">
+      {% if section %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
       {{ value_select('category', 'Section of ' ~ name, f.category, section_labels) }}
       <noscript><button class="button small secondary" type="submit">Save</button></noscript></form>
     {% call menu(name) %}
-      {{ menu_item('/settings/feed_toggle', 'Pause' if f.enabled else 'Resume', 'pause' if f.enabled else 'play', {'id': f.id}, inplace=true) }}
-      {{ menu_item('/settings/feed_favicon', 'Show initials, not logo' if f.favicon else 'Show logo', 'badge', {'id': f.id}, inplace=true) }}
-      {{ menu_item('/settings/feed_remove', 'Remove', 'trash', {'id': f.id}, danger=true, confirm='Remove ' ~ name ~ '?', inplace=true) }}
+      {{ menu_item('/settings/feed_toggle', 'Pause' if f.enabled else 'Resume', 'pause' if f.enabled else 'play', dict(id=f.id, **here), inplace=true) }}
+      {{ menu_item('/settings/feed_favicon', 'Show initials, not logo' if f.favicon else 'Show logo', 'badge', dict(id=f.id, **here), inplace=true) }}
+      {{ menu_item('/settings/feed_remove', 'Remove', 'trash', dict(id=f.id, **here), danger=true, confirm='Remove ' ~ name ~ '?', inplace=true) }}
     {% endcall %}
   </span>
 </div>
 {% endmacro %}
+
+{# "Add a feed…": an address in, the feeds behind it out, each with its own Add. On a section's page (`section`) the
+   lookup comes back to that page and the section is chosen already. Reads `finder` from the page when there is one. #}
+{% macro feed_finder(section=none) %}
+<form method="post" action="/settings/feed_find" class="sform">
+  {% if section %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
+  <label>Website or feed address <input name="address" required value="{{ finder.address if finder is defined }}"
+    placeholder="example.com" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+  <p class="muted small">Paste the site's address: its feed is found for you.</p>
+  <button class="button" type="submit">Find feed</button>
+</form>
+{% if finder is defined %}
+{% if finder.error %}<p class="callout error">{{ finder.error }}</p>{% endif %}
+{% for f in finder.found %}
+<form method="post" action="/settings/feed_add" class="sform found-feed">
+  <input type="hidden" name="url" value="{{ f.url }}">
+  <p><strong>{{ f.name }}</strong><br><span class="muted small" title="{{ f.url }}">{{ host(f.url) }} ·
+    {% if not f.entries %}no posts yet
+    {% elif f.newest_days is none %}{{ f.entries }} posts, undated
+    {% elif f.newest_days > 14 %}last post {{ f.newest_days|int }} days ago
+    {% elif f.per_day >= 1 %}about {{ f.per_day|round|int }} posts a day
+    {% else %}about {{ (f.per_day * 7)|round|int or 1 }} a week{% endif %}</span></p>
+  {% if f.headlines %}<ul class="found-headlines small">{% for h in f.headlines %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
+  {% if f.known %}<p class="muted small">Already added as {{ f.known }}.</p>
+  {% else %}
+  <label>Name <input name="name" required maxlength="80" value="{{ f.name }}"></label>
+  <label>Section <select name="category">{{ section_options(section or 'world') }}</select></label>
+  <button class="button" type="submit">Add feed</button>
+  {% endif %}
+</form>
+{% endfor %}
+{% endif %}
+{% endmacro %}
+
+{# The gray line under a section's name: where it shows, and how many feeds it has #}
+{% macro section_sub(s, n) %}{{ 'News tab' if s.key in ('news', 'world') else 'Tab' if s.tab else 'Chip under For you' }} · {{ n }} {{ 'feed' if n == 1 else 'feeds' }}{% endmacro %}
 
 {# ---------- profile: how the feed is tuned ---------- #}
 

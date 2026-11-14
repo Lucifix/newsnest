@@ -1420,6 +1420,20 @@ input.sinput:invalid { border-color: var(--danger); }
 .sact-danger .srow-title { color: var(--danger); font-weight: 600; }
 @media (hover: hover) { .sact:hover { background: var(--surface-2); } }
 .slist > .srow-form { display: block; }
+.srow-danger { color: var(--danger); font-weight: 600; }
+
+/* a group header with a link at its right ("Arrange", "Done") */
+.sgroup-title.has-action { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-right: 16px; }
+.sgroup-action { font: 600 0.92rem var(--sans); text-transform: none; letter-spacing: 0; color: var(--accent-text); text-decoration: none; }
+.sgroup-action:hover { text-decoration: underline; }
+/* Arrange: ↑ ↓ at the end of each section's row; the first can't go up, the last can't go down */
+.srow-end.arrange { gap: 2px; }
+.srow-end.arrange .iconbtn { margin-right: 0; color: var(--accent-text); }
+.srow-end.arrange .iconbtn:disabled { color: var(--muted); opacity: 0.35; cursor: default; background: none; }
+/* a page below a settings page (a section under Feeds) keeps its back link on wide screens too */
+.sback.deep { display: inline-flex; }
+.sback.deep + .pagehead { padding-top: 2px; }
+.sempty { margin: 24px 16px 0; color: var(--muted); font-size: 0.92rem; }
 
 /* a group that folds */
 .sfold > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; min-height: 36px; margin: 0 0 0 16px; padding-right: 16px; }

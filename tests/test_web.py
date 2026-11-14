@@ -151,7 +151,7 @@ def test_settings_edit_keeps_comments_and_validates(client, env):
     before = path.read_text(encoding="utf-8")
     r = client.post("/settings/feed_add", data={"name": "Primorske novice", "url": "https://www.primorske.si/rss",
                                                  "category": "news"}, follow_redirects=False)
-    assert r.headers["location"] == "/settings/feeds?saved=feed_add#feed-primorske-novice"
+    assert r.headers["location"] == "/settings/feeds/news?saved=feed_add#feed-primorske-novice"
     after = path.read_text(encoding="utf-8")
     assert "id: primorske-novice" in after
     assert "# Plain RSS / Atom feeds" in after  # comments survive
@@ -177,7 +177,7 @@ def test_settings_edit_keeps_comments_and_validates(client, env):
     # a feed in another language stays where it was put: Local is only flagged, never moved
     r = client.post("/settings/feed_add", data={"name": "BBC London", "url": "https://feeds.bbci.co.uk/news/england/london/rss.xml",
                                                  "category": "news"}, follow_redirects=False)
-    assert r.headers["location"] == "/settings/feeds?saved=feed_add#feed-bbc-london"
+    assert r.headers["location"] == "/settings/feeds/news?saved=feed_add#feed-bbc-london"
     assert "category: news" in path.read_text(encoding="utf-8").split("id: bbc-london")[1].split("- id:")[0]
 
 
@@ -187,7 +187,7 @@ def test_lifestyle_pack(client, env):
     assert "Lifestyle &amp; gear pack" in client.get("/settings/feeds").text
     assert 'href="/?f=lifestyle"' not in client.get("/settings/feeds").text  # no tab until there are feeds
     r = client.post("/settings/pack/lifestyle", data={"interest": "1"}, follow_redirects=False)
-    assert r.headers["location"].startswith(f"/settings/feeds?pack={len(LIFESTYLE_PACK)}&")
+    assert r.headers["location"].startswith(f"/settings/feeds/lifestyle?pack={len(LIFESTYLE_PACK)}&")
     text = (env.config / "config.yaml").read_text(encoding="utf-8")
     assert "id: gear-patrol" in text and "daily_cap: 8" in text
     assert "Men's lifestyle and gear" in read_profile("interests.md")
@@ -209,11 +209,11 @@ def section_keys_in(env) -> list[str]:
 def test_add_rename_reorder_and_remove_a_section(client, env):
     path = env.config / "config.yaml"
     r = client.post("/settings/section_add", data={"label": "Sports", "icon": "ball"}, follow_redirects=False)
-    assert r.headers["location"] == "/settings/feeds?saved=section_add#sections"
+    assert r.headers["location"] == "/settings/feeds/sports?saved=section_add"
     text = path.read_text(encoding="utf-8")
     assert "- {key: sports, label: Sports, icon: ball}" in text and "# Plain RSS / Atom feeds" in text   # comments survive
     assert section_keys_in(env) == ["news", "world", "tech", "sports"]
-    assert '<option value="sports"' in client.get("/settings/feeds").text   # the section menu of every feed
+    assert '<option value="sports"' in client.get("/settings/feeds/tech").text   # the section menu of every feed
 
     # a feed in it, and the tab appears once there is something to read
     assert 'data-tab="sports"' not in client.get("/").text
@@ -243,6 +243,48 @@ def test_add_rename_reorder_and_remove_a_section(client, env):
     assert "category: world" in path.read_text(encoding="utf-8").split("id: sport24")[1].split("- id:")[0]
     assert path.with_suffix(".yaml.bak").exists()
     assert "1 feed and 1 story moved" in client.get(r.headers["location"]).text
+    # its page is gone with it
+    r = client.get("/settings/feeds/sports", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/settings/feeds"
+
+
+def test_each_section_has_its_own_page(client, env):
+    """Feeds lists the sections; each opens a page with its feeds, a way to add one, and its own settings."""
+    overview = client.get("/settings/feeds").text
+    for key in ("news", "world", "tech"):
+        assert f'href="/settings/feeds/{key}"' in overview
+    assert 'id="feed-theverge"' not in overview          # the feeds are on the sections' pages, not listed twice
+    tech = client.get("/settings/feeds/tech").text
+    assert 'id="feed-theverge"' in tech and 'id="feed-24ur"' not in tech
+    assert '<input type="hidden" name="section" value="tech">' in tech   # the finder and each row come back here
+    assert 'href="/settings/feeds#section-tech"' in tech   # the back link
+    assert "Remove Tech" in tech and "Remove Local" not in client.get("/settings/feeds/news").text   # built in
+
+    # a change made on a section's page comes back to it; a feed moved away stays there, marked, until you leave
+    r = client.post("/settings/feed_section", data={"id": "theverge", "category": "world", "section": "tech"}, follow_redirects=False)
+    assert r.headers["location"].startswith("/settings/feeds/tech?saved=feed_section&changed=theverge&")
+    assert "Moved to World" in client.get(r.headers["location"]).text
+    assert 'id="feed-theverge"' not in client.get("/settings/feeds/tech").text
+    r = client.post("/settings/feed_toggle", data={"id": "theverge", "section": "world"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds/world?saved=feed_toggle#feed-theverge"
+    # a section that isn't there is never followed: the change lands on the list of sections
+    r = client.post("/settings/feed_toggle", data={"id": "theverge", "section": "https://evil.example"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds?saved=feed_toggle#feed-theverge"
+    r = client.post("/settings/section_edit", data={"key": "tech", "label": "Gadgets", "icon": "chip", "tab": "on"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds/tech?saved=section_edit"
+    assert "<h1>Gadgets</h1>" in client.get("/settings/feeds/tech").text
+    assert client.get("/settings/feeds/nope", follow_redirects=False).headers["location"] == "/settings/feeds"
+
+
+def test_sections_are_arranged_on_the_list(client, env):
+    overview = client.get("/settings/feeds").text
+    assert 'href="/settings/feeds?arrange=1#sections"' in overview and "Move Tech up" not in overview
+    arrange = client.get("/settings/feeds?arrange=1").text
+    assert "Move Tech up" in arrange and 'href="/settings/feeds#sections">Done' in arrange
+    assert 'aria-label="Move Local up" title="Move up" disabled' in arrange   # nothing above the first
+    r = client.post("/settings/section_move", data={"key": "tech", "dir": "up"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds?saved=section_move&arrange=1#sections"   # still arranging
+    assert section_keys_in(env) == ["news", "tech", "world"]
 
 
 def env_cfg(env):
@@ -402,14 +444,14 @@ def test_onboarding_asks_where_you_live_then_offers_the_pack(client, env):
     assert "Local news for Slovenia" not in client.get("/profile").text
     # a second tap adds nothing; an unknown pack is a 404; other next= values are ignored
     r = client.post("/settings/pack/local/si", data={"next": "https://evil.example"}, follow_redirects=False)
-    assert r.headers["location"].startswith("/settings/feeds?localpack=0&")
+    assert r.headers["location"].startswith("/settings/feeds/news?localpack=0&")
     assert client.post("/settings/pack/local/xx").status_code == 404
     r = client.post("/settings/region", data={"next": "https://evil.example", "country": "Slovenia"}, follow_redirects=False)
     assert r.headers["location"] == "/settings/general?saved=region"
 
 
 def test_feeds_page_offers_local_packs(client, env):
-    page = client.get("/settings/feeds").text
+    page = client.get("/settings/feeds/news").text   # on Local's own page
     assert "Local news packs" in page and "Set your country in General" in page and "/settings/pack/local/si" in page
 
 
@@ -560,7 +602,7 @@ def test_swipe_deck(client):
 
 
 def test_settings_pages_use_rows_menus_and_chips(client, env):
-    feeds = client.get("/settings/feeds").text
+    feeds = client.get("/settings/feeds/tech").text
     # a feed is one row: its section in a select, Pause and Remove in the ⋯ menu
     assert 'id="feed-theverge"' in feeds and 'action="/settings/feed_section"' in feeds and "rowmenu-btn" in feeds
     assert 'action="/settings/feed_toggle"' in feeds and 'data-confirm="Remove The Verge?"' in feeds
@@ -692,14 +734,13 @@ def test_settings_changes_save_in_place(client, env):
         return bool(found) and all("data-inplace" in f for f in found)
 
     feeds = client.get("/settings/feeds").text
+    assert inplace(feeds, "/settings/section_add")
+    assert inplace(client.get("/settings/feeds?arrange=1").text, "/settings/section_move")
+    tech = client.get("/settings/feeds/tech").text
     for action in ("/settings/feed_section", "/settings/feed_toggle", "/settings/feed_favicon", "/settings/feed_remove",
-                   "/settings/section_add", "/settings/section_edit", "/settings/section_move"):
-        assert inplace(feeds, action), action
-    client.post("/settings/section_add", data={"label": "Sports", "icon": "star"})
-    feeds = client.get("/settings/feeds").text
-    assert inplace(feeds, "/settings/section_remove")
-    assert 'id="edit-section-sports"' in feeds and 'id="edit-section-news"' in feeds  # an open edit stays open
-    assert not inplace(feeds, "/settings/feed_find")  # finding a feed shows its own page
+                   "/settings/section_edit", "/settings/section_remove"):
+        assert inplace(tech, action), action
+    assert not inplace(feeds, "/settings/feed_find") and not inplace(tech, "/settings/feed_find")  # finding a feed shows its own page
 
     client.post("/settings/watch_add", data={"name": "Energy", "keywords": "elektrik"})
     topics = client.get("/settings/topics").text
@@ -749,13 +790,13 @@ def test_source_icons_are_served_and_shown_unless_turned_off(client, env):
 
     src = f'src="/icon/theverge?v={version}"'
     assert src in client.get("/").text                       # the story card's badge
-    assert src in client.get("/settings/feeds").text         # the feed's row
+    assert src in client.get("/settings/feeds/tech").text    # the feed's row
     assert '<span class="badge h' in client.get("/").text    # sources without an icon keep their initials
 
     client.post("/settings/feed_favicon", data={"id": "theverge"})
     assert "favicon: false" in (env.config / "config.yaml").read_text(encoding="utf-8")
-    assert src not in client.get("/").text and src not in client.get("/settings/feeds").text
-    assert "Show logo" in client.get("/settings/feeds").text
+    assert src not in client.get("/").text and src not in client.get("/settings/feeds/tech").text
+    assert "Show logo" in client.get("/settings/feeds/tech").text
     client.post("/settings/feed_favicon", data={"id": "theverge"})
     assert "favicon: false" not in (env.config / "config.yaml").read_text(encoding="utf-8")
     assert src in client.get("/").text
