@@ -823,15 +823,34 @@ def test_the_feed_names_its_session_so_a_tab_keeps_its_place_only_within_it(clie
 
 
 def test_home_has_a_front_page_for_wide_screens_beside_the_feed(client):
-    """The front page repeats stories from the feed: its copies share data-ids (read state follows both) but
-    not the feed card's id, and they are not seen-tracked (only the feed's [data-track-seen] counts)."""
+    """The front page's stories stay in the feed for phones, marked on-front so the lane beside the front page
+    hides them. The front copies share data-ids (read state follows both) but not the feed card's id; they are
+    seen-tracked and have the feed card's buttons, since on wide screens they are the only copy shown."""
     html = client.get("/?f=all").text
     front = html.split('<section class="front"', 1)[1].split("</section>\n")[0]
+    stream = html.split('id="stream"', 1)[1]
     lead_ids = re.search(r'class="story flead[^"]*" data-ids="([^"]+)"', front).group(1)
-    assert f'data-ids="{lead_ids}"' in html.split('id="stream"', 1)[1]   # the lead is in the feed too
-    assert 'id="item-' not in front and "data-track-seen" not in front
+    lead_card = re.search(rf'<article class="([^"]*)" id="item-\d+" data-ids="{lead_ids}"', stream)
+    assert lead_card and "on-front" in lead_card.group(1).split()   # in the feed too, hidden beside the front page
+    front_ids = set(re.findall(r'class="story f(?:lead|big|item)[^"]*" data-ids="([^"]+)"', front))
+    marked = set(re.findall(r'class="[^"]*\bon-front\b[^"]*" id="item-\d+" data-ids="([^"]+)"', stream))
+    assert marked == front_ids
+    assert 'id="item-' not in front and "data-track-seen" in html.split('<section class="front"', 1)[1].split(">")[0]
+    assert front.count('class="act kebab-btn"') == len(front_ids) and front.count('class="act like"') == len(front_ids)
     assert '<h2 class="lane-head">' in html
     assert 'class="lane-more"' in html and "&amp;view=list" in html.split('class="lane-more"', 1)[1].split(">")[0]
+
+
+def test_the_lane_beside_the_front_page_still_gets_a_full_first_page(client):
+    """Hiding the front page's stories must not leave the lane short: its first page runs on until it holds
+    PAGE_SIZE stories that are not on the front page (or the feed ends). The list view has no front page."""
+    from newsnest.web import PAGE_SIZE
+    stream = client.get("/?f=all").text.split('id="stream"', 1)[1]
+    cards = re.findall(r'<article class="([^"]*)" id="item-', stream)
+    lane = [c for c in cards if "on-front" not in c.split()]
+    assert len(lane) == PAGE_SIZE or ('class="loadmore"' not in stream and len(cards) > len(lane))
+    listed = client.get("/?f=all&view=list").text.split('id="stream"', 1)[1]
+    assert "on-front" not in listed
 
 
 def test_the_list_view_is_the_feed_alone_and_tabs_and_chips_stay_in_it(client):

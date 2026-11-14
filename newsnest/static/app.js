@@ -591,17 +591,12 @@ document.addEventListener("DOMContentLoaded", watchLoadMore);
 // ---------- Home categories: More folds the long tail, a tap swaps the feed in place (no reload) ----------
 const CATS_OPEN = "newsnest.catsOpen";
 
-// The phone opens the first top story's key points; on wide screens the front page's lead already shows
-// them beside the feed, so the feed's copy starts closed instead of repeating them at length.
 const wideFront = matchMedia("(min-width: 1240px)");
-function closeLaneLead() {
-  if (!wideFront.matches || !document.querySelector(".feedwrap.home > .front")) return;
-  document.querySelector(".feedwrap.home .stream > .story:first-of-type .tldr[open]")?.removeAttribute("open");
-}
 
 // Beside the front page the feed lane shows as many stories as fit next to it (at least LANE_MIN), so the two
 // lanes end together; More stories then opens the list view starting at the first story left out. Measured on load,
 // on resize and after a tab swap; not while reading (opening key points in the lane does not cut it again).
+// The lane's copies of the front page's stories (.on-front) are hidden by CSS and not counted here.
 // Without the script the lane shows the whole first page and the button's link starts after it.
 const LANE_MIN = 8;
 function fitLane() {
@@ -609,8 +604,9 @@ function fitLane() {
   const front = wrap?.querySelector(":scope > .front");
   const more = wrap?.querySelector(".lane-more");
   if (!front || !more) return;  // no button: the whole feed fits in the first page, so nothing is cut
-  const cards = [...wrap.querySelectorAll(".stream > .story")];
-  cards.forEach((card) => card.classList.remove("lane-over"));
+  const all = [...wrap.querySelectorAll(".stream > .story")];
+  all.forEach((card) => card.classList.remove("lane-over"));
+  const cards = wideFront.matches ? all.filter((card) => !card.classList.contains("on-front")) : all;
   let shown = cards.length;
   if (wideFront.matches) {
     const end = front.getBoundingClientRect().bottom + 80;  // a card may run a little past the front page
@@ -625,7 +621,8 @@ function fitLane() {
     const url = new URL(more.getAttribute("href"), location.href);
     url.searchParams.set("at", next.id.replace("item-", ""));  // the list starts at this story
     more.setAttribute("href", url.pathname + url.search);
-    more.querySelector("span").textContent = `${Number(more.dataset.total) - shown} more`;
+    // The list view runs from that story to the end of the feed, front page stories included
+    more.querySelector("span").textContent = `${Number(more.dataset.total) - all.indexOf(next)} more`;
   }
 }
 addEventListener("load", fitLane);
@@ -881,7 +878,6 @@ async function showFeed(href, { push = false, tab = false, now = false, restore 
     if (push) history.pushState(state, "", address);
     else history.replaceState(state, "", address);
     setupCats(scrollLeft);
-    closeLaneLead();
     fitLane();
     applyBanner();
     rememberNewsChip();
@@ -968,7 +964,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const wrap = document.querySelector(".feedwrap[data-href]");
   if (wrap && !history.state?.search) history.replaceState({ feed: true, href: wrap.dataset.href }, "");
   setupCats();
-  closeLaneLead();
   fitLane();
   if (!wrap || !swapsInPlace()) return;
   // The feed puts each view back in its place itself (above), Back and reloads included

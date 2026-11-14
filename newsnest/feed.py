@@ -631,12 +631,18 @@ class FrontPage:
     lead: FeedItem | None
     packages: list[Package]
 
+    @property
+    def lead_ids(self) -> set[int]:
+        """The lead item id of every story on the front page; the feed lane beside it leaves these out."""
+        stories = ([self.lead] if self.lead else []) + [it for p in self.packages for it in p.items]
+        return {it.card.lead.id for it in stories}
+
 
 def front_page(items: list[FeedItem], per_package: int = 4, max_packages: int = 4, min_package: int = 2) -> FrontPage:
     """The desktop front page beside the feed, picked from the feed's own ranked stream: the best story as
     the lead, then Top stories (the next ones by rank), then a package for each category in the order of its
     best story. Unread stories come first, so the page shows what is still new; read ones only fill up.
-    Every story appears at most once on it (the feed beside it still lists them all, in rank order).
+    Every story appears at most once on it, and the feed lane beside it leaves them out (lead_ids).
     In a package the first story with a photo is the large one. No database access."""
     pool = [it for it in items if not it.card.read] + [it for it in items if it.card.read]
     if not pool:

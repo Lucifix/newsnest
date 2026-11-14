@@ -214,8 +214,9 @@ def test_feed_pages_load_incrementally_without_repeats(db, cfg, monkeypatch):
     from newsnest.web import app
     with TestClient(app) as client:
         page = client.get("/?f=all").text
-        # the feed's own cards (the wide-screen front page before it repeats some of them)
-        assert page.split('id="stream"', 1)[1].count('<article class="story') == 20
+        # the feed's own cards: 20 besides the front page's stories (on-front, hidden beside it on wide screens)
+        stream = page.split('id="stream"', 1)[1]
+        assert stream.count('<article class="story') == 20 + stream.count(" on-front")
         assert page.count('id="cardmenu"') == 1 and page.count("<form") < 30  # one shared menu, not 5 forms per card
         seen = set(__import__("re").findall(r'id="item-(\d+)"', page))
         url = page.split('data-fragment="')[1].split('"')[0].replace("&amp;", "&")
@@ -227,7 +228,8 @@ def test_feed_pages_load_incrementally_without_repeats(db, cfg, monkeypatch):
             seen |= ids
             pages += 1
             url = frag.split('data-fragment="')[1].split('"')[0].replace("&amp;", "&") if "data-fragment" in frag else None
-        assert len(seen) == 45 and pages == 3 and "That's everything" in frag
+        first = 20 + stream.count(" on-front")
+        assert len(seen) == 45 and pages == 1 + -(-(45 - first) // 20) and "That's everything" in frag
 
 
 def test_opens_and_likes_leave_the_weights_alone(db, cfg, monkeypatch):
@@ -427,6 +429,18 @@ def test_front_page_puts_a_photo_first_and_skips_lone_or_unscored_categories():
     one = [_front_item(f"a{i}") for i in range(10)]
     assert [p.title for p in front_page(one).packages] == ["Top stories"]
     assert front_page([]).lead is None and front_page([_front_item("only")]).packages == []
+
+
+def test_front_page_lead_ids_are_every_story_on_it():
+    from types import SimpleNamespace
+    from newsnest.feed import front_page
+    items = [_front_item(f"i{n}", "AI" if n % 2 else "Security") for n in range(12)]
+    for n, it in enumerate(items):
+        it.card.lead = SimpleNamespace(id=100 + n)
+    front = front_page(items)
+    on_it = [front.lead] + [it for p in front.packages for it in p.items]
+    assert front.lead_ids == {it.card.lead.id for it in on_it} and len(front.lead_ids) == len(on_it)
+    assert front_page([]).lead_ids == set()
 
 
 def test_swipe_deck_asks_about_close_calls_first(db, cfg):

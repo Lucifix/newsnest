@@ -107,7 +107,7 @@
 {# Wide screens: the front page on the left (the lead, Top stories, a package per category), the feed in a lane
    on the right. Phones never show the front page; the feed alone is the page there. #}
 {% if front and front.lead %}
-<section class="front" aria-label="Front page">
+<section class="front" aria-label="Front page" data-track-seen>
   {{ front_lead(front.lead) }}
   {% for p in front.packages %}{{ front_package(p) }}{% endfor %}
 </section>

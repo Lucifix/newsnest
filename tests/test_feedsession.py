@@ -128,7 +128,10 @@ def test_load_more_pages_come_from_the_session(db, cfg, client):
     url = page.split('data-fragment="')[1].split('"')[0].replace("&amp;", "&")
     client.get(f"/go/{shown[0]}", follow_redirects=False)
     more = order(client.get(url).text)
-    assert len(shown) == 20 and len(more) == 10 and not set(more) & set(shown)
+    # The first page holds 20 stories besides the front page's (on-front: hidden beside it on wide screens)
+    on_front = page.split('id="stream"', 1)[1].count(" on-front")
+    assert on_front and len(shown) == 20 + on_front
+    assert len(more) == 30 - len(shown) and not set(more) & set(shown)
     # An unknown token (e.g. from before the deploy) starts a session instead of failing
     r = client.get("/feed/more?token=gone&offset=20&f=all")
     assert r.status_code == 200 and len(order(r.text)) == 9  # a fresh ranking, without the opened story
