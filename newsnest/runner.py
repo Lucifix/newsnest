@@ -93,6 +93,37 @@ def _fetch_one(conn, source, registry, ctx, prefilter, cfg, summary) -> None:
                                            "error": result.error})
 
 
+def fetch_now(source_id: str) -> dict:
+    """"Check now" on a feed's page: fetch that one feed right away, as the work loop would. Its new stories are
+    scored on the next tick. Answers {"new": n} or {"error": …}; never waits for a tick that is running."""
+    if not _tick_lock.acquire(blocking=False):
+        return {"error": "the app is fetching right now; try again in a minute"}
+    try:
+        loaded = load_config(config_dir())
+        source = next((s for s in loaded.sources if s.id == source_id), None)
+        if not loaded.config or source is None:
+            return {"error": "no such feed"}
+        cfg = loaded.config
+        with session() as conn:
+            st = conn.execute("SELECT * FROM source_state WHERE source_id = ?", (source_id,)).fetchone()
+            blocked = parse_iso(st["blocked_until"]) if st else None
+            if blocked and blocked > utcnow():   # the site asked us to wait: asking again only makes it longer
+                return {"error": f"the site asked to wait until {blocked:%H:%M} UTC"}
+            if st is not None and (source_id in icons.known_sources(conn) or not icons.wants_icon(source)):
+                source.params.update(etag=st["etag"], last_modified=st["last_modified"], prev_raw=st["raw_count"])
+            summary = {"fetched": 1, "new": 0, "failed": []}
+            with make_client(cfg) as client:
+                _fetch_one(conn, source, build_registry(), FetchContext(cfg, client), Prefilter(cfg), cfg, summary)
+            if summary["failed"]:
+                return {"error": summary["failed"][0].split(": ", 1)[-1]}
+            return {"new": summary["new"]}
+    except Exception as e:   # a page action: say what went wrong instead of a server error
+        log.exception("fetch now failed", extra={"source": source_id})
+        return {"error": f"{type(e).__name__}: {e}"}
+    finally:
+        _tick_lock.release()
+
+
 def tick(force: bool = False, ai: bool = True) -> dict:
     """One pass of the work loop. Never raises; errors land in the status panel."""
     if not _tick_lock.acquire(blocking=False):

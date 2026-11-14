@@ -36,6 +36,7 @@ from newsnest.digest import available_days, build_digest
 from newsnest.discovery import (OpmlFeed, add_candidates, good_stories, named_sources, parse_opml, promotion_suggestions,
                              region_words, start_check_thread, _signals)
 from newsnest.feedfinder import FinderError, capped_get, find_feeds, finder_client
+from newsnest.feedstats import feed_numbers
 from newsnest import feedsession
 from newsnest.drift import FADED, LIFTED, LINGER_MIN_CARDS, Drift, current_drift, current_lines, reading_report
 from newsnest.feed import (SEARCH_DAYS, TOP_STORIES, adjust_weight, front_page, load_weights, read_stories,
@@ -1060,7 +1061,7 @@ def proposal_reject(pid: int, conn=Depends(get_conn)):
 SETTINGS_PAGES = ("general", "feeds", "discover", "topics", "more", "app", "about")
 ACTION_PAGE = {"general": "general", "region": "general",
                "feed_add": "feeds", "feed_section": "feeds", "feed_remove": "feeds", "feed_toggle": "feeds",
-               "feed_favicon": "feeds",
+               "feed_favicon": "feeds", "feed_cap": "feeds", "feed_rename": "feeds",
                "section_add": "feeds", "section_edit": "feeds", "section_move": "feeds", "section_remove": "feeds",
                "watch_add": "topics", "watch_remove": "topics", "keywords": "topics",
                "repo_add": "more", "repo_remove": "more"}
@@ -1154,6 +1155,54 @@ def catalog_icons(conn=Depends(get_conn)):
 def settings_section(key: str, request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     """One section under Feeds: its feeds, a way to add one, and the section's own settings."""
     return _section_page(request, key, conn, loaded)
+
+
+@app.get("/settings/feeds/{key}/{feed_id}", response_class=HTMLResponse)
+def settings_feed(key: str, feed_id: str, request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
+    """One feed: what it brings, whether it works, its latest stories, and everything that can be set for it."""
+    cfg = loaded.config
+    feed = _feed_of(cfg, feed_id)
+    if feed is None:   # removed meanwhile: its section's page, or the list when the section is gone too
+        return RedirectResponse("/settings/feeds/" + key if cfg and key in section_keys(cfg) else "/settings/feeds",
+                                status_code=303)
+    if feed.category != key:   # moved to another section: its address follows
+        return RedirectResponse(_feed_path(feed), status_code=303)
+    health = next((s.health for s in collect_status(conn, loaded).sources if s.id == feed.id), None)
+    state = conn.execute("SELECT * FROM source_state WHERE source_id = ?", (feed.id,)).fetchone()
+    return render(request, "settings_feed.html", conn, loaded, page="feeds", root=False, feed=feed,
+                  sec=next(s for s in cfg.all_sections if s.key == key), health=health, state=state,
+                  numbers=feed_numbers(conn, cfg, feed.id), caps=FEED_CAPS,
+                  error=request.query_params.get("error"), saved=request.query_params.get("saved"),
+                  **settings_context("feeds", conn, loaded))
+
+
+# "Max stories a day" on a feed's page; any other number set in config.yaml is shown too
+FEED_CAPS = (3, 5, 10, 20)
+# Changes made on a feed's page; feed_remove isn't one: the page is gone, so it goes back to the section
+FEED_PAGE_ACTIONS = ("feed_section", "feed_toggle", "feed_favicon", "feed_cap", "feed_rename")
+
+
+def _feed_of(cfg: Config | None, feed_id: str | None):
+    return next((f for f in cfg.feeds if f.id == feed_id), None) if cfg and feed_id else None
+
+
+def _feed_path(feed) -> str:
+    """A feed's page. Built from the config's own section key and feed id, never from what a form sent."""
+    return "/settings/feeds/" + feed.category + "/" + feed.id
+
+
+@app.post("/settings/feed_check")
+async def feed_check(request: Request):
+    """"Check now": fetch the feed once, then back to its page with what came of it."""
+    from newsnest.runner import fetch_now
+    form = await request.form()
+    feed = _feed_of(load_config(config_dir()).config, form.get("id"))
+    if feed is None:
+        return RedirectResponse("/settings/feeds?error=" + quote("no such feed"), status_code=303)
+    result = await asyncio.to_thread(fetch_now, feed.id)
+    if "error" in result:
+        return RedirectResponse(_feed_path(feed) + "?error=" + quote(str(result["error"])[:300]), status_code=303)
+    return RedirectResponse(_feed_path(feed) + "?saved=feed_check&new=" + str(int(result["new"])), status_code=303)
 
 
 def _section_page(request: Request, key: str, conn, loaded: LoadedConfig, **extra):
@@ -1311,13 +1360,19 @@ async def settings_action(action: str, request: Request):
     back = "/calibration" if action in CALIBRATION_ACTIONS else "/settings/" + ACTION_PAGE.get(action, "general")
     if action == "region" and _onboarding_next(form):
         back = "/profile"
-    keys = section_keys(load_config(config_dir()).config)
+    before = load_config(config_dir()).config
+    keys = section_keys(before)
     # Feeds live on their section's page: a change made there comes back there. Only a key of a section that
     # exists is followed, joined to our own prefix (CodeQL: what the form sent never picks the path itself)
     page_of = {"feed_add": "category", "section_edit": "key", "section_remove": "key",
-               "feed_section": "section", "feed_toggle": "section", "feed_favicon": "section", "feed_remove": "section"}
+               "feed_section": "section", "feed_toggle": "section", "feed_favicon": "section", "feed_remove": "section",
+               "feed_cap": "section", "feed_rename": "section"}
     if (field := page_of.get(action)) and (key := form.get(field)) in keys:
         back = "/settings/feeds/" + keys[keys.index(key)]
+    # ...and one made on a feed's own page comes back to that page (feed_page=1), wherever the feed now is
+    on_feed_page = form.get("feed_page") == "1" and action in FEED_PAGE_ACTIONS
+    if on_feed_page and (feed := _feed_of(before, form.get("id"))):
+        back = _feed_path(feed)
     if "category" in form and form["category"] not in keys:
         return RedirectResponse(f"{back}?error={quote('unknown section ' + form['category'])}", status_code=303)
 
@@ -1393,6 +1448,23 @@ async def settings_action(action: str, request: Request):
                         f["favicon"] = False
                     else:
                         f.pop("favicon", None)   # the default: no need to spell it out
+        elif action == "feed_cap":
+            cap = form.get("daily_cap", "").strip()
+            if cap and (not cap.isdigit() or not 1 <= int(cap) <= 500):
+                raise ConfigEditError("the daily maximum is a number from 1 to 500")
+            for f in section_list(data, "feeds"):
+                if f.get("id") == form["id"]:
+                    if cap:
+                        f["daily_cap"] = int(cap)
+                    else:
+                        f.pop("daily_cap", None)   # no limit is the default
+        elif action == "feed_rename":
+            name = " ".join(form["name"].split())[:80]
+            if not name:
+                raise ConfigEditError("a feed needs a name")
+            for f in section_list(data, "feeds"):
+                if f.get("id") == form["id"]:
+                    f["name"] = name
         elif action == "watch_add":
             section_list(data, "watches").append({"name": form["name"].strip(), "keywords": _lines(form["keywords"])})
         elif action == "watch_remove":
@@ -1446,6 +1518,11 @@ async def settings_action(action: str, request: Request):
         back = "/settings/feeds/" + added["key"]   # a new section is empty: its page is where it gets feeds
     elif action == "section_move":
         extra += "&arrange=1"                       # moves are made while arranging: stay arranging
+    if on_feed_page:
+        # the feed's page after the change: under its new section when it moved
+        if feed := _feed_of(load_config(config_dir()).config, form.get("id")):
+            back = _feed_path(feed)
+        return RedirectResponse(back + "?saved=" + action, status_code=303)
     if action in ("feed_section", "feed_toggle"):
         anchor = f"#feed-{form['id']}"
     elif action == "feed_add":

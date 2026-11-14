@@ -1,0 +1,109 @@
+{% extends "_settings_layout.html" %}
+{% from "_settings_ui.html" import group, expand, link_row, toggle_row, value_select, avatar with context %}
+{# One feed: how it's doing, whether it works, its latest stories, and its settings #}
+{% block stitle %}{{ feed.name or feed.id }}{% endblock %}
+{% block back %}<a class="sback deep" href="/settings/feeds/{{ feed.category }}#feed-{{ feed.id }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>{{ sec.label }}</a>{% endblock %}
+{% block sintro %}
+<p class="sub"><a href="{{ feed.url }}" target="_blank" rel="noopener" title="{{ feed.url }}">{{ host(feed.url) }}</a>
+  {%- if numbers.first_seen %} · first story {{ localtime(numbers.first_seen, '%-d %b %Y') }}{% endif %}
+  {%- if not feed.enabled %} · <strong>paused</strong>{% endif %}</p>
+{% endblock %}
+
+{# A row that only shows something: title (and a gray line under it), value at the right #}
+{% macro info_row(title, value=none, sub=none, cls='') %}
+<div class="srow"><span class="srow-main"><span class="srow-title">{{ title }}</span>{% if sub %}<span class="srow-sub">{{ sub }}</span>{% endif %}</span>
+  {% if value is not none %}<span class="srow-end"><span class="srow-value {{ cls }}">{{ value }}</span></span>{% endif %}</div>
+{% endmacro %}
+
+{# What every settings form here sends along: the feed, and that the change comes back to this page #}
+{% macro hidden_fields(feed) %}<input type="hidden" name="id" value="{{ feed.id }}"><input type="hidden" name="feed_page" value="1"><input type="hidden" name="section" value="{{ feed.category }}">{% endmacro %}
+
+{% block page %}
+{% set name = feed.name or feed.id %}
+{% set n = numbers %}
+
+{% if saved == 'feed_check' %}
+{% set new = request.query_params.get('new', '0')|int %}
+<p class="callout ok">Checked just now: {{ 'nothing new' if not new else new ~ (' new story' if new == 1 else ' new stories') }}.{% if new %} They're scored on the next run, within a minute or two.{% endif %}</p>
+{% endif %}
+
+{# ---------- how it's doing ---------- #}
+{% set direction, level = n.ranking %}
+{% call group('Last 30 days' if n.days >= 30 or not n.first_seen else 'Since ' ~ localtime(n.first_seen, '%-d %b'), id='numbers') %}
+  {{ info_row('Stories', n.stories, ('about %.0f a day'|format(n.per_day) if n.per_day >= 1 else 'about %.0f a week'|format(n.per_day * 7) if n.stories else 'none yet')) }}
+  {% set why = [] %}
+  {% if n.low %}{% set _ = why.append(n.low ~ ' below your limit of ' ~ cfg.digest.min_final) %}{% endif %}
+  {% if n.muted %}{% set _ = why.append(n.muted ~ ' muted by your filters') %}{% endif %}
+  {% if n.waiting %}{% set _ = why.append(n.waiting ~ ' waiting for a score') %}{% endif %}
+  {{ info_row('Good enough for your feed', (n.shown ~ ' · ' ~ n.shown_share ~ '%') if n.shown + n.low else n.shown, why|join(', ') or none,
+              cls='progress' if n.shown else '') }}
+  {{ info_row('You opened', n.opened, ('liked ' ~ n.liked ~ ' · disliked ' ~ n.disliked) if n.liked or n.disliked else none) }}
+  {% set ranked = {'more': ['Normal', 'A little higher', 'Clearly higher', 'As high as it goes'],
+                   'less': ['Normal', 'A little lower', 'Clearly lower', 'As low as it goes']} %}
+  {{ link_row('/profile#tuning', 'Ranked from your reading', value=ranked[direction][level]) }}
+{% endcall %}
+
+{# ---------- whether it works ---------- #}
+{% set words = {'ok': 'Working', 'warning': 'Working, last try failed', 'failing': 'Failing', 'pending': 'Not checked yet', 'disabled': 'Paused'} %}
+{% call group('Status', id='status') %}
+  {{ info_row(words.get(health.level, 'Unknown') if health else 'Unknown', none, health.message if health and health.message else none) }}
+  {% if state %}
+  {{ info_row('Last checked', ago(state.last_run) or 'never', ('HTTP ' ~ state.last_http) if state.last_http and state.last_http >= 400 else none) }}
+  {% endif %}
+  {% if n.latest %}{{ info_row('Newest story', ago(n.latest[0].fetched_at)) }}{% endif %}
+  <form method="post" action="/settings/feed_check" class="srow-form" data-inplace>
+    <input type="hidden" name="id" value="{{ feed.id }}">
+    <button type="submit" class="srow sact sact-accent"><span class="srow-main"><span class="srow-title">Check now</span>
+      <span class="srow-sub">Fetches it once, without waiting for its turn</span></span></button>
+  </form>
+{% endcall %}
+{% if health and health.level == 'failing' %}<p class="sgroup-foot">The <a href="/status">Status</a> page has every source's recent fetches.</p>{% endif %}
+
+{# ---------- latest stories ---------- #}
+{% set verdicts = {'shown': ('In your feed', 'ok'), 'low': ('Below your limit', ''), 'muted': ('Muted by a filter', ''),
+                   'waiting': ('Waiting for a score', ''), 'unscored': ('Not scored', '')} %}
+{% call group('Latest stories', id='latest', footnote='The score is out of 11. Stories below your limit of ' ~ cfg.digest.min_final ~ ' stay out of your feed; you set the limit in General.' if n.latest else none) %}
+  {% for s in n.latest %}
+  {% set label, tone = verdicts[s.verdict] %}
+  <a class="srow story-row{% if s.verdict != 'shown' %} dim{% endif %}" href="/go/{{ s.id }}" target="_blank" rel="noopener">
+    <span class="srow-main"><span class="srow-title">{{ s.title }}</span>
+      <span class="srow-sub"><span class="{{ tone }}">{{ label }}</span> · {{ ago(s.fetched_at) }}{% if s.opened %} · opened{% endif %}{% if s.rating == 1 %} · liked{% elif s.rating == -1 %} · disliked{% endif %}</span></span>
+    <span class="srow-end">{% if s.final is not none %}<span class="srow-value score">{{ '%.1f'|format(s.final) }}</span>{% endif %}</span>
+  </a>
+  {% else %}
+  {{ info_row('No stories yet', none, 'Check now fetches the first ones.') }}
+  {% endfor %}
+{% endcall %}
+
+{# ---------- settings: each saves as soon as it changes ---------- #}
+{% set caps_shown = {'': 'No limit'} %}
+{% for c in caps %}{% set _ = caps_shown.update({c|string: c|string}) %}{% endfor %}
+{% if feed.daily_cap and feed.daily_cap not in caps %}{% set _ = caps_shown.update({feed.daily_cap|string: feed.daily_cap|string}) %}{% endif %}
+{% call group('Settings', id='feed-settings', footnote='Past the daily maximum, the rest of its stories stay out of your feed that day. Stories a filter always shows still get in.') %}
+  <form method="post" action="/settings/feed_rename" class="srow-form" data-autosubmit data-inplace>{{ hidden_fields(feed) }}
+    <label class="srow"><span class="srow-main"><span class="srow-title">Name</span></span>
+      <span class="srow-end"><input class="sinput" style="width: 12em" name="name" value="{{ name }}" required maxlength="80"></span></label>
+    <noscript><button class="button small secondary" type="submit">Save</button></noscript></form>
+  <form method="post" action="/settings/feed_section" class="srow-form" data-autosubmit data-inplace>{{ hidden_fields(feed) }}
+    <div class="srow"><span class="srow-main"><span class="srow-title">Section</span></span>
+      <span class="srow-end">{{ value_select('category', 'Section of ' ~ name, feed.category, section_labels) }}</span></div>
+    <noscript><button class="button small secondary" type="submit">Save</button></noscript></form>
+  <form method="post" action="/settings/feed_cap" class="srow-form" data-autosubmit data-inplace>{{ hidden_fields(feed) }}
+    <div class="srow"><span class="srow-main"><span class="srow-title">Max stories a day</span></span>
+      <span class="srow-end">{{ value_select('daily_cap', 'Max stories a day from ' ~ name, (feed.daily_cap|string) if feed.daily_cap else '', caps_shown) }}</span></div>
+    <noscript><button class="button small secondary" type="submit">Save</button></noscript></form>
+  <form method="post" action="/settings/feed_favicon" class="srow-form" data-autosubmit data-inplace>{{ hidden_fields(feed) }}
+    {{ toggle_row('favicon', 'Show its logo', 'Next to its stories. Off: its initials instead', feed.favicon) }}</form>
+  <form method="post" action="/settings/feed_toggle" class="srow-form" data-autosubmit data-inplace>{{ hidden_fields(feed) }}
+    {{ toggle_row('paused', 'Paused', 'Not fetched until you turn this off', not feed.enabled) }}</form>
+{% endcall %}
+
+{% call group() %}
+  {% call expand('Remove ' ~ name ~ '…', danger=true) %}
+  <form method="post" action="/settings/feed_remove" class="sform" data-inplace data-confirm="Remove {{ name }}?">
+    <input type="hidden" name="id" value="{{ feed.id }}"><input type="hidden" name="section" value="{{ feed.category }}">
+    <button class="button danger" type="submit">Remove {{ name }}</button>
+  </form>
+  {% endcall %}
+{% endcall %}
+{% endblock %}

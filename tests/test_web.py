@@ -908,3 +908,78 @@ def test_accepting_a_reword_keeps_the_interest_labels(client, env):
                        (iso(NOW), json.dumps({"basis": {}, "items": items}))).lastrowid
     client.post(f"/profile/proposals/{pid}/apply", data={"accept": ["0"]})
     assert [r[0] for r in conn.execute("SELECT interest FROM items WHERE id IN (1, 2)")] == ["linux and homelab"] * 2
+
+
+def test_a_feed_has_its_own_page(client, env):
+    """Settings → Feeds → Tech → The Verge: what it brings, whether it works, its latest stories, its settings."""
+    tech = client.get("/settings/feeds/tech").text
+    assert 'href="/settings/feeds/tech/theverge"' in tech   # the row opens the feed's page
+    conn = connect()
+    pf = Prefilter(env_cfg(env))
+    verge = Source(id="theverge", type="rss", category="tech", name="The Verge", url="https://theverge.com/rss")
+    ingest(conn, verge, [Item("theverge", "tech", "Chip news", "https://theverge.com/y", "e", NOW),
+                         Item("theverge", "tech", "Gossip", "https://theverge.com/z", "f", NOW),
+                         Item("theverge", "tech", "Muted one", "https://theverge.com/m", "g", NOW)], pf, NOW)
+    conn.execute("UPDATE items SET score_status='scored', topic=10, importance=10, personal=10, opened_at=? "
+                 "WHERE url='https://theverge.com/y'", (iso(NOW),))
+    conn.execute("UPDATE items SET score_status='scored', topic=0, importance=0, personal=0, rating=-1 "
+                 "WHERE url='https://theverge.com/z'")
+    conn.execute("UPDATE items SET prefilter='muted' WHERE url='https://theverge.com/m'")
+    conn.close()
+
+    from newsnest.feedstats import feed_numbers
+    n = feed_numbers(connect(), env_cfg(env), "theverge")
+    assert (n.stories, n.shown, n.low, n.muted, n.waiting, n.opened, n.disliked) == (4, 1, 1, 1, 1, 1, 1)
+    assert n.shown_share == 50 and [s.verdict for s in n.latest if s.title == "Chip news"] == ["shown"]
+
+    page = client.get("/settings/feeds/tech/theverge").text
+    assert "<h1>The Verge</h1>" in page and 'href="/settings/feeds/tech#feed-theverge"' in page   # back to Tech
+    assert "Good enough for your feed" in page and "1 muted by your filters" in page and "1 waiting for a score" in page
+    assert 'href="/go/' in page and "Chip news" in page and "Below your limit" in page and "Muted by a filter" in page
+    for action in ("/settings/feed_rename", "/settings/feed_section", "/settings/feed_cap", "/settings/feed_favicon",
+                   "/settings/feed_toggle", "/settings/feed_check", "/settings/feed_remove"):
+        assert f'action="{action}"' in page, action
+
+    # the address follows the feed: another section's address redirects, a feed that is gone goes to the section
+    assert client.get("/settings/feeds/world/theverge", follow_redirects=False).headers["location"] == "/settings/feeds/tech/theverge"
+    assert client.get("/settings/feeds/tech/nope", follow_redirects=False).headers["location"] == "/settings/feeds/tech"
+
+
+def test_changes_on_a_feed_page_come_back_to_it(client, env):
+    path = env.config / "config.yaml"
+    here = {"id": "theverge", "feed_page": "1", "section": "tech"}
+    r = client.post("/settings/feed_cap", data={**here, "daily_cap": "5"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds/tech/theverge?saved=feed_cap"
+    assert "daily_cap: 5" in path.read_text(encoding="utf-8")
+    client.post("/settings/feed_cap", data={**here, "daily_cap": ""})                  # no limit: the default, left out
+    assert "daily_cap" not in path.read_text(encoding="utf-8").split("id: theverge")[1].split("- id:")[0]
+    r = client.post("/settings/feed_cap", data={**here, "daily_cap": "lots"}, follow_redirects=False)
+    assert "error=" in r.headers["location"] and r.headers["location"].startswith("/settings/feeds/tech/theverge?")
+    r = client.post("/settings/feed_rename", data={**here, "name": "  The  Verge US "}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds/tech/theverge?saved=feed_rename"
+    assert "name: The Verge US" in path.read_text(encoding="utf-8")
+    assert "error=" in client.post("/settings/feed_rename", data={**here, "name": "  "}, follow_redirects=False).headers["location"]
+    # moved to another section: its page is now under that section
+    r = client.post("/settings/feed_section", data={**here, "category": "world"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds/world/theverge?saved=feed_section"
+    # removed: back to the section it was in
+    r = client.post("/settings/feed_remove", data={"id": "theverge", "section": "world"}, follow_redirects=False)
+    assert r.headers["location"] == "/settings/feeds/world?saved=feed_remove"
+
+
+def test_check_now_fetches_the_feed_once(client, env, monkeypatch):
+    from newsnest import runner
+    real_fetch_now = runner.fetch_now
+    asked = []
+    monkeypatch.setattr(runner, "fetch_now", lambda fid: asked.append(fid) or {"new": 2})
+    r = client.post("/settings/feed_check", data={"id": "theverge"}, follow_redirects=False)
+    assert asked == ["theverge"] and r.headers["location"] == "/settings/feeds/tech/theverge?saved=feed_check&new=2"
+    assert "2 new stories" in client.get(r.headers["location"]).text
+    monkeypatch.setattr(runner, "fetch_now", lambda fid: {"error": "the site asked to wait until 14:00 UTC"})
+    r = client.post("/settings/feed_check", data={"id": "theverge"}, follow_redirects=False)
+    assert r.headers["location"].startswith("/settings/feeds/tech/theverge?error=")
+    assert client.post("/settings/feed_check", data={"id": "nope"}, follow_redirects=False).headers["location"].startswith("/settings/feeds?error=")
+    # while the work loop is fetching, Check now doesn't wait for it
+    monkeypatch.setattr(runner, "fetch_now", real_fetch_now)
+    with runner._tick_lock:
+        assert "fetching right now" in runner.fetch_now("theverge")["error"]
