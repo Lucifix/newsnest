@@ -179,10 +179,10 @@ def test_find_then_add(client, env, monkeypatch):
     # the reader picks the section; the name is the feed's title, numbered when another feed has it
     r = client.post("/settings/feed_add", data={"name": "  Example\n", "url": "https://x.example/feed/", "category": "news"},
                     follow_redirects=False)
-    assert r.headers["location"] == "/settings/feeds?saved=feed_add#feed-example"
+    assert r.headers["location"] == "/settings/feeds/news?saved=feed_add#feed-example"
     r = client.post("/settings/feed_add", data={"name": "Example", "url": "https://y.example/feed", "category": "world"},
                     follow_redirects=False)
-    assert r.headers["location"] == "/settings/feeds?saved=feed_add#feed-example-2"
+    assert r.headers["location"] == "/settings/feeds/world?saved=feed_add#feed-example-2"
     config = (env.config / "config.yaml").read_text(encoding="utf-8")
     assert "name: Example\n" in config and "id: example-2" in config
     # once added, finding it again says so instead of offering it twice

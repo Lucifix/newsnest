@@ -1150,6 +1150,22 @@ def catalog_icons(conn=Depends(get_conn)):
     return {"running": catalog.warming(), "icons": catalog.found_icons(conn)}
 
 
+@app.get("/settings/feeds/{key}", response_class=HTMLResponse)
+def settings_section(key: str, request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
+    """One section under Feeds: its feeds, a way to add one, and the section's own settings."""
+    return _section_page(request, key, conn, loaded)
+
+
+def _section_page(request: Request, key: str, conn, loaded: LoadedConfig, **extra):
+    cfg = loaded.config
+    sec = next((s for s in cfg.all_sections if s.key == key), None) if cfg else None
+    if sec is None:   # removed meanwhile, or a typo: the list of sections is where to go next
+        return RedirectResponse("/settings/feeds", status_code=303)
+    return render(request, "settings_section.html", conn, loaded, page="feeds", root=False, sec=sec,
+                  error=request.query_params.get("error"), saved=request.query_params.get("saved"),
+                  **settings_context("feeds", conn, loaded), **extra)
+
+
 @app.get("/settings/{page}", response_class=HTMLResponse)
 def settings_page(page: str, request: Request, conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
     if page not in SETTINGS_PAGES:
@@ -1180,8 +1196,10 @@ def _free_id(feeds: list, name: str) -> str:
 
 
 @app.post("/settings/feed_find", response_class=HTMLResponse)
-def feed_find(request: Request, address: str = Form(""), conn=Depends(get_conn), loaded: LoadedConfig = Depends(get_loaded)):
-    """Look up the feeds behind a website address and show them with a preview, each with its own Add."""
+def feed_find(request: Request, address: str = Form(""), section: str = Form(""), conn=Depends(get_conn),
+              loaded: LoadedConfig = Depends(get_loaded)):
+    """Look up the feeds behind a website address and show them with a preview, each with its own Add.
+    Asked from a section's page, the answer is that page, with the section chosen for the feeds found."""
     cfg = _require_cfg(loaded)
     error = None
     try:
@@ -1194,7 +1212,10 @@ def feed_find(request: Request, address: str = Form(""), conn=Depends(get_conn),
     known = {normalize_url(f.url): f.name or f.id for f in cfg.feeds}
     for f in found:
         f.known = known.get(normalize_url(f.url))
-    return _settings(request, "feeds", conn, loaded, finder={"address": address, "found": found, "error": error})
+    finder = {"address": address, "found": found, "error": error}
+    if section in section_keys(cfg):
+        return _section_page(request, section, conn, loaded, finder=finder)
+    return _settings(request, "feeds", conn, loaded, finder=finder)
 
 
 @app.post("/settings/pack/lifestyle")
@@ -1215,8 +1236,8 @@ async def lifestyle_pack(request: Request):
     if form.get("interest"):
         write_profile("interests.md", add_interest(read_profile("interests.md"), LIFESTYLE_INTEREST))
     await asyncio.to_thread(_refile)
-    return RedirectResponse(f"/settings/feeds?pack={counts['added']}&packmoved={counts['moved']}"
-                            f"&interest={1 if form.get('interest') else 0}#section-lifestyle", status_code=303)
+    return RedirectResponse(f"/settings/feeds/lifestyle?pack={counts['added']}&packmoved={counts['moved']}"
+                            f"&interest={1 if form.get('interest') else 0}", status_code=303)
 
 
 def _onboarding_next(form) -> bool:
@@ -1280,8 +1301,8 @@ async def local_pack(code: str, request: Request):
     await asyncio.to_thread(_refile)
     if back == "/profile":
         return RedirectResponse(f"/profile?localpack={counts['added']}", status_code=303)
-    return RedirectResponse(f"/settings/feeds?localpack={counts['added']}&packmoved={counts['moved']}&country={quote(pack.country)}"
-                            "#section-news", status_code=303)
+    return RedirectResponse(f"/settings/feeds/news?localpack={counts['added']}&packmoved={counts['moved']}&country={quote(pack.country)}",
+                            status_code=303)
 
 
 @app.post("/settings/{action}")
@@ -1290,7 +1311,14 @@ async def settings_action(action: str, request: Request):
     back = "/calibration" if action in CALIBRATION_ACTIONS else "/settings/" + ACTION_PAGE.get(action, "general")
     if action == "region" and _onboarding_next(form):
         back = "/profile"
-    if "category" in form and form["category"] not in section_keys(load_config(config_dir()).config):
+    keys = section_keys(load_config(config_dir()).config)
+    # Feeds live on their section's page: a change made there comes back there. Only a key of a section that
+    # exists is followed, joined to our own prefix (CodeQL: what the form sent never picks the path itself)
+    page_of = {"feed_add": "category", "section_edit": "key", "section_remove": "key",
+               "feed_section": "section", "feed_toggle": "section", "feed_favicon": "section", "feed_remove": "section"}
+    if (field := page_of.get(action)) and (key := form.get(field)) in keys:
+        back = "/settings/feeds/" + keys[keys.index(key)]
+    if "category" in form and form["category"] not in keys:
         return RedirectResponse(f"{back}?error={quote('unknown section ' + form['category'])}", status_code=303)
 
     added = {}
@@ -1409,14 +1437,20 @@ async def settings_action(action: str, request: Request):
         n = await asyncio.to_thread(_refile)
         extra += f"&changed={quote(form['id'])}&n={n}"
     if action == "section_remove":
-        # Stories already stored under the section follow its feeds; this also catches those of feeds that are gone
+        # Stories already stored under the section follow its feeds; this also catches those of feeds that are gone.
+        # The section's page is gone with it: back to the list of sections
         n = await asyncio.to_thread(_move_section, form["key"], form["move_to"])
         extra += f"&feeds={removed['feeds']}&n={n}"
+        back = "/settings/feeds"
+    elif action == "section_add":
+        back = "/settings/feeds/" + added["key"]   # a new section is empty: its page is where it gets feeds
+    elif action == "section_move":
+        extra += "&arrange=1"                       # moves are made while arranging: stay arranging
     if action in ("feed_section", "feed_toggle"):
         anchor = f"#feed-{form['id']}"
     elif action == "feed_add":
         anchor = f"#feed-{added['id']}"
-    elif action.startswith("section_"):
+    elif action in ("section_move", "section_remove"):
         anchor = "#sections"
     # Calibration comes back to the period you were looking at (one of the page's own three, never the raw input)
     if action in CALIBRATION_ACTIONS and (days := CALIBRATION_DAYS.get(form.get("days", ""))):
