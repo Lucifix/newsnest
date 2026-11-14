@@ -191,9 +191,6 @@ Copyright © 2026 Lucifix. NewsNest is free software under the
 commercially. If you share a changed version, or run one for other people over a network, you must give
 them its source code under the same license.
 
-Versions up to and including v0.8.0 were released under the MIT License, and copies of those versions
-stay under MIT.
-
 The bundled fonts in [`newsnest/static/fonts/`](newsnest/static/fonts/) have their own license:
 [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) and
 [Space Grotesk](https://github.com/floriankarsten/space-grotesk) are licensed under the
