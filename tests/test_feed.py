@@ -157,9 +157,14 @@ def test_menu_feedback_hides_and_adjusts_weights_without_touching_config(db, cfg
 def test_menu_feedback_undo_restores_the_weight_it_replaced(db, cfg, monkeypatch):
     monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
     from newsnest.web import app
-    weight = lambda: (db.execute("SELECT weight FROM weights WHERE key = 'Health'").fetchone() or [None])[0]
-    post = lambda client, action: client.post("/api/feedback", data={"action": action, "target": "Health"},
-                                              headers={"Accept": "application/json"}).json()["weight"]
+
+    def weight():
+        return (db.execute("SELECT weight FROM weights WHERE key = 'Health'").fetchone() or [None])[0]
+
+    def post(client, action):
+        return client.post("/api/feedback", data={"action": action, "target": "Health"},
+                           headers={"Accept": "application/json"}).json()["weight"]
+
     with TestClient(app) as client:
         assert post(client, "less_category") == 0.75
         assert post(client, "undo_less_category") is None and weight() is None  # back to normal: no row
