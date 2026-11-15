@@ -672,8 +672,14 @@ a.chip { text-decoration: none; }
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 40;
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 0.9rem;
-  box-shadow: var(--shadow-hi);
+  box-shadow: var(--shadow-hi); display: flex; align-items: center; gap: 14px;
 }
+.toast[hidden] { display: none; }
+.toast-undo {
+  margin: -6px -8px -6px 0; padding: 6px 10px; border: 0; border-radius: 999px; background: transparent;
+  color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.toast-undo:hover, .toast-undo:focus-visible { background: color-mix(in srgb, var(--bg) 18%, transparent); }
 @media (max-width: 760px) { .toast { bottom: calc(90px + env(safe-area-inset-bottom)); } }
 
 .caughtup { text-align: center; padding: 36px 16px 8px; color: var(--muted); }
@@ -779,21 +785,56 @@ a.chip { text-decoration: none; }
 .loadmore.loading { color: var(--muted); }
 
 /* ---------- shared card menu: bottom sheet on phones, popover on desktop ---------- */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 45; background: rgb(0 0 0 / 0.35); }
-@media (min-width: 761px) { .sheet-backdrop { background: transparent; } }
+/* Both slide or fade in and out: [hidden] is display: none, which the transitions wait for (allow-discrete),
+   and @starting-style is where they come from. Browsers without either just show and hide them. */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 45; background: rgb(0 0 0 / 0.35); touch-action: none;
+  transition: opacity 0.2s ease, display 0.2s allow-discrete;
+}
+.sheet-backdrop[hidden] { opacity: 0; }
+@starting-style { .sheet-backdrop:not([hidden]) { opacity: 0; } }
+@media (min-width: 761px) { .sheet-backdrop { background: transparent; touch-action: auto; } }
 .sheet {
   position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; padding: 8px 8px calc(12px + env(safe-area-inset-bottom));
   background: var(--surface); border-radius: 18px 18px 0 0; box-shadow: var(--shadow-hi);
+  touch-action: none; /* a drag down moves the sheet, not the page */
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), display 0.24s allow-discrete;
 }
+.sheet[hidden] { transform: translateY(100%); transition-timing-function: cubic-bezier(0.4, 0, 1, 1); transition-duration: 0.18s; }
+@starting-style { .sheet:not([hidden]) { transform: translateY(100%); } }
+.sheet.dragging { transition: none; }
 .sheet::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--border); margin: 2px auto 6px; }
 .sheet-title { margin: 2px 12px 6px; font-size: 0.8rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 .sheet .pop-item[hidden] { display: none; }
 .kebab-btn svg { fill: currentColor; }
 .kebab-btn[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
 @media (min-width: 761px) {
-  .sheet { left: auto; right: auto; bottom: auto; width: 270px; padding: 6px; border-radius: 14px; border: 1px solid var(--border); }
+  .sheet {
+    left: auto; right: auto; bottom: auto; width: 270px; padding: 6px; border-radius: 14px; border: 1px solid var(--border);
+    touch-action: auto; transition: opacity 0.14s ease, transform 0.14s ease, display 0.14s allow-discrete;
+  }
+  .sheet[hidden] { opacity: 0; transform: scale(0.97); }
+  @starting-style { .sheet:not([hidden]) { opacity: 0; transform: scale(0.97); } }
   .sheet::before { display: none; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .sheet[hidden] { transition-property: opacity, display; }
+  .sheet[hidden] { opacity: 0; }
+  @starting-style { .sheet:not([hidden]) { opacity: 0; transform: none; } }
+}
+
+/* A card the reader said less about (or hid) stays in place under a veil with an Undo */
+.story.veiled { min-height: 128px; }
+.story.veiled > :not(.veil) { opacity: 0.25; filter: grayscale(1); }
+.veil {
+  position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 16px; text-align: center; border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 55%, transparent); animation: veil-in 0.2s ease;
+}
+.veil p { margin: 0; max-width: 32ch; color: var(--text); font-weight: 600; }
+.veil .button { margin: 0; }
+@keyframes veil-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .veil { animation: none; } }
 
 /* one-tap like / dislike */
 .acts.slim .act.like[aria-pressed="true"] { background: var(--ok); color: var(--surface); }

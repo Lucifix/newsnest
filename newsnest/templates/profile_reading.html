@@ -15,10 +15,10 @@
   <span class="srow-end">
     {% if r.effect %}<span class="srow-value">{{ r.effect }}</span>{% endif %}
     {% if r.kind == 'category' %}{% call menu(r.name) %}
-      {{ menu_item('/api/feedback', 'More about ' ~ r.name, 'plus', {'action': 'more_category', 'target': r.target}) }}
-      {{ menu_item('/api/feedback', 'Less about ' ~ r.name, 'minus', {'action': 'less_category', 'target': r.target}) }}
+      {{ menu_item('/api/feedback', 'More about ' ~ r.name, 'trend-up', {'action': 'more_category', 'target': r.target}) }}
+      {{ menu_item('/api/feedback', 'Less about ' ~ r.name, 'trend-down', {'action': 'less_category', 'target': r.target}) }}
     {% endcall %}{% elif r.kind == 'source' %}{% call menu(r.name) %}
-      {{ menu_item('/api/feedback', 'Less from ' ~ r.name, 'minus', {'action': 'less_source', 'target': r.target}) }}
+      {{ menu_item('/api/feedback', 'Less from ' ~ r.name, 'quieter', {'action': 'less_source', 'target': r.target}) }}
     {% endcall %}{% endif %}
   </span>
 </div>

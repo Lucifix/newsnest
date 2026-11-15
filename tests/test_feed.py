@@ -154,6 +154,32 @@ def test_menu_feedback_hides_and_adjusts_weights_without_touching_config(db, cfg
     assert order.index(i) < order.index(j)
 
 
+def test_menu_feedback_undo_restores_the_weight_it_replaced(db, cfg, monkeypatch):
+    monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
+    from newsnest.web import app
+
+    def weight():
+        return (db.execute("SELECT weight FROM weights WHERE key = 'Health'").fetchone() or [None])[0]
+
+    def post(client, action):
+        return client.post("/api/feedback", data={"action": action, "target": "Health"},
+                           headers={"Accept": "application/json"}).json()["weight"]
+
+    with TestClient(app) as client:
+        assert post(client, "less_category") == 0.75
+        assert post(client, "undo_less_category") is None and weight() is None  # back to normal: no row
+        post(client, "more_category")
+        post(client, "more_category")
+        assert post(client, "undo_more_category") == 1.25 == weight()  # only the latest choice
+        assert post(client, "undo_less_category") == 1.25  # nothing of that kind to take back
+        for _ in range(12):
+            post(client, "less_category")
+        assert weight() == 0.2  # clamped
+        assert post(client, "undo_less_category") == 0.2  # the clamped choice changed nothing
+    kinds = [r[0] for r in db.execute("SELECT kind FROM feedback WHERE target = 'Health' ORDER BY id")]
+    assert kinds == ["more_category"] + ["less_category"] * 11
+
+
 def test_category_chips_and_filter(db, cfg, monkeypatch):
     monkeypatch.setenv("NEWSNEST_SCHEDULER", "off")
     add(db, cfg, "a", "Nova bolnišnica v Ljubljani", "https://a.si/h", cat="Health", topic=7, importance=5, personal=7)

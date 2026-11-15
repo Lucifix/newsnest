@@ -708,36 +708,58 @@ def set_expanded(item_id: int, conn=Depends(get_conn)):
     return JSONResponse({"ok": True})
 
 
-FEEDBACK_ACTIONS = {"not_interested", "undo_not_interested", "less_source", "more_source", "less_category", "more_category"}
+WEIGHT_ACTIONS = {"less_source", "more_source", "less_category", "more_category"}
+FEEDBACK_ACTIONS = {"not_interested", "undo_not_interested", *WEIGHT_ACTIONS, *(f"undo_{a}" for a in WEIGHT_ACTIONS)}
 
 
 @app.post("/api/feedback")
 def feedback(request: Request, action: str = Form(...), ids: str = Form(""), target: str = Form(""),
              conn=Depends(get_conn)):
     """The card's menu. 'Not interested' hides the story and counts as 👎; the other actions adjust
-    learned outlet/category weights (ranking only) and are logged for the weekly profile proposal."""
+    learned outlet/category weights (ranking only) and are logged for the weekly profile proposal.
+    undo_<action> takes back the latest such choice for that target: the weight it replaced comes back."""
     if action not in FEEDBACK_ACTIONS:
         raise HTTPException(400, f"unknown action {action}")
     id_list = _ids(ids)
     now = iso(utcnow())
-    weight = None
+    weight = prev = None
     if action in ("not_interested", "undo_not_interested") and id_list:
         marks = ",".join("?" * len(id_list))
         hide = action == "not_interested"
         conn.execute(f"UPDATE items SET hidden_at = ? WHERE id IN ({marks})", (now if hide else None, *id_list))
         conn.execute("UPDATE items SET rating = ?, rated_at = ? WHERE id = ?",
                      (-1 if hide else None, now if hide else None, id_list[0]))
-    elif action.endswith("_source") and target:
-        weight = adjust_weight(conn, "source", target, 0.75 if action.startswith("less") else 1.25)
-    elif action.endswith("_category") and target:
-        weight = adjust_weight(conn, "category", target, 0.75 if action.startswith("less") else 1.25)
+    elif action in WEIGHT_ACTIONS and target:
+        kind = action.split("_", 1)[1]
+        row = conn.execute("SELECT weight FROM weights WHERE kind = ? AND key = ?", (kind, target)).fetchone()
+        prev = row["weight"] if row else None
+        weight = adjust_weight(conn, kind, target, 0.75 if action.startswith("less") else 1.25)
+    elif action.startswith("undo_") and target:
+        return _back(request, {"action": action, "weight": _undo_weight(conn, action.removeprefix("undo_"), target)})
     if action != "undo_not_interested":
-        conn.execute("INSERT INTO feedback (at, kind, target, item_id) VALUES (?, ?, ?, ?)",
-                     (now, action, target or None, id_list[0] if id_list else None))
+        conn.execute("INSERT INTO feedback (at, kind, target, item_id, prev_weight) VALUES (?, ?, ?, ?, ?)",
+                     (now, action, target or None, id_list[0] if id_list else None, prev))
     else:
         conn.execute("DELETE FROM feedback WHERE id = (SELECT MAX(id) FROM feedback WHERE kind = 'not_interested' "
                      "AND item_id = ?)", (id_list[0] if id_list else None,))
     return _back(request, {"action": action, "weight": weight})
+
+
+def _undo_weight(conn, action: str, target: str) -> float | None:
+    """Take back the latest `action` for target: its log entry goes and the weight it replaced comes back.
+    The weight it leaves (None: back to normal, no row)."""
+    kind = action.split("_", 1)[1]
+    last = conn.execute("SELECT id, prev_weight FROM feedback WHERE kind = ? AND target = ? ORDER BY id DESC LIMIT 1",
+                        (action, target)).fetchone()
+    if last:
+        conn.execute("DELETE FROM feedback WHERE id = ?", (last["id"],))
+        if last["prev_weight"] is None:
+            conn.execute("DELETE FROM weights WHERE kind = ? AND key = ?", (kind, target))
+        else:
+            conn.execute("UPDATE weights SET weight = ?, updated_at = ? WHERE kind = ? AND key = ?",
+                         (last["prev_weight"], iso(utcnow()), kind, target))
+    row = conn.execute("SELECT weight FROM weights WHERE kind = ? AND key = ?", (kind, target)).fetchone()
+    return row["weight"] if row else None
 
 
 @app.post("/api/weights/reset")
