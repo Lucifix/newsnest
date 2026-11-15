@@ -524,6 +524,12 @@ document.addEventListener("click", (event) => {
   if (event.target.classList.contains("sheet-backdrop")) dismissSheet();
 });
 
+// While a sheet is open the page behind stays put: a drag on the sheet or the dimmed backdrop scrolls nothing.
+// (The CSS says so with touch-action; this is for browsers that ignore it on a fixed layer.)
+for (const layer of document.querySelectorAll(".sheet, .sheet-backdrop")) {
+  layer.addEventListener("touchmove", (event) => { if (!wideSheets.matches) event.preventDefault(); }, { passive: false });
+}
+
 // Swipe down to close (phones). The sheet follows the finger; let go past a third of its height, or with a
 // flick, and it slides away from where it is, otherwise it springs back. A drag is never also a tap.
 for (const sheet of document.querySelectorAll(".sheet")) {
@@ -580,7 +586,7 @@ function openCardMenu(button) {
   if (readItem) {
     const read = button.closest(".story")?.dataset.read === "1";
     readItem.dataset.value = read ? "0" : "1";
-    readItem.querySelector("span").textContent = read ? "Mark as unread" : "I've already read this";
+    readItem.querySelector("span").textContent = read ? "Mark as unread" : "Mark as read";
   }
   // Above the button when there is room, else below
   presentSheet(cardMenu, cardMenu.previousElementSibling, button, (r, h, w) =>
