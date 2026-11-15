@@ -146,6 +146,16 @@ def test_go_marks_read_and_redirects(client):
     assert connect().execute("SELECT read_at FROM items WHERE id = 1").fetchone()[0]
 
 
+def test_card_menu_shares_the_original_article_link(client):
+    """Share sends the article's own address, not /go/: whoever gets the link can't get past the login."""
+    html = client.get("/?f=all").text
+    menu = html.split('id="cardmenu"', 1)[1].split("</div>", 1)[0]
+    assert 'data-action="share"' in menu
+    kebabs = re.findall(r'<button type="button" class="act kebab-btn".*?>', html, re.S)
+    assert kebabs and all('data-url="https://' in k for k in kebabs)
+    assert any('data-url="https://theverge.com/x" data-title="Airbnb bans making guests do dishes"' in k for k in kebabs)
+
+
 def test_settings_edit_keeps_comments_and_validates(client, env):
     path = env.config / "config.yaml"
     before = path.read_text(encoding="utf-8")
