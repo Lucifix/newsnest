@@ -445,6 +445,42 @@ function toast(message) {
   el._timer = setTimeout(() => { el.hidden = true; }, 2600);
 }
 
+// Copy text to the clipboard. The Clipboard API needs HTTPS, and NewsNest often runs on plain HTTP at home,
+// so fall back to a hidden textarea and execCommand there. Runs synchronously on that path, inside the tap.
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through */ }
+  }
+  const active = document.activeElement;
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+  document.body.append(area);
+  area.select();
+  area.setSelectionRange(0, text.length);
+  let copied = false;
+  try { copied = document.execCommand("copy"); } catch { copied = false; }
+  area.remove();
+  active?.focus?.({ preventScroll: true });
+  return copied;
+}
+
+// Share the article's original link: the phone's share sheet where there is one, else copy the link.
+// navigator.share must be called inside the tap, so nothing is awaited before it.
+async function shareStory(url, title) {
+  if (!url) return;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: title || undefined, url });
+      return;
+    } catch (e) {
+      if (e.name === "AbortError") return;  // the person closed the share sheet
+    }
+  }
+  toast(await copyText(url) ? "Link copied" : "Could not copy the link");
+}
+
 // One shared sheet for every card's ⋯ button (a bottom sheet on phones, a popover on desktop)
 const sheet = document.getElementById("cardmenu");
 const backdrop = document.querySelector(".sheet-backdrop");
@@ -463,6 +499,9 @@ function openSheet(button) {
   const d = button.dataset;
   sheet.querySelectorAll("[data-fill]").forEach((el) => { el.textContent = d[el.dataset.fill] || ""; });
   sheet.querySelectorAll("[data-needs-cat]").forEach((el) => { el.hidden = !d.cat; });
+  sheet.querySelectorAll("[data-needs-url]").forEach((el) => { el.hidden = !d.url; });
+  const shareItem = sheet.querySelector('[data-action="share"] span');
+  if (shareItem) shareItem.textContent = navigator.share ? "Share" : "Copy link";
   const readItem = sheet.querySelector('[data-action="read"]');
   if (readItem) {
     const read = button.closest(".story")?.dataset.read === "1";
@@ -493,6 +532,7 @@ document.addEventListener("click", async (event) => {
   const action = item.dataset.action;
   const story = menuButton.closest(".story");
   closeSheet();
+  if (action === "share") { await shareStory(d.url, d.title); return; }
   if (action === "read") {
     const read = item.dataset.value === "1";
     try {

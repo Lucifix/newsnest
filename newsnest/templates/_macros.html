@@ -192,6 +192,7 @@
 {% set c = it.card %}{% set r = c.lead.row %}
 <button type="button" class="act kebab-btn" aria-label="More options" title="More options" aria-haspopup="dialog"
         data-lead="{{ c.lead.id }}" data-ids="{{ c.ids }}" data-src="{{ r.source_id }}" data-srcname="{{ c.lead.source_name }}"
+        data-url="{{ r.url }}" data-title="{{ r.title }}"
         data-cat="{{ it.category if it.category != 'Unscored' else '' }}" data-rating="{{ r.rating or 0 }}">
   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
 </button>
