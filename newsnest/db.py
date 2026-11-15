@@ -252,6 +252,10 @@ MIGRATIONS: list[str] = [
         interest TEXT PRIMARY KEY, line TEXT NOT NULL, step INTEGER NOT NULL, updated_at TEXT NOT NULL
     )
     """,
+    # Undo for the card menu's "less from / more about": the weight the choice replaced (NULL: there was none)
+    """
+    ALTER TABLE feedback ADD COLUMN prev_weight REAL
+    """,
 ]
 
 

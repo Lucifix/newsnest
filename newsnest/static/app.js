@@ -153,6 +153,16 @@ document.addEventListener("submit", async (event) => {
     saveInPlace(form, event.submitter);
     return;
   }
+  if (openSheet?.sheet.contains(form) && !form.matches(".rate, .readform")) {
+    // It leaves the page: the sheet closes first, so Back on the next page does not land on its entry
+    event.preventDefault();
+    const { submitter } = event;
+    dismissSheet(false, () => {
+      if (submitter?.name) form.append(Object.assign(document.createElement("input"), { type: "hidden", name: submitter.name, value: submitter.value }));
+      form.submit();
+    });
+    return;
+  }
   const button = event.submitter;
   if (!button) return;
 
@@ -436,96 +446,209 @@ document.addEventListener("click", (event) => {
 });
 
 // ---------- card menu: more like this, not interested (with undo), less/more of outlet or category ----------
-function toast(message) {
+// A toast can carry an Undo; then it stays longer, and while a finger or the focus is on it
+function toast(message, undo) {
   const el = document.querySelector(".toast");
   if (!el) return;
-  el.textContent = message;
+  el.replaceChildren(Object.assign(document.createElement("span"), { textContent: message }));
+  if (undo) {
+    const button = Object.assign(document.createElement("button"), { type: "button", className: "toast-undo", textContent: "Undo" });
+    button.addEventListener("click", () => { el.hidden = true; undo(); });
+    el.append(button);
+  }
   el.hidden = false;
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.hidden = true; }, 2600);
+  const hide = () => {
+    el._timer = setTimeout(() => {
+      if (el.matches(":hover, :focus-within")) hide(); else el.hidden = true;
+    }, undo ? 5000 : 2600);
+  };
+  hide();
 }
 
-// One shared sheet for every card's ⋯ button (a bottom sheet on phones, a popover on desktop)
-const sheet = document.getElementById("cardmenu");
-const backdrop = document.querySelector(".sheet-backdrop");
-let menuButton = null;
+// ---------- sheets: the card ⋯ menu and the settings row ⋯ menu ----------
+// A bottom sheet on phones, a popover beside its button on desktop. One is open at a time. While it is
+// open it has a history entry, so the phone's Back closes it rather than leaving the page; on phones a
+// swipe down closes it too. It slides in and out (the CSS), and the focus goes back to its button.
+const wideSheets = window.matchMedia("(min-width: 761px)");
+let openSheet = null; // { sheet, backdrop, button }
 
-function closeSheet() {
-  if (!sheet || sheet.hidden) return;
+function presentSheet(sheet, backdrop, button, place) {
+  if (openSheet) dismissSheet();
+  openSheet = { sheet, backdrop, button };
+  sheet.style.transform = "";
+  sheet.hidden = false;
+  backdrop.hidden = false;
+  button.setAttribute("aria-expanded", "true");
+  if (wideSheets.matches) {
+    const r = button.getBoundingClientRect();
+    const { top, left } = place(r, sheet.offsetHeight, sheet.offsetWidth);
+    sheet.style.top = `${Math.max(8, top)}px`;
+    sheet.style.left = `${Math.max(8, left)}px`;
+  } else {
+    sheet.style.top = sheet.style.left = "";
+  }
+  if (!sheetBack && !history.state?.sheet) history.pushState({ ...history.state, sheet: true }, "");
+  sheet.querySelector(".pop-item:not([hidden])")?.focus({ preventScroll: true });
+}
+
+let sheetBack = null; // a Back this code started that has not arrived yet: what to do once it has
+
+// fromHistory: Back closed it, so its history entry is gone already. then: runs once that entry is gone
+// (a form that leaves the page waits for it, so the entry does not outlive the sheet)
+function dismissSheet(fromHistory = false, then = () => {}) {
+  if (!openSheet) return then();
+  const { sheet, backdrop, button } = openSheet;
+  openSheet = null;
   sheet.hidden = true;
   backdrop.hidden = true;
-  menuButton?.setAttribute("aria-expanded", "false");
-  menuButton?.focus({ preventScroll: true });
+  button.setAttribute("aria-expanded", "false");
+  button.focus({ preventScroll: true });
+  if (fromHistory || !history.state?.sheet) return then();
+  sheetBack = then;
+  history.back();
 }
 
-function openSheet(button) {
+addEventListener("popstate", () => {
+  if (sheetBack) {
+    const then = sheetBack;
+    sheetBack = null;
+    if (openSheet) history.pushState({ ...history.state, sheet: true }, "");  // another opened meanwhile
+    then();
+  } else if (openSheet && !history.state?.sheet) {
+    dismissSheet(true);
+  }
+});
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") dismissSheet(); });
+document.addEventListener("click", (event) => {
+  if (event.target.classList.contains("sheet-backdrop")) dismissSheet();
+});
+
+// Swipe down to close (phones). The sheet follows the finger; let go past a third of its height, or with a
+// flick, and it slides away from where it is, otherwise it springs back. A drag is never also a tap.
+for (const sheet of document.querySelectorAll(".sheet")) {
+  let start = null;
+  let dragged = false;
+  sheet.addEventListener("pointerdown", (event) => {
+    if (wideSheets.matches || !event.isPrimary || event.button > 0) return;
+    start = { y: event.clientY, x: event.clientX, t: event.timeStamp, dy: 0, dragging: false };
+    dragged = false;
+  });
+  sheet.addEventListener("pointermove", (event) => {
+    if (!start || !event.isPrimary) return;
+    const dy = event.clientY - start.y;
+    if (!start.dragging) {
+      if (Math.abs(dy) < 8 && Math.abs(event.clientX - start.x) < 8) return;
+      if (dy <= 0 || Math.abs(event.clientX - start.x) > dy) { start = null; return; }
+      start.dragging = dragged = true;
+      sheet.setPointerCapture(event.pointerId);
+      sheet.classList.add("dragging");
+    }
+    start.dy = Math.max(0, dy);
+    sheet.style.transform = `translateY(${start.dy}px)`;
+  });
+  const release = (event) => {
+    if (!start) return;
+    const { dy, t, dragging } = start;
+    start = null;
+    if (!dragging) return;
+    sheet.classList.remove("dragging");
+    const flick = dy / Math.max(1, event.timeStamp - t) > 0.5;
+    if (event.type === "pointerup" && (dy > sheet.offsetHeight / 3 || flick)) dismissSheet();  // slides on from dy
+    else sheet.style.transform = "";  // springs back
+  };
+  sheet.addEventListener("pointerup", release);
+  sheet.addEventListener("pointercancel", release);
+  sheet.addEventListener("click", (event) => {
+    if (!dragged) return;
+    dragged = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+}
+
+// ---------- the card ⋯ menu ----------
+const cardMenu = document.getElementById("cardmenu");
+let menuButton = null;
+
+function openCardMenu(button) {
   menuButton = button;
   const d = button.dataset;
-  sheet.querySelectorAll("[data-fill]").forEach((el) => { el.textContent = d[el.dataset.fill] || ""; });
-  sheet.querySelectorAll("[data-needs-cat]").forEach((el) => { el.hidden = !d.cat; });
-  const readItem = sheet.querySelector('[data-action="read"]');
+  cardMenu.querySelectorAll("[data-fill]").forEach((el) => { el.textContent = d[el.dataset.fill] || ""; });
+  cardMenu.querySelectorAll("[data-needs-cat]").forEach((el) => { el.hidden = !d.cat; });
+  const readItem = cardMenu.querySelector('[data-action="read"]');
   if (readItem) {
     const read = button.closest(".story")?.dataset.read === "1";
     readItem.dataset.value = read ? "0" : "1";
     readItem.querySelector("span").textContent = read ? "Mark as unread" : "I've already read this";
   }
-  sheet.hidden = false;
-  backdrop.hidden = false;
-  button.setAttribute("aria-expanded", "true");
-  if (window.matchMedia("(min-width: 761px)").matches) {
-    const r = button.getBoundingClientRect();
-    const top = r.top - sheet.offsetHeight - 8 > 8 ? r.top - sheet.offsetHeight - 8 : r.bottom + 8;
-    sheet.style.top = `${top}px`;
-    sheet.style.left = `${Math.max(8, r.right - sheet.offsetWidth)}px`;
-  } else {
-    sheet.style.top = sheet.style.left = "";
-  }
-  sheet.querySelector(".pop-item:not([hidden])").focus({ preventScroll: true });
+  // Above the button when there is room, else below
+  presentSheet(cardMenu, cardMenu.previousElementSibling, button, (r, h, w) =>
+    ({ top: r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8, left: r.right - w }));
+}
+
+// The card stays where it is under a veil that says what changed, with an Undo (as long as the page
+// is open), so the feed does not jump and a mis-tap is one tap away from undone. Undo lifts the veil.
+function veilStory(story, message, undo) {
+  if (!story || story.querySelector(":scope > .veil")) return;
+  const veil = document.createElement("div");
+  veil.className = "veil";
+  veil.innerHTML = '<p></p><button type="button" class="button small secondary">Undo</button>';
+  veil.querySelector("p").textContent = message;
+  const covered = [...story.children];
+  covered.forEach((el) => { el.inert = true; });
+  story.classList.add("veiled");
+  story.append(veil);
+  veil.querySelector("button").addEventListener("click", async () => {
+    try {
+      await undo();
+      covered.forEach((el) => { el.inert = false; });
+      story.classList.remove("veiled");
+      veil.remove();
+    } catch { toast("That did not work; try again"); }
+  });
+}
+
+async function setRead(story, ids, read) {
+  await postForm("/api/read", { ids, value: read ? "1" : "0" });
+  setStoryRead(story, read);
+  applyFilters();
 }
 
 document.addEventListener("click", async (event) => {
   const kebab = event.target.closest(".kebab-btn");
-  if (kebab) { openSheet(kebab); return; }
-  if (event.target === backdrop) { closeSheet(); return; }
+  if (kebab) { openCardMenu(kebab); return; }
   const item = event.target.closest("#cardmenu .pop-item");
   if (!item || !menuButton) return;
   const d = menuButton.dataset;
   const action = item.dataset.action;
   const story = menuButton.closest(".story");
-  closeSheet();
+  dismissSheet();
   if (action === "read") {
     const read = item.dataset.value === "1";
     try {
-      await postForm("/api/read", { ids: d.ids, value: item.dataset.value });
-      setStoryRead(story, read);
-      applyFilters();
-      toast(read ? "Marked as read" : "Marked as unread");
+      await setRead(story, d.ids, read);
+      toast(read ? "Marked as read" : "Marked as unread", async () => {
+        try { await setRead(story, d.ids, !read); } catch { toast("That did not work; try again"); }
+      });
     } catch { toast("That did not work; try again"); }
     return;
   }
+  const bySource = action.endsWith("_source");
+  const target = bySource ? d.src : d.cat;
+  const what = `${bySource ? "from" : "about"} ${bySource ? d.srcname : d.cat}`;
+  const undo = () => postForm("/api/feedback", { action: `undo_${action}`, target });
   try {
-    const target = action.endsWith("_source") ? d.src : d.cat;
     await postForm("/api/feedback", { action, target });
-    const label = action.endsWith("_source") ? d.srcname : d.cat;
-    toast(`${action.startsWith("less") ? "Showing less" : "Showing more"} ${action.endsWith("_source") ? "from" : "about"} ${label}`);
+    // "Less" is about this card too, so it goes under a veil; "more" leaves the card to be read
+    if (action.startsWith("less")) veilStory(story, `You'll see less ${what}.`, undo);
+    else toast(`You'll see more ${what}`, async () => {
+      try { await undo(); } catch { toast("That did not work; try again"); }
+    });
   } catch { toast("That did not work; try again"); }
 });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeSheet(); });
 
 // ---------- one-tap like / dislike on every card ----------
-function hideStory(story, ids) {
-  story.hidden = true;
-  const bar = document.createElement("div");
-  bar.className = "hiddenbar";
-  bar.innerHTML = '<span>Hidden. You will see fewer stories like this.</span><button type="button" class="button small secondary">Undo</button>';
-  story.after(bar);
-  bar.querySelector("button").addEventListener("click", async () => {
-    await postForm("/api/feedback", { action: "undo_not_interested", ids });
-    story.hidden = false;
-    bar.remove();
-  });
-}
-
 document.addEventListener("click", async (event) => {
   const like = event.target.closest(".act.like");
   const dislike = event.target.closest(".act.dislike");
@@ -538,9 +661,10 @@ document.addEventListener("click", async (event) => {
       like.setAttribute("aria-pressed", String(rating === 1));
       toast(rating === 1 ? "More like this" : "Removed");
     } else {
-      const story = dislike.closest(".story");
-      hideStory(story, dislike.dataset.ids);
-      await postForm("/api/feedback", { action: "not_interested", ids: dislike.dataset.ids });
+      const ids = dislike.dataset.ids;
+      veilStory(dislike.closest(".story"), "Hidden. You'll see fewer stories like this.",
+        () => postForm("/api/feedback", { action: "undo_not_interested", ids }));
+      await postForm("/api/feedback", { action: "not_interested", ids });
     }
   } catch { toast("That did not work; try again"); }
 });
@@ -1651,39 +1775,18 @@ document.addEventListener("keydown", (event) => {
 
 // ---------- settings: a row's ⋯ menu, words as chips, folded groups that open for the row you came back to ----------
 const rowSheet = document.getElementById("rowmenu");
-const rowBackdrop = document.getElementById("rowbackdrop");
 let rowButton = null;
 
-function closeRowMenu() {
-  if (!rowSheet || rowSheet.hidden) return;
-  rowSheet.hidden = true;
-  rowBackdrop.hidden = true;
-  rowButton?.setAttribute("aria-expanded", "false");
-  rowButton?.focus({ preventScroll: true });
-}
-
 document.addEventListener("click", (event) => {
-  if (!rowSheet) return;
-  if (event.target === rowBackdrop) { closeRowMenu(); return; }
-  const button = event.target.closest(".rowmenu-btn");
+  const button = rowSheet && event.target.closest(".rowmenu-btn");
   if (!button) return;
   rowButton = button;
   rowSheet.querySelector(".sheet-title").textContent = button.dataset.title;
   rowSheet.querySelector("[data-items]").replaceChildren(button.nextElementSibling.content.cloneNode(true));
-  rowSheet.hidden = false;
-  rowBackdrop.hidden = false;
-  button.setAttribute("aria-expanded", "true");
-  if (window.matchMedia("(min-width: 761px)").matches) {
-    const r = button.getBoundingClientRect();
-    const top = r.bottom + 8 + rowSheet.offsetHeight < innerHeight ? r.bottom + 8 : r.top - rowSheet.offsetHeight - 8;
-    rowSheet.style.top = `${Math.max(8, top)}px`;
-    rowSheet.style.left = `${Math.max(8, r.right - rowSheet.offsetWidth)}px`;
-  } else {
-    rowSheet.style.top = rowSheet.style.left = "";
-  }
-  rowSheet.querySelector(".pop-item")?.focus({ preventScroll: true });
+  // Below the button when there is room, else above
+  presentSheet(rowSheet, document.getElementById("rowbackdrop"), button, (r, h, w) =>
+    ({ top: r.bottom + 8 + h < innerHeight ? r.bottom + 8 : r.top - h - 8, left: r.right - w }));
 });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeRowMenu(); });
 
 // ---------- settings: save in place ----------
 // A form with data-inplace posts in the background. The server answers as it does without JS, with a redirect to the
@@ -1700,7 +1803,7 @@ function saveInPlace(form, submitter) {
   if (submitter?.name) body.append(submitter.name, submitter.value);
   // A ⋯ menu item lives in the sheet: the row it belongs to is where the page holds still and the focus returns
   const fromMenu = rowSheet?.contains(form);
-  if (fromMenu) closeRowMenu();
+  if (fromMenu) dismissSheet();
   const origin = fromMenu ? rowButton : form;
   const page = document.querySelector(".spage");
   const anchors = [];

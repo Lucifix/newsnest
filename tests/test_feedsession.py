@@ -231,6 +231,7 @@ def test_the_migration_adds_the_table_to_an_existing_database(env):
     for column in ("interest", "view_ms", "expanded_at"):
         conn.execute(f"ALTER TABLE items DROP COLUMN {column}")
     conn.execute("DROP TABLE interest_levels")
+    conn.execute("ALTER TABLE feedback DROP COLUMN prev_weight")
     before = next(i for i, sql in enumerate(MIGRATIONS) if "CREATE TABLE feed_sessions" in sql)
     conn.execute("UPDATE schema_version SET version = ?", (before,))
     assert migrate(conn) == len(MIGRATIONS)
