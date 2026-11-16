@@ -1,0 +1,30 @@
+# Config for the read-only demo (see demo/build.py). Made-up outlets only; nothing here is fetched.
+timezone: Europe/Amsterdam
+
+sections:
+  - {key: news, label: Local}
+  - {key: world, label: World}
+  - {key: tech, label: Tech, icon: chip}
+
+feeds:
+  - {id: harbor-times, name: Harbor Times, url: "https://example.com/feeds/harbor-times.xml", category: news, favicon: false}
+  - {id: old-town-gazette, name: Old Town Gazette, url: "https://example.com/feeds/old-town-gazette.xml", category: news, favicon: false}
+  - {id: canal-courier, name: Canal Courier, url: "https://example.com/feeds/canal-courier.xml", category: news, favicon: false}
+  - {id: meridian-post, name: Meridian Post, url: "https://example.com/feeds/meridian-post.xml", category: world, favicon: false}
+  - {id: northern-wire, name: Northern Wire, url: "https://example.com/feeds/northern-wire.xml", category: world, favicon: false}
+  - {id: daily-ledger, name: Daily Ledger, url: "https://example.com/feeds/daily-ledger.xml", category: world, favicon: false}
+  - {id: kernel-weekly, name: Kernel Weekly, url: "https://example.com/feeds/kernel-weekly.xml", category: tech, favicon: false}
+  - {id: open-circuit, name: Open Circuit, url: "https://example.com/feeds/open-circuit.xml", category: tech, favicon: false}
+  - {id: pixel-ledger, name: Pixel Ledger, url: "https://example.com/feeds/pixel-ledger.xml", category: tech, favicon: false}
+
+scoring:
+  calibration_mode: false
+
+# A fresh database makes every outlet "new", and new outlets get their weakest stories into the feed (and onto
+# the front page's Top stories). The demo shows the plain ranking instead.
+feed:
+  new_source_stories: 0
+  explore_every: 0
+
+drift:
+  enabled: false

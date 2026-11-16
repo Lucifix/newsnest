@@ -1,0 +1,25 @@
+/* Demo-only styles; the colours come from the app's own variables, so light and dark both work. */
+.demo-strip {
+  padding: 8px 16px;
+  background: var(--accent-soft);
+  color: var(--accent-ink, var(--text));
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: center;
+}
+.demo-strip a { color: inherit; font-weight: 700; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .demo-strip { background: var(--surface-2); color: var(--text); }
+}
+:root[data-theme="dark"] .demo-strip { background: var(--surface-2); color: var(--text); }
+
+/* Search needs a server */
+.topsearch, .docksearch, .searchlayer, .search-open { display: none !important; }
+
+/* Fallback toast, used only if app.js has not defined its own */
+.demo-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  padding: 10px 16px; border-radius: 8px; background: var(--text); color: var(--bg);
+  font-size: 0.875rem; z-index: 100;
+}
+.demo-toast[hidden] { display: none; }

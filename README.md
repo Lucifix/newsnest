@@ -15,7 +15,7 @@ what matters to you.
 [![Docker pulls](https://img.shields.io/docker/pulls/lucifix/newsnest?logo=docker&logoColor=white)](https://hub.docker.com/r/lucifix/newsnest)
 [![Build status](https://img.shields.io/github/actions/workflow/status/Lucifix/newsnest/docker-publish.yml?branch=main&label=build)](https://github.com/Lucifix/newsnest/actions/workflows/docker-publish.yml)
 
-[Website](https://lucifix.github.io/newsnest/) · [Features](#features) · [Quick start](#quick-start) · [How it works](docs/how-it-works.md) · [Install](docs/install.md) · [Configuration](docs/configuration.md) · [Contributing](CONTRIBUTING.md)
+[Website](https://lucifix.github.io/newsnest/) · [Demo](https://lucifix.github.io/newsnest/demo/) · [Features](#features) · [Quick start](#quick-start) · [How it works](docs/how-it-works.md) · [Install](docs/install.md) · [Configuration](docs/configuration.md) · [Contributing](CONTRIBUTING.md)
 
 <br>
 
@@ -53,6 +53,9 @@ NewsNest is the opposite deal. **You choose the sources, you write down what int
 see why every story ranks where it does.** It runs on your own machine, keeps everything in one SQLite
 file, and talks to the Anthropic API with your own key, or to any OpenAI-compatible API, including a
 local model in Ollama.
+
+Want a look first? Try the [read-only demo](https://lucifix.github.io/newsnest/demo/): made-up stories, no
+install.
 
 ## Features
 

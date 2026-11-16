@@ -42,6 +42,17 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 - If your change makes a sentence in [How NewsNest works](docs/how-it-works.md) wrong, update it in the
   same PR.
 
+## The demo
+
+[`demo/`](demo/) builds the read-only demo at <https://lucifix.github.io/newsnest/demo/>: it runs the real
+app once against made-up stories and saves every page as plain HTML. The demo needs no code in `newsnest/`.
+
+- The stories, outlets and interests are in `demo/stories.yaml`, `demo/config.yaml` and `demo/interests.md`.
+- Preview it with `python -m demo serve` and open the address it prints.
+- The Pages workflow rebuilds it on every merge to `main` and once a day.
+- `tests/test_demo.py` fails if a change leaves a demo link pointing nowhere. A new page the demo should
+  show only needs a link to it from a page the demo already has.
+
 ## Your first PR: a local news pack for your country
 
 Add a `LocalPack` to `LOCAL_PACKS` in [`newsnest/packs.py`](newsnest/packs.py) with 8 to 10 national
