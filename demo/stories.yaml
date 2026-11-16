@@ -1,0 +1,654 @@
+# The made-up stories of the demo. One entry = one card; its articles are the outlets' versions of the story.
+# Every outlet, name and event here is fictional. Schema: see the plan in CONTRIBUTING.md ("The demo").
+
+# ---------------------------------------------------------------- Local
+- section: news
+  hours_ago: 3
+  event: old-town-bridge
+  category: Local
+  topic: 8
+  importance: 8
+  personal: 8
+  reason: "Matches your interest in cycling and city transport; the main bridge goes car-free."
+  summary:
+    lede: "The old town's main bridge closes to cars for good from next month and becomes a walking and cycling route."
+    points:
+      - "Cars are barred from the bridge from the first of next month; buses and delivery vans keep a morning window."
+      - "The two traffic lanes become a wide cycle track and a promenade with benches."
+      - "A trial last summer cut crossings by car by a third without clogging the streets nearby."
+    why: "A direct link between the station and the old town for anyone who cycles."
+    depth: enough
+  image: city-bike.webp
+  state: [liked]
+  articles:
+    - {outlet: harbor-times, title: "Old town closes its main bridge to cars for good", snippet: "From next month the stone bridge is for walkers and cyclists only, the council said on Tuesday."}
+    - {outlet: old-town-gazette, title: "Main bridge goes car-free after a summer trial", snippet: "Shopkeepers are split, but the council says the numbers from the trial are clear.", minutes_earlier: 40}
+
+- section: news
+  hours_ago: 5
+  event: canal-cycle-lanes
+  category: Local
+  topic: 8
+  importance: 5
+  personal: 9
+  reason: "Matches your interest in cycling; a new protected route along the canal."
+  summary:
+    lede: "New protected cycle lanes open along both banks of the canal this weekend."
+    points:
+      - "The lanes run for four kilometres, from the lock to the east harbour."
+      - "They are separated from the towpath by a low kerb, with lights at the three crossings."
+    why: "It is the quickest flat route between the station and the east side."
+    depth: enough
+  articles:
+    - {outlet: canal-courier, title: "New cycle lanes open along the canal this weekend", snippet: "A ribbon-cutting at the lock on Saturday morning opens the four-kilometre route."}
+
+- section: news
+  hours_ago: 8
+  event: library-winter-hours
+  category: Culture
+  topic: 5
+  importance: 5
+  personal: 6
+  reason: "A small local item; two outlets carry it."
+  summary:
+    lede: "The central library keeps its longer opening hours through the winter."
+    points:
+      - "Doors now open at eight and close at nine on weekdays."
+      - "Study rooms can be booked a week ahead on the library's site."
+    why: "Handy if you work from the reading room."
+    depth: enough
+  image: library.webp
+  state: [saved]
+  articles:
+    - {outlet: harbor-times, title: "Library extends opening hours through the winter", snippet: "The council found the money after a busy autumn."}
+    - {outlet: canal-courier, title: "Reading room to stay open until nine", snippet: "Students asked for the later closing time in a petition.", minutes_earlier: 25}
+
+- section: news
+  hours_ago: 11
+  event: market-zero-waste
+  category: Food & drink
+  topic: 6
+  importance: 4
+  personal: 6
+  reason: "A neighbourhood item with a mild link to your interests."
+  summary:
+    lede: "The market hall tries a zero-waste Saturday, with no single-use packaging at any stall."
+    points:
+      - "Stallholders sell loose produce and fill reusable tubs and jars."
+      - "The trial runs for six Saturdays, then the traders vote on keeping it."
+    why: "A change you will notice if you shop there."
+    depth: enough
+  state: [read]
+  articles:
+    - {outlet: old-town-gazette, title: "Market hall to trial a zero-waste Saturday", snippet: "Traders will fill tubs and jars instead of handing out bags."}
+
+- section: news
+  hours_ago: 14
+  event: tram-timetable
+  category: Local
+  topic: 7
+  importance: 6
+  personal: 7
+  reason: "Matches your interest in city transport; the timetable changes on Monday."
+  summary:
+    lede: "Tram timetables change on Monday, with more services at rush hour and fewer late at night."
+    points:
+      - "Lines 2 and 5 run every six minutes between seven and nine in the morning."
+      - "The last tram on weekdays leaves the centre at 23:10 instead of 00:05."
+      - "A free night bus covers the gap on the busiest routes."
+    why: "Check your usual connection before Monday."
+    depth: full
+    depth_tag: timetable
+  image: tram.webp
+  articles:
+    - {outlet: harbor-times, title: "Tram timetable changes start on Monday", snippet: "Rush-hour trams get more frequent, late-night ones do not."}
+    - {outlet: old-town-gazette, title: "Trams run more often at rush hour from Monday", snippet: "The transport company says passenger counts drove the new plan.", minutes_earlier: 30}
+    - {outlet: canal-courier, title: "Late trams cut back as the new timetable arrives", snippet: "A night bus will replace the last services on two lines.", minutes_earlier: 55}
+
+- section: news
+  hours_ago: 20
+  event: parish-parking
+  category: Local
+  topic: 4
+  importance: 4
+  personal: 4
+  reason: "Local politics with little overlap with your interests."
+  summary:
+    lede: "The parish council argues over a new charge for evening parking near the church."
+    points:
+      - "The plan would charge two euros an hour after six in the evening."
+      - "A vote is expected at the next meeting, with no clear majority yet."
+    depth: enough
+  articles:
+    - {outlet: canal-courier, title: "Parish council debates a new parking charge", snippet: "Residents on both sides have written to the council."}
+
+- section: news
+  hours_ago: 4
+  event: bike-share-east
+  category: Local
+  topic: 8
+  importance: 6
+  personal: 8
+  reason: "Matches your interest in cycling and city transport; the bike-share reaches a new district."
+  summary:
+    lede: "The city's bike-share expands to the east harbour, with 40 stations opening over the next month."
+    points:
+      - "Stations go in every few hundred metres, most of them beside tram stops."
+      - "Half of the 400 new bikes are electric."
+      - "The first half hour of every ride stays free for annual pass holders."
+    why: "Makes the trip from the east harbour to the centre easy without a car."
+    depth: enough
+  image: bike-share.webp
+  articles:
+    - {outlet: harbor-times, title: "Bike-share expands to the east harbour with 40 stations", snippet: "The first stations open next week near the ferry terminal."}
+    - {outlet: canal-courier, title: "Shared bikes reach the east harbour next month", snippet: "Half the new fleet will be electric.", minutes_earlier: 50}
+
+- section: news
+  hours_ago: 9.5
+  event: school-streets
+  category: Local
+  topic: 7
+  importance: 6
+  personal: 7
+  reason: "Matches your interest in city transport; streets near schools close at drop-off time."
+  summary:
+    lede: "Six streets outside primary schools close to through traffic at drop-off and pick-up time."
+    points:
+      - "The closures last 45 minutes in the morning and afternoon on school days."
+      - "Residents and blue-badge holders can still drive in."
+    why: "Quieter, safer routes if you walk or cycle past a school."
+    depth: enough
+  articles:
+    - {outlet: old-town-gazette, title: "School streets close to traffic at drop-off time", snippet: "The scheme starts after the autumn half-term."}
+
+- section: news
+  hours_ago: 17
+  event: lakeside-park
+  category: Local
+  topic: 6
+  importance: 5
+  personal: 5
+  reason: "A neighbourhood improvement with a loose link to your interests."
+  summary:
+    lede: "Lakeside park gets a new playground and a picnic lawn, opening in spring."
+    points:
+      - "The old car park becomes the lawn, with trees along its edge."
+      - "The playground has equipment for children who use wheelchairs."
+    depth: enough
+  articles:
+    - {outlet: harbor-times, title: "Lakeside park gets a playground and picnic lawn", snippet: "Work starts in January and should finish by April."}
+
+- section: news
+  hours_ago: 24
+  event: bakery-prize
+  category: Food & drink
+  topic: 6
+  importance: 4
+  personal: 6
+  reason: "A small local story; you follow the old town's food news."
+  summary:
+    lede: "A night bakery on Mill Lane wins the regional prize for its rye bread."
+    points:
+      - "The judges tasted 120 loaves from bakeries across the region."
+      - "The bakery opens its doors at five in the morning, when the bread comes out."
+    why: "Worth a detour on your next morning ride."
+    depth: enough
+  articles:
+    - {outlet: canal-courier, title: "Mill Lane bakery wins regional bread prize", snippet: "Its rye loaf beat 119 others in a blind tasting."}
+
+- section: news
+  hours_ago: 6.5
+  event: pool-reopens
+  category: Local
+  topic: 5
+  importance: 5
+  personal: 6
+  reason: "Local news covered by two outlets."
+  summary:
+    lede: "The town's indoor swimming pool reopens on Saturday after a year of repairs."
+    points:
+      - "The roof, the changing rooms and the heating were all replaced."
+      - "Early-morning lane swimming returns at seven on weekdays."
+      - "Tickets cost the same as before the closure."
+    why: "Early lanes are back if you swim before work."
+    depth: enough
+  image: pool.webp
+  articles:
+    - {outlet: harbor-times, title: "Swimming pool reopens after a year of repairs", snippet: "A new roof and heating system went in during the closure."}
+    - {outlet: old-town-gazette, title: "Town pool opens again after long repair work", snippet: "Lane swimming at seven in the morning is back.", minutes_earlier: 35}
+
+# ---------------------------------------------------------------- World
+- section: world
+  hours_ago: 2
+  event: flood-fund
+  category: World
+  topic: 8
+  importance: 9
+  personal: 8
+  reason: "Matches your interest in climate policy; five coastal cities share the cost."
+  summary:
+    lede: "Five coastal cities agree to pool money for sea walls and flood barriers, with a fund of two billion over ten years."
+    points:
+      - "Each city pays in according to its size and how much coastline it must protect."
+      - "The first money goes to the cities with the oldest defences."
+      - "An independent panel will check each project before funds are released."
+      - "Smaller towns can apply to join from next year."
+    why: "A rare case of cities sharing the bill for climate adaptation."
+    depth: full
+    depth_tag: analysis
+  image: sea-wall.webp
+  articles:
+    - {outlet: meridian-post, title: "Coastal cities agree on a shared flood-defence fund", snippet: "Mayors signed the deal at a summit on Monday night."}
+    - {outlet: northern-wire, title: "Five port cities pool billions for sea walls", snippet: "The money will be spent over ten years on barriers and pumps.", minutes_earlier: 35}
+    - {outlet: daily-ledger, title: "Mayors sign pact to split the cost of flood barriers", snippet: "A panel of outside engineers will approve each project.", minutes_earlier: 70}
+
+- section: world
+  hours_ago: 4
+  event: night-trains
+  category: Travel & outdoors
+  topic: 9
+  importance: 8
+  personal: 9
+  reason: "Matches your interest in rail travel in Europe; four new sleeper routes."
+  summary:
+    lede: "Night trains return on four European routes, with sleeper cars booking from next month."
+    points:
+      - "The new routes link the north coast with the Alps, the south and two capitals."
+      - "Sleeper cabins come in two-, four- and six-berth versions, plus seats."
+      - "Fares start at a price close to a daytime ticket."
+    why: "Four routes you could use for a weekend trip without a flight."
+    depth: full
+    depth_tag: route guide
+  image: night-train.webp
+  state: [saved]
+  articles:
+    - {outlet: meridian-post, title: "Night trains return on four European routes", snippet: "Operators say bookings for the first month have already opened."}
+    - {outlet: northern-wire, title: "Sleeper services restart between the north coast and the Alps", snippet: "New cars with showers were ordered last spring.", minutes_earlier: 45}
+
+- section: world
+  hours_ago: 7
+  event: solar-record
+  category: Science
+  topic: 7
+  importance: 7
+  personal: 8
+  reason: "Matches your interest in energy policy; a record month for solar power."
+  summary:
+    lede: "Solar panels across the south produced more power last month than in any month before."
+    points:
+      - "Output was up a fifth on the same month last year."
+      - "On three sunny days solar alone covered the region's midday demand."
+    why: "A sign that new capacity is arriving faster than expected."
+    depth: enough
+  image: solar.webp
+  state: [read]
+  articles:
+    - {outlet: northern-wire, title: "Solar output hits a new high across the south", snippet: "The grid operator published the figures on Sunday."}
+
+- section: world
+  hours_ago: 10
+  event: harvest-festival
+  category: Culture
+  topic: 5
+  importance: 4
+  personal: 5
+  reason: "A pleasant regional item with a loose link to your interests."
+  summary:
+    lede: "The valley's harvest festival drew its biggest crowds yet over the weekend."
+    points:
+      - "More than forty thousand visitors came over three days."
+      - "Extra trains ran on the valley line and were full."
+    depth: enough
+  articles:
+    - {outlet: daily-ledger, title: "Harvest festival draws its biggest crowds yet to the valley", snippet: "Organisers had to add trains to cope with the visitors."}
+    - {outlet: meridian-post, title: "Valley festival fills every train out of the capital", snippet: "Stalls ran out of fruit by Saturday afternoon.", minutes_earlier: 50}
+
+- section: world
+  hours_ago: 13
+  event: battery-ferries
+  category: World
+  topic: 7
+  importance: 6
+  personal: 7
+  reason: "Matches your interest in energy and transport."
+  summary:
+    lede: "Ferry operators begin trials of battery-powered crossings on two short routes."
+    points:
+      - "The boats charge in ten minutes at each end of the crossing."
+      - "The operators expect to run the full fleet on batteries within five years."
+    why: "Shows how short-haul transport can switch away from diesel."
+    depth: enough
+  image: ferry.webp
+  state: [liked]
+  articles:
+    - {outlet: northern-wire, title: "Ferry operators trial battery-powered crossings", snippet: "Two routes will run without diesel from this week."}
+
+- section: world
+  hours_ago: 18
+  event: mild-winter
+  category: World
+  topic: 4
+  importance: 4
+  personal: 5
+  reason: "Routine weather news with little link to your interests."
+  summary:
+    lede: "The weather service expects a mild start to winter, with rain rather than snow."
+    points:
+      - "Temperatures should stay a few degrees above the usual until January."
+      - "Skiing areas may open late."
+    depth: enough
+  state: [disliked]
+  articles:
+    - {outlet: daily-ledger, title: "Weather service expects a mild start to winter", snippet: "The outlook covers the next eight weeks."}
+
+- section: world
+  hours_ago: 3.5
+  event: offshore-wind
+  category: Science
+  topic: 8
+  importance: 8
+  personal: 8
+  reason: "Matches your interest in energy policy; a large wind farm starts supplying the grid."
+  summary:
+    lede: "An offshore wind farm starts sending power to the grid, enough for about half a million homes."
+    points:
+      - "The first 30 of 80 turbines are running; the rest follow by summer."
+      - "Power reaches land through a cable that also links two national grids."
+      - "The operator says output will be steadiest in winter, when demand peaks."
+    why: "One of the largest single steps in the region's move to clean power."
+    depth: full
+    depth_tag: explainer
+  image: wind-farm.webp
+  articles:
+    - {outlet: northern-wire, title: "Offshore wind farm starts sending power to the grid", snippet: "Thirty turbines are turning, with fifty more to come."}
+    - {outlet: daily-ledger, title: "First offshore turbines feed the grid", snippet: "A new subsea cable carries the power ashore.", minutes_earlier: 40}
+
+- section: world
+  hours_ago: 8.5
+  event: river-cycle-route
+  category: Travel & outdoors
+  topic: 8
+  importance: 6
+  personal: 9
+  reason: "Matches your interests in cycling and travel in Europe."
+  summary:
+    lede: "A signposted cycle route now follows the river through three countries, 600 kilometres end to end."
+    points:
+      - "The route keeps to flat riverside paths away from main roads."
+      - "Trains with bike spaces stop near both ends and at six points along the way."
+    why: "A ready-made week-long trip by bike and train."
+    depth: full
+    depth_tag: route guide
+  image: river-path.webp
+  articles:
+    - {outlet: meridian-post, title: "Riverside cycle route links three countries", snippet: "Signs went up along the final stretch this month."}
+
+- section: world
+  hours_ago: 15
+  event: museum-pass
+  category: Culture
+  topic: 5
+  importance: 5
+  personal: 5
+  reason: "Culture news with a light link to your travel interests."
+  summary:
+    lede: "Twelve museums in the capital launch a single pass for visitors."
+    points:
+      - "The pass is valid for three days and includes public transport."
+      - "Children under twelve go free with an adult."
+    depth: enough
+  articles:
+    - {outlet: daily-ledger, title: "Museums launch a single pass for visitors", snippet: "The three-day pass also covers buses and trams."}
+
+- section: world
+  hours_ago: 5.5
+  event: rail-booking
+  category: Travel & outdoors
+  topic: 9
+  importance: 7
+  personal: 9
+  reason: "Matches your interest in rail travel in Europe; one site for cross-border tickets."
+  summary:
+    lede: "Rail operators agree to sell cross-border trips on one booking site from next year."
+    points:
+      - "Journeys that use two or three operators can be bought in one go."
+      - "A missed connection on a through ticket is covered by the next train."
+      - "Prices stay the same as buying each leg separately."
+    why: "Booking a train across borders gets as easy as booking a flight."
+    depth: full
+    depth_tag: analysis
+  articles:
+    - {outlet: meridian-post, title: "Rail operators agree on one booking site for cross-border trips", snippet: "The site should open in the spring."}
+    - {outlet: northern-wire, title: "One site to book trains across borders", snippet: "Through tickets protect passengers who miss a connection.", minutes_earlier: 30}
+    - {outlet: daily-ledger, title: "Cross-border train tickets move to a single site", snippet: "Operators in eight countries signed up.", minutes_earlier: 65}
+
+- section: world
+  hours_ago: 26
+  event: seed-bank
+  category: Science
+  topic: 6
+  importance: 5
+  personal: 5
+  reason: "A science story with a loose link to your interests."
+  summary:
+    lede: "A national seed bank opens its doors to school groups for the first time."
+    points:
+      - "Visits show how seeds are dried, frozen and tested every few years."
+      - "Places can be booked for classes from age ten."
+    depth: enough
+  articles:
+    - {outlet: northern-wire, title: "Seed bank opens its doors to school groups", snippet: "Guided visits start in the new year."}
+
+# ---------------------------------------------------------------- Tech
+- section: tech
+  hours_ago: 1.5
+  event: open-model-coding
+  category: AI
+  topic: 9
+  importance: 8
+  personal: 9
+  reason: "Matches your interest in open-source AI tools; a freely available model now rivals paid ones."
+  summary:
+    lede: "A freely available model now matches last year's best paid models on standard coding tests."
+    points:
+      - "Its weights and training code are published under a permissive licence."
+      - "It runs on a single high-end graphics card with a smaller compressed version."
+      - "The authors warn that the tests do not cover long, messy real-world projects."
+    why: "You can try it on your own machine without an account."
+    depth: full
+    depth_tag: benchmarks
+  image: code.webp
+  articles:
+    - {outlet: kernel-weekly, title: "Open model now matches last year's frontier on coding tasks", snippet: "A research group published weights and results on Monday."}
+    - {outlet: open-circuit, title: "Free coding model closes the gap with paid rivals", snippet: "It fits on one graphics card in a compressed form.", minutes_earlier: 40}
+
+- section: tech
+  hours_ago: 6
+  event: browser-tab-sync
+  category: Software & releases
+  topic: 7
+  importance: 5
+  personal: 7
+  reason: "A useful release for people who work across several devices."
+  summary:
+    lede: "A browser update lets tab groups sync across a phone, a laptop and a tablet."
+    points:
+      - "Groups keep their names and colours on every device."
+      - "Sync is end-to-end encrypted and can be turned off in settings."
+    why: "Saves re-opening your research tabs on each device."
+    depth: enough
+  articles:
+    - {outlet: pixel-ledger, title: "Browser update makes tab groups sync across devices", snippet: "The feature rolls out over the coming week."}
+
+- section: tech
+  hours_ago: 9
+  event: laptop-spare-parts
+  category: Hardware & gadgets
+  topic: 6
+  importance: 5
+  personal: 6
+  reason: "Repairability matters to people who keep their devices for years."
+  summary:
+    lede: "A small laptop maker promises five years of spare parts for every model it sells."
+    points:
+      - "Batteries, screens and keyboards stay on sale as single parts."
+      - "Repair guides and part numbers are published for each model."
+    why: "Makes a longer-lasting laptop easier to justify."
+    depth: enough
+  image: repair-kit.webp
+  articles:
+    - {outlet: open-circuit, title: "Small laptop maker promises five years of spare parts", snippet: "Parts will be sold directly to owners and repair shops."}
+    - {outlet: pixel-ledger, title: "Repairable laptops get a pledge on parts supply", snippet: "Guides for each model go online next month.", minutes_earlier: 35}
+
+- section: tech
+  hours_ago: 12
+  event: passkey-import
+  category: Security
+  topic: 6
+  importance: 6
+  personal: 7
+  reason: "A security improvement you may want to use."
+  summary:
+    lede: "A popular password manager can now import passkeys from other apps."
+    points:
+      - "Passkeys move over in one step, without being exposed in plain text."
+      - "Export from other managers is supported where they offer it."
+    why: "Makes switching managers less of a chore."
+    depth: enough
+  articles:
+    - {outlet: kernel-weekly, title: "Password manager adds passkey import from other apps", snippet: "The move follows a new common format agreed this year."}
+
+- section: tech
+  hours_ago: 16
+  event: offline-cycle-routing
+  category: Software & releases
+  topic: 8
+  importance: 6
+  personal: 9
+  reason: "Matches your interests in open-source software and cycling."
+  summary:
+    lede: "Volunteer mapmakers add offline routing for cyclists to a free maps app."
+    points:
+      - "Routes avoid busy roads and prefer protected cycle lanes."
+      - "Maps download by region and work without a data connection."
+    why: "Open-source navigation built with cyclists in mind."
+    depth: enough
+  image: bike-gps.webp
+  articles:
+    - {outlet: kernel-weekly, title: "Volunteer mapmakers add offline routing for cyclists", snippet: "The update arrived in the free maps app last week."}
+    - {outlet: open-circuit, title: "Free maps app can now plan bike routes without a signal", snippet: "Developers credit hundreds of volunteer contributors.", minutes_earlier: 60}
+
+- section: tech
+  hours_ago: 22
+  event: speaker-firmware
+  category: Hardware & gadgets
+  topic: 4
+  importance: 3
+  personal: 4
+  reason: "A minor update with little link to your interests."
+  summary:
+    lede: "A firmware update for a smart speaker is delayed again, now to next month."
+    points:
+      - "The maker blames testing on older models."
+      - "Owners keep the current software until then."
+    depth: enough
+  articles:
+    - {outlet: pixel-ledger, title: "Smart-speaker firmware update delays rollout again", snippet: "The company gave no new date beyond next month."}
+
+- section: tech
+  hours_ago: 3
+  event: photo-editor-source
+  category: Software & releases
+  topic: 8
+  importance: 6
+  personal: 8
+  reason: "Matches your interest in open-source software; a well-known app opens its code."
+  summary:
+    lede: "A popular photo editor publishes its source code after ten years as a paid app."
+    points:
+      - "The code is out under a licence that allows changes and redistribution."
+      - "The paid version stays, with cloud sync as the main difference."
+      - "Volunteers can now add support for new camera formats themselves."
+    why: "A capable editor you can now use and change for free."
+    depth: enough
+  articles:
+    - {outlet: kernel-weekly, title: "Popular photo editor releases its code to the public", snippet: "The developers say the community asked for years."}
+    - {outlet: open-circuit, title: "Photo editor's source code is now free to read", snippet: "Cloud sync stays in the paid version.", minutes_earlier: 45}
+
+- section: tech
+  hours_ago: 7.5
+  event: router-updates
+  category: Security
+  topic: 6
+  importance: 7
+  personal: 6
+  reason: "A security change that affects most homes."
+  summary:
+    lede: "Home routers from three large makers will install security updates automatically by default."
+    points:
+      - "Updates install at night and the router restarts in under two minutes."
+      - "Owners can still switch automatic updates off in the settings."
+    why: "One less thing to remember to keep your home network safe."
+    depth: enough
+  image: router.webp
+  articles:
+    - {outlet: pixel-ledger, title: "Home routers get security updates by default", snippet: "The change reaches existing routers over the next month."}
+
+- section: tech
+  hours_ago: 11
+  event: code-review-survey
+  category: AI
+  topic: 7
+  importance: 6
+  personal: 7
+  reason: "Matches your interest in AI tools; a survey on how teams check AI-written code."
+  summary:
+    lede: "A developer survey finds most teams now review AI-written code the same way as code written by people."
+    points:
+      - "Seven in ten teams use AI tools to write some of their code."
+      - "Most say reviews take about as long as before."
+      - "Fewer than one in five have written rules for AI tools."
+    why: "Useful numbers if you are setting up AI tools in your own work."
+    depth: full
+    depth_tag: survey
+  articles:
+    - {outlet: open-circuit, title: "Developer survey finds most teams now review AI-written code", snippet: "More than 20,000 developers answered this year."}
+
+- section: tech
+  hours_ago: 14.5
+  event: e-ink-search
+  category: Hardware & gadgets
+  topic: 6
+  importance: 4
+  personal: 6
+  reason: "A gadget update for people who take notes by hand."
+  summary:
+    lede: "An e-ink writing tablet can now search handwritten notes without a connection."
+    points:
+      - "Handwriting is recognised on the device, so notes never leave it."
+      - "The update is free for every model sold in the last three years."
+    why: "Private note search that works anywhere."
+    depth: enough
+  image: tablet.webp
+  articles:
+    - {outlet: pixel-ledger, title: "E-ink tablet adds handwriting search that works offline", snippet: "Recognition runs on the tablet itself."}
+    - {outlet: kernel-weekly, title: "Handwriting search arrives on a paper-like tablet", snippet: "Owners of older models get the update too.", minutes_earlier: 50}
+
+- section: tech
+  hours_ago: 19
+  event: language-release
+  category: Software & releases
+  topic: 7
+  importance: 5
+  personal: 7
+  reason: "A major release of a programming language used in open-source projects."
+  summary:
+    lede: "A programming language ships its long-awaited 4.0 release with faster builds."
+    points:
+      - "Large projects build up to twice as fast."
+      - "Older code keeps working, with warnings where a change is needed."
+    why: "Worth a look if you maintain projects written in it."
+    depth: full
+    depth_tag: release notes
+  articles:
+    - {outlet: kernel-weekly, title: "Programming language ships its long-awaited 4.0 release", snippet: "The release took three years of work."}
